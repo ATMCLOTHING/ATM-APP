@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO } from '../lib/assets'
-
-const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
-const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
+import { WZNEW, WZSAVE, WZDELETE, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO, WZPRINT } from '../lib/assets'
+import ModalNuevaMarca       from './ModalNuevaMarca'
+import ModalNuevoProveedor   from './ModalNuevoProveedor'
+import ModalListadoArticulos from './ModalListadoArticulos'
 
 const VACIO = {
   codartic:'', tipo:'', tipotalla:'U', descartic:'', genero:'', marca:'',
@@ -11,132 +11,140 @@ const VACIO = {
   preciocomp:0, estado:'A', usuario:''
 }
 
-const TIPOS = ['JEAN','SHORT','BLUSA','CAMISA','PANTALON','VESTIDO','FALDA','BERMUDA','LEGGIN','OTRO']
+const TIPOS   = ['JEAN','SHORT','BLUSA','CAMISA','PANTALON','VESTIDO','FALDA','BERMUDA','LEGGIN','OTRO']
 const GENEROS = ['DAMA','CABALLERO','NIÑO','NIÑA','UNISEX']
 
 export default function Articulos({ supabase, onClose }) {
-  const [form,      setForm]      = useState({...VACIO})
-  const [allIds,    setAllIds]    = useState([])
-  const [navPos,    setNavPos]    = useState(null)
-  const [busy,      setBusy]      = useState(false)
-  const [msg,       setMsg]       = useState(null)
-  const [modoNueva, setModoNueva] = useState(true)
-  const [guardado,  setGuardado]  = useState(false)
-  const [provSugg,  setProvSugg]  = useState([])
-  const [listaProvs,setListaProvs]= useState([])
+  const [form,       setForm]       = useState({...VACIO})
+  const [allIds,     setAllIds]     = useState([])
+  const [busy,       setBusy]       = useState(false)
+  const [msg,        setMsg]        = useState(null)
+  const [modoNueva,  setModoNueva]  = useState(true)
+  const [guardado,   setGuardado]   = useState(false)
+  const [marcas,     setMarcas]     = useState([])
+  const [provSugg,   setProvSugg]   = useState([])
+  const [modal,      setModal]      = useState(null)
 
   const navPosRef = useRef(null)
   const allIdsRef = useRef([])
   const codRef    = useRef()
 
-  useEffect(() => { init() }, [])
-  useEffect(() => {
-    supabase.from('proveedores').select('id,cedrif,nomproveed').order('nomproveed')
-      .then(({data}) => { if(data) setListaProvs(data) })
-  }, [])
+  useEffect(()=>{ init() },[])
 
   async function init() {
     setBusy(true)
+    // cargar marcas
+    const {data:mdata} = await supabase.from('marcas').select('id,descmarca').order('descmarca')
+    setMarcas(mdata||[])
+    // cargar artículos
     const {data} = await supabase.from('articulo').select('codartic').order('codartic',{ascending:true})
-    const ids = (data||[]).map(r=>r.codartic)
+    const ids=(data||[]).map(r=>r.codartic)
     setAllIds(ids); allIdsRef.current=ids
-    if (ids.length>0) {
-      await cargarDoc(ids[ids.length-1], ids)
-    } else {
-      setModoNueva(true)
-    }
+    if (ids.length>0) await cargarDoc(ids[ids.length-1],ids)
     setBusy(false)
   }
 
-  function upd(campo, val) { setForm(prev=>({...prev,[campo]:val})) }
+  function upd(k,v){setForm(prev=>({...prev,[k]:v}))}
 
-  async function cargarDoc(id, idsParam) {
+  async function cargarDoc(id,idsParam) {
     setBusy(true); setMsg(null)
-    const {data} = await supabase.from('articulo').select('*').eq('codartic',id).limit(1)
-    if (!data||!data.length){setBusy(false);return}
-    const r = data[0]
-    setForm({...VACIO,...r})
-    const ids = idsParam||allIdsRef.current
-    const pos = ids.indexOf(id)
-    setNavPos(pos); navPosRef.current=pos
+    const {data}=await supabase.from('articulo').select('*').eq('codartic',id).limit(1)
+    if(!data||!data.length){setBusy(false);return}
+    setForm({...VACIO,...data[0]})
+    const ids=idsParam||allIdsRef.current
+    const pos=ids.indexOf(id)
+    navPosRef.current=pos
     setModoNueva(false); setGuardado(true)
     setBusy(false)
   }
 
-  async function recargarIds() {
-    const {data} = await supabase.from('articulo').select('codartic').order('codartic',{ascending:true})
+  async function recargarIds(){
+    const {data}=await supabase.from('articulo').select('codartic').order('codartic',{ascending:true})
     const ids=(data||[]).map(r=>r.codartic); setAllIds(ids); allIdsRef.current=ids; return ids
   }
 
-  function navPrimero()   { const ids=allIdsRef.current; if(!ids.length)return; navPosRef.current=0; setNavPos(0); cargarDoc(ids[0]) }
-  function navAnterior()  { const ids=allIdsRef.current; const p=navPosRef.current; if(p>0){navPosRef.current=p-1;setNavPos(p-1);cargarDoc(ids[p-1])} }
-  function navSiguiente() { const ids=allIdsRef.current; const p=navPosRef.current; if(p<ids.length-1){navPosRef.current=p+1;setNavPos(p+1);cargarDoc(ids[p+1])} }
-  function navUltimo()    { const ids=allIdsRef.current; if(!ids.length)return; const l=ids.length-1; navPosRef.current=l; setNavPos(l); cargarDoc(ids[l]) }
+  function navPrimero()   {const ids=allIdsRef.current;if(!ids.length)return;navPosRef.current=0;cargarDoc(ids[0])}
+  function navAnterior()  {const ids=allIdsRef.current;const p=navPosRef.current;if(p>0){navPosRef.current=p-1;cargarDoc(ids[p-1])}}
+  function navSiguiente() {const ids=allIdsRef.current;const p=navPosRef.current;if(p<ids.length-1){navPosRef.current=p+1;cargarDoc(ids[p+1])}}
+  function navUltimo()    {const ids=allIdsRef.current;if(!ids.length)return;const l=ids.length-1;navPosRef.current=l;cargarDoc(ids[l])}
 
-  async function nuevoPart() {
-    if (modoNueva && form.descartic) {
-      if (!window.confirm('¿Descartar cambios sin guardar?')) return
-    }
+  async function nuevoArt(){
+    if(modoNueva&&form.descartic){if(!window.confirm('¿Descartar cambios sin guardar?'))return}
     setForm({...VACIO}); setModoNueva(true); setGuardado(false)
-    setMsg(null); setNavPos(null); navPosRef.current=null
+    setMsg(null); navPosRef.current=null
     setTimeout(()=>codRef.current?.focus(),100)
   }
 
-  function duplicar() {
-    const nuevo = {...form, codartic:'', existencia:0, cantactual:0, cantfisico:0}
+  function duplicar(){
+    const nuevo={...form,codartic:'',existencia:0,cantactual:0,cantfisico:0}
     setForm(nuevo); setModoNueva(true); setGuardado(false)
-    setMsg(null); setNavPos(null); navPosRef.current=null
+    setMsg(null); navPosRef.current=null
     setTimeout(()=>codRef.current?.focus(),100)
   }
 
-  async function guardar() {
-    if (!form.codartic.trim()){setMsg({tipo:'err',texto:'El código es obligatorio.'}); return}
-    if (!form.descartic.trim()){setMsg({tipo:'err',texto:'La descripción es obligatoria.'}); return}
+  async function guardar(){
+    if(!form.codartic.trim()){setMsg({tipo:'err',texto:'El código es obligatorio.'}); return}
+    if(!form.descartic.trim()){setMsg({tipo:'err',texto:'La descripción es obligatoria.'}); return}
     setBusy(true)
     try {
-      const {error} = await supabase.from('articulo').upsert({...form},{onConflict:'codartic'})
-      if (error) throw error
-      // sincronizar preciocomp, preciovent, preciovend, preciovenv en articomp
+      const {error}=await supabase.from('articulo').upsert({...form},{onConflict:'codartic'})
+      if(error)throw error
+      // sincronizar precios y datos en articomp
       await supabase.from('articomp').update({
-        preciocomp: form.preciocomp,
-        preciovent: form.preciovent,
-        preciovend: form.preciovend,
-        preciovenv: form.preciovenv,
-        descartic:  form.descartic,
-        marca:      form.marca,
-        genero:     form.genero,
-        tipo:       form.tipo,
-      }).eq('codartic', form.codartic)
+        preciocomp:form.preciocomp, preciovent:form.preciovent,
+        preciovend:form.preciovend, preciovenv:form.preciovenv,
+        descartic:form.descartic, marca:form.marca,
+        genero:form.genero, tipo:form.tipo,
+      }).eq('codartic',form.codartic)
       setGuardado(true); setModoNueva(false)
       setMsg({tipo:'ok',texto:`✅ Artículo ${form.codartic} guardado.`})
-      const ids = await recargarIds()
-      const pos = ids.indexOf(form.codartic)
-      setNavPos(pos); navPosRef.current=pos
-    } catch(e) { setMsg({tipo:'err',texto:`❌ ${e.message}`}) }
+      const ids=await recargarIds()
+      const pos=ids.indexOf(form.codartic)
+      navPosRef.current=pos
+    } catch(e){setMsg({tipo:'err',texto:`❌ ${e.message}`})}
     setBusy(false)
   }
 
-  async function eliminar() {
-    if (!window.confirm(`¿Eliminar el artículo ${form.codartic}?`)) return
+  async function eliminar(){
+    if(!window.confirm(`¿Eliminar el artículo ${form.codartic}?`))return
     setBusy(true)
     await supabase.from('articomp').delete().eq('codartic',form.codartic)
     await supabase.from('articulo').delete().eq('codartic',form.codartic)
     setMsg({tipo:'ok',texto:'Artículo eliminado.'})
-    const ids = await recargarIds()
-    if (ids.length>0) cargarDoc(ids[ids.length-1], ids)
-    else { setForm({...VACIO}); setModoNueva(true) }
+    const ids=await recargarIds()
+    if(ids.length>0) cargarDoc(ids[ids.length-1],ids)
+    else {setForm({...VACIO}); setModoNueva(true)}
     setBusy(false)
   }
 
-  async function buscarProv(txt) {
+  async function buscarProv(txt){
     upd('nomproveed',txt)
-    if (txt.length<2){setProvSugg([]);return}
-    const {data} = await supabase.from('proveedores').select('id,cedrif,nomproveed').ilike('nomproveed',`%${txt}%`).limit(8)
+    if(txt.length<2){setProvSugg([]);return}
+    const {data}=await supabase.from('proveedores').select('id,cedrif,nomproveed').ilike('nomproveed',`%${txt}%`).limit(8)
     setProvSugg(data||[])
   }
 
-  return (
+  function onMarcaGuardada(marca){
+    setMarcas(prev=>[...prev,marca].sort((a,b)=>a.descmarca.localeCompare(b.descmarca)))
+    upd('marca',marca.descmarca)
+    setModal(null)
+  }
+
+  function onProvGuardado(prov){
+    upd('nomproveed',prov.nomproveed)
+    upd('codproveed',prov.cedrif||'')
+    setProvSugg([])
+    setModal(null)
+  }
+
+  const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
+
+  return(
     <div style={P.pagina}>
+      {modal==='marca'    && <ModalNuevaMarca       supabase={supabase} onGuardar={onMarcaGuardada}  onClose={()=>setModal(null)}/>}
+      {modal==='prov'     && <ModalNuevoProveedor   supabase={supabase} onGuardar={onProvGuardado}   onClose={()=>setModal(null)}/>}
+      {modal==='listado'  && <ModalListadoArticulos supabase={supabase}                              onClose={()=>setModal(null)}/>}
+
       <div style={P.ventana}>
         {/* TÍTULO */}
         <div style={P.titulo}>
@@ -146,13 +154,15 @@ export default function Articulos({ supabase, onClose }) {
           </div>
           <span style={P.titTxt}>ARTÍCULOS / REFERENCIAS</span>
           <div style={P.titCod}>
-            {form.codartic ? <strong style={{fontSize:18}}>{form.codartic}</strong> : <span style={{fontSize:12,opacity:0.7}}>NUEVO</span>}
-            {modoNueva && !guardado && <span style={P.badgeN}>NUEVO</span>}
+            {form.codartic
+              ? <strong style={{fontSize:18}}>{form.codartic}</strong>
+              : <span style={{fontSize:12,opacity:0.7}}>NUEVO</span>}
+            {modoNueva&&!guardado&&<span style={P.badgeN}>NUEVO</span>}
           </div>
         </div>
 
         {/* MENSAJE */}
-        {msg && (
+        {msg&&(
           <div style={{...P.alerta,
             background:msg.tipo==='ok'?'#e8f5e9':'#ffebee',
             color:msg.tipo==='ok'?'#2e7d32':'#c62828',
@@ -161,7 +171,7 @@ export default function Articulos({ supabase, onClose }) {
           </div>
         )}
 
-        {/* ENCABEZADO */}
+        {/* FORMULARIO */}
         <div style={P.bloque}>
           {/* FILA 1 */}
           <div style={P.fila}>
@@ -170,10 +180,10 @@ export default function Articulos({ supabase, onClose }) {
                 value={form.codartic} onChange={e=>upd('codartic',e.target.value.toUpperCase())}
                 disabled={guardado&&!modoNueva} placeholder="Código"/>
             </Campo>
-            <Campo label="DESCRIPCIÓN" w={320}>
-              <input style={P.inp} value={form.descartic} onChange={e=>upd('descartic',e.target.value.toUpperCase())} placeholder="Descripción del artículo"/>
+            <Campo label="DESCRIPCIÓN" w={300}>
+              <input style={P.inp} value={form.descartic} onChange={e=>upd('descartic',e.target.value.toUpperCase())} placeholder="Descripción"/>
             </Campo>
-            <Campo label="TIPO" w={150}>
+            <Campo label="TIPO" w={140}>
               <select style={P.inp} value={form.tipo} onChange={e=>upd('tipo',e.target.value)}>
                 <option value="">--</option>
                 {TIPOS.map(t=><option key={t}>{t}</option>)}
@@ -185,8 +195,15 @@ export default function Articulos({ supabase, onClose }) {
                 {GENEROS.map(g=><option key={g}>{g}</option>)}
               </select>
             </Campo>
-            <Campo label="MARCA" w={130}>
-              <input style={P.inp} value={form.marca} onChange={e=>upd('marca',e.target.value.toUpperCase())} placeholder="Marca"/>
+            <Campo label="MARCA" w={160}>
+              <div style={{display:'flex',gap:3}}>
+                <select style={{...P.inp,flex:1}} value={form.marca} onChange={e=>upd('marca',e.target.value)}>
+                  <option value="">--</option>
+                  {marcas.map(m=><option key={m.id} value={m.descmarca}>{m.descmarca}</option>)}
+                </select>
+                <button onClick={()=>setModal('marca')} title="Nueva marca"
+                  style={{...P.inp,width:28,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,background:'#e8f5e9',fontWeight:900,fontSize:14}}>+</button>
+              </div>
             </Campo>
             <Campo label="ESTADO" w={90}>
               <select style={P.inp} value={form.estado} onChange={e=>upd('estado',e.target.value)}>
@@ -199,27 +216,32 @@ export default function Articulos({ supabase, onClose }) {
           {/* FILA 2 — proveedor */}
           <div style={P.fila}>
             <Campo label="COD. PROVEEDOR" w={130}>
-              <input style={P.inp} value={form.codproveed} onChange={e=>upd('codproveed',e.target.value)} placeholder="Cédula/NIT"/>
+              <input style={P.inp} value={form.codproveed} onChange={e=>upd('codproveed',e.target.value)} placeholder="NIT"/>
             </Campo>
-            <Campo label="PROVEEDOR" w={300} rel>
-              <input style={P.inp} value={form.nomproveed}
-                onChange={e=>buscarProv(e.target.value)}
-                placeholder="Buscar proveedor…"/>
-              {provSugg.length>0 && (
-                <ul style={P.drop}>
-                  {provSugg.map(p=>(
-                    <li key={p.id} style={P.dropItem} onClick={()=>{
-                      upd('nomproveed',p.nomproveed); upd('codproveed',p.cedrif); setProvSugg([])
-                    }}>
-                      <strong>{p.cedrif}</strong> — {p.nomproveed}
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <Campo label="PROVEEDOR" w={320} rel>
+              <div style={{display:'flex',gap:3}}>
+                <div style={{flex:1,position:'relative'}}>
+                  <input style={{...P.inp,width:'100%'}} value={form.nomproveed}
+                    onChange={e=>buscarProv(e.target.value)} placeholder="Buscar proveedor…"/>
+                  {provSugg.length>0&&(
+                    <ul style={P.drop}>
+                      {provSugg.map(p=>(
+                        <li key={p.id} style={P.dropItem} onClick={()=>{
+                          upd('nomproveed',p.nomproveed); upd('codproveed',p.cedrif||''); setProvSugg([])
+                        }}>
+                          <strong>{p.cedrif}</strong> — {p.nomproveed}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <button onClick={()=>setModal('prov')} title="Nuevo proveedor"
+                  style={{...P.inp,width:28,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,background:'#e8f5e9',fontWeight:900,fontSize:14}}>+</button>
+              </div>
             </Campo>
           </div>
 
-          {/* FILA 3 — precios y existencias */}
+          {/* FILA 3 — precios */}
           <div style={P.fila}>
             <Campo label="$ COMPRA" w={120}>
               <input type="number" style={P.inp} value={form.preciocomp} min={0} onChange={e=>upd('preciocomp',Number(e.target.value))}/>
@@ -234,7 +256,8 @@ export default function Articulos({ supabase, onClose }) {
               <input type="number" style={P.inp} value={form.preciovenv} min={0} onChange={e=>upd('preciovenv',Number(e.target.value))}/>
             </Campo>
             <Campo label="EXISTENCIAS" w={110}>
-              <input type="number" style={{...P.inp,fontWeight:700,color:'#1a3a6b'}} value={form.existencia} min={0} onChange={e=>upd('existencia',Number(e.target.value))}/>
+              <input type="number" style={{...P.inp,fontWeight:700,color:form.existencia<=form.existminim&&form.existminim>0?'#c62828':'#1a3a6b'}}
+                value={form.existencia} min={0} onChange={e=>upd('existencia',Number(e.target.value))}/>
             </Campo>
             <Campo label="EXIST. MÍN." w={110}>
               <input type="number" style={P.inp} value={form.existminim} min={0} onChange={e=>upd('existminim',Number(e.target.value))}/>
@@ -249,34 +272,36 @@ export default function Articulos({ supabase, onClose }) {
         <div style={P.footer}>
           <div style={P.footCol}>
             <div style={P.btnFila}>
-              <IBtn src={WZTOP}  onClick={navPrimero}  title="Primero"/>
-              <IBtn src={WZBACK} onClick={navAnterior} title="Anterior"/>
-              <IBtn src={WZNEXT} onClick={navSiguiente}title="Siguiente"/>
-              <IBtn src={WZEND}  onClick={navUltimo}   title="Último"/>
-              <IBtn src={WZLOCATE} onClick={()=>setMsg({tipo:'warn',texto:'Búsqueda próximamente.'})} title="Buscar"/>
+              <IBtn src={WZTOP}    onClick={navPrimero}           title="Primero"/>
+              <IBtn src={WZBACK}   onClick={navAnterior}          title="Anterior"/>
+              <IBtn src={WZNEXT}   onClick={navSiguiente}         title="Siguiente"/>
+              <IBtn src={WZEND}    onClick={navUltimo}            title="Último"/>
+              <IBtn src={WZLOCATE} onClick={()=>setModal('listado')} title="Listado de artículos"/>
             </div>
             <div style={P.btnFila}>
-              <IBtn src={WZNEW}    onClick={nuevoPart} title="Nuevo artículo"/>
-              <IBtn src={WZSAVE}   onClick={guardar}   title="Guardar" disabled={busy}/>
-              <IBtn src={WZUNDO}   onClick={duplicar}  title="Duplicar datos"/>
-              <IBtn src={WZDELETE} onClick={eliminar}  title="Eliminar" disabled={modoNueva&&!guardado}/>
-              <IBtn src={WZCLOSE}  onClick={onClose}   title="Volver al menú"/>
+              <IBtn src={WZNEW}    onClick={nuevoArt} title="Nuevo artículo"/>
+              <IBtn src={WZSAVE}   onClick={guardar}  title="Guardar" disabled={busy}/>
+              <IBtn src={WZUNDO}   onClick={duplicar} title="Duplicar datos"/>
+              <IBtn src={WZPRINT}  onClick={()=>setModal('listado')} title="Imprimir listado"/>
+              <IBtn src={WZDELETE} onClick={eliminar} title="Eliminar" disabled={modoNueva&&!guardado}/>
+              <IBtn src={WZCLOSE}  onClick={onClose}  title="Volver al menú"/>
             </div>
           </div>
 
-          {/* INFO */}
-          <div style={{...P.footCol,flex:1,justifyContent:'center',padding:'0 20px'}}>
-            {form.codartic && (
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+          {/* RESUMEN PRECIOS */}
+          {form.codartic&&(
+            <div style={{...P.footCol,flex:1,justifyContent:'center',padding:'0 16px'}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:6}}>
                 <InfoVal label="$ Compra"   val={`$${fmt(form.preciocomp)}`}/>
-                <InfoVal label="$ Mayor"    val={`$${fmt(form.preciovent)}`} color="#1a3a6b"/>
-                <InfoVal label="$ Detal"    val={`$${fmt(form.preciovend)}`} color="#2e7d32"/>
-                <InfoVal label="$ Vendedor" val={`$${fmt(form.preciovenv)}`} color="#e65100"/>
-                <InfoVal label="Existencia" val={form.existencia} color={form.existencia<=form.existminim?'#c62828':'#1a3a6b'} grande/>
-                <InfoVal label="Exist. Mín" val={form.existminim}/>
+                <InfoVal label="$ Mayor"    val={`$${fmt(form.preciovent)}`}  color="#1a3a6b"/>
+                <InfoVal label="$ Detal"    val={`$${fmt(form.preciovend)}`}  color="#2e7d32"/>
+                <InfoVal label="$ Vendedor" val={`$${fmt(form.preciovenv)}`}  color="#e65100"/>
+                <InfoVal label="Existencia" val={form.existencia}
+                  color={form.existencia<=form.existminim&&form.existminim>0?'#c62828':'#1a3a6b'} grande/>
+                <InfoVal label="Mínimo"     val={form.existminim}/>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -293,9 +318,9 @@ function Campo({label,w,children,rel}){
 }
 function InfoVal({label,val,color,grande}){
   return(
-    <div style={{background:'#fff',border:'1px solid #c8d5ea',borderRadius:5,padding:'5px 10px',textAlign:'center'}}>
-      <div style={{fontSize:10,color:'#888',fontWeight:600,textTransform:'uppercase'}}>{label}</div>
-      <div style={{fontSize:grande?18:13,fontWeight:700,color:color||'#333'}}>{val}</div>
+    <div style={{background:'#fff',border:'1px solid #c8d5ea',borderRadius:5,padding:'4px 8px',textAlign:'center'}}>
+      <div style={{fontSize:9,color:'#888',fontWeight:600,textTransform:'uppercase'}}>{label}</div>
+      <div style={{fontSize:grande?16:12,fontWeight:700,color:color||'#333'}}>{val}</div>
     </div>
   )
 }
