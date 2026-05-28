@@ -29,6 +29,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   const [cliente,   setCliente]   = useState(null)
   const [cedVend,   setCedVend]   = useState('')
   const [vendedor,  setVendedor]  = useState(null)
+  const [listaVend, setListaVend] = useState([])
   const [lineas,    setLineas]    = useState(FILAS())
   const [artSugg,   setArtSugg]   = useState([])
   const [artIdx,    setArtIdx]    = useState(null)
@@ -50,6 +51,9 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   // ════════ INIT: cargar la última nota ════════
   async function init() {
     setBusy(true)
+    // cargar lista de vendedores
+    const {data:vdata} = await supabase.from('vendedores').select('id,cedula,nombre').eq('activo',true).order('nombre')
+    setListaVend(vdata||[])
     const {data} = await supabase.from('encnotaen')
       .select('numnotaent')
       .order('numnotaent', {ascending:false})
@@ -143,10 +147,10 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   }
 
   // ════════ VENDEDOR ════════
-  async function cargarVendedor(ced) {
-    if (!ced) return
-    const {data} = await supabase.from('vendedores').select('*').eq('cedula', ced).limit(1)
-    setVendedor(data && data.length > 0 ? data[0] : null)
+  function elegirVendedor(v) {
+    if (!v) { setCedVend(''); setVendedor(null); return }
+    setCedVend(v.cedula)
+    setVendedor(v)
   }
 
   // ════════ ARTÍCULOS ════════
@@ -447,13 +451,15 @@ export default function NotaDeEntrega({ supabase, onClose }) {
                 <input type="radio" name="tipo" checked={tipoVta===t} onChange={()=>setTipoVta(t)} disabled={anulada}/>{' '}{t}
               </label>
             ))}
-            <Fld label="Cédula Vendedor" w={140}>
-              <input style={P.inp} value={cedVend} onChange={e=>setCedVend(e.target.value)} onBlur={()=>cargarVendedor(cedVend)} disabled={anulada}/>
+            <Fld label="Vendedor" w={240}>
+              <select style={{...P.inp,cursor:'pointer'}} value={cedVend} onChange={e=>elegirVendedor(listaVend.find(v=>v.cedula===e.target.value)||null)} disabled={anulada}>
+                <option value="">-- Selecciona vendedor --</option>
+                {listaVend.map(v=>(
+                  <option key={v.id} value={v.cedula}>{v.cedula} - {v.nombre}</option>
+                ))}
+              </select>
             </Fld>
-            <Fld label="Nombre Vendedor" w={200}>
-              <input style={{...P.inp,...P.ro}} value={vendedor?.nombre||''} readOnly/>
-            </Fld>
-            <Fld label="Celular" w={140}>
+            <Fld label="Celular Vendedor" w={140}>
               <input style={{...P.inp,...P.ro}} value={vendedor?.celular||''} readOnly/>
             </Fld>
           </div>
