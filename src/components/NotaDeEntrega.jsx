@@ -100,6 +100,17 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     await prepararNueva()
   }
 
+  // ── revertir nueva nota: vuelve a la última guardada ──
+  async function revertirNueva() {
+    if (!modoNueva) return
+    const ids = allIds
+    if (ids.length > 0) {
+      await cargarDoc(ids[ids.length-1])
+    } else {
+      setMsg({tipo:'warn',texto:'No hay notas guardadas a las cuales volver.'})
+    }
+  }
+
   // ── cliente ──
   async function onCedulaEnter() {
     const ced = cedula.trim()
@@ -144,7 +155,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setLineas(prev=>{const n=[...prev];n[idx]={...n[idx],codartic:txt};return n})
     if (txt.length<1){setArtSugg([]);setArtIdx(null);return}
     const {data} = await supabase.from('articomp')
-      .select('codartic,descartic,talla,preciovent,preciovend,preciovenv,porciva')
+      .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
       .ilike('codartic',`%${txt}%`).limit(10)
     if (!data||!data.length){setArtSugg([]);setArtIdx(null);return}
     // si hay una sola coincidencia exacta, cargar directo sin mostrar lista
@@ -160,7 +171,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setLineas(prev=>{const n=[...prev];n[idx]={...n[idx],descartic:txt};return n})
     if (txt.length<2){setArtSugg([]);setArtIdx(null);return}
     const {data} = await supabase.from('articomp')
-      .select('codartic,descartic,talla,preciovent,preciovend,preciovenv,porciva')
+      .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
       .ilike('descartic',`%${txt}%`).limit(10)
     setArtSugg(data||[]); setArtIdx(idx)
   }
@@ -329,13 +340,12 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
 
-  // ── abrir modal de abonos: guarda primero si no está guardada ──
+  // ── abrir modal de abonos: guarda automáticamente si no está guardada ──
   async function abrirAbonos() {
+    if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de registrar abonos.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de registrar abonos.'}); return }
     if (!guardada) {
       await guardar()
-      // si guardar falló, no abrir modal
-      if (!guardada) return
     }
     setModal('abonos')
   }
@@ -458,7 +468,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             <table style={P.tabla}>
               <thead>
                 <tr style={P.thead}>
-                  {['#','Cód. Artículo','Descripción','Talla','Cantidad','$ Unidad','%IVA','$IVA','%Dcto','$Dcto','$ Total',''].map(h=>(
+                  {['#','Cód. Artículo','Descripción','Marca','Género','Talla','Cantidad','$ Unidad','%Dcto','$Dcto','$ Total',''].map(h=>(
                     <th key={h} style={P.th}>{h}</th>
                   ))}
                 </tr>
@@ -471,6 +481,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
                       <div style={{position:'relative'}}>
                         <input style={{...P.ci,width:88}} value={l.codartic}
                           onChange={e=>buscarArt(e.target.value,i)}
+                          onKeyDown={e=>{if(e.key==='Enter'){setArtSugg([]);setArtIdx(null);e.target.closest('tr')?.querySelectorAll('input')[3]?.focus()}}}
                           placeholder="Código" disabled={anulada}/>
                         {artIdx===i&&artSugg.length>0&&(
                           <ul style={{...P.drop,width:460,zIndex:99}}>
@@ -489,11 +500,11 @@ export default function NotaDeEntrega({ supabase, onClose }) {
                         onChange={e=>buscarDesc(e.target.value,i)}
                         placeholder="Descripción" disabled={anulada}/>
                     </td>
+                    <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.marca||''}</td>
+                    <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.genero||''}</td>
                     <td style={P.td}><input style={{...P.ci,width:46,textAlign:'center'}} value={l.talla} onChange={e=>upd(i,{talla:e.target.value})} disabled={anulada}/></td>
                     <td style={P.td}><input type="number" style={{...P.ci,width:60,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} min={1} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada}/></td>
                     <td style={P.td}><input type="number" style={{...P.ci,width:96,textAlign:'right'}} value={l.valunit} min={0} onChange={e=>upd(i,{valunit:Number(e.target.value)})} disabled={anulada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porciva} min={0} onChange={e=>upd(i,{porciva:Number(e.target.value)})} disabled={anulada}/></td>
-                    <td style={{...P.td,textAlign:'right',paddingRight:6,color:'#555',fontSize:12}}>{l.valiva?fmt(l.valiva):''}</td>
                     <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porcdescue} min={0} max={100} onChange={e=>upd(i,{porcdescue:Number(e.target.value)})} disabled={anulada}/></td>
                     <td style={{...P.td,textAlign:'right',paddingRight:6,color:'#c0392b',fontSize:12}}>{l.valdescue?fmt(l.valdescue):''}</td>
                     <td style={{...P.td,textAlign:'right',paddingRight:6,fontWeight:700,color:'#1a3a6b',fontSize:13}}>{l.valtotal?fmt(l.valtotal):''}</td>
@@ -562,6 +573,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             <div style={P.acciones}>
               <BtnAcc onClick={abrirAbonos} icon="💵">Abonos</BtnAcc>
               <BtnAcc onClick={()=>setModal('detalle')} icon="🔍">Detalle</BtnAcc>
+              <BtnAcc onClick={revertirNueva} icon="↩️" style={{display:modoNueva?'flex':'none'}}>Revertir</BtnAcc>
               <BtnAcc onClick={()=>setModal('resumen')} icon="📊">Resumen</BtnAcc>
               <BtnAcc onClick={()=>setModal('print')}   icon="🖨">Imprimir</BtnAcc>
             </div>
