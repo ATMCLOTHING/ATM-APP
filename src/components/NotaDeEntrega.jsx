@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { LOGO, WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO } from '../lib/assets'
 import ModalAbonos        from './ModalAbonos'
-import ModalResumen       from './ModalResumen'
+import ModalBuscarNota from './ModalBuscarNota'
 import ModalDetalle       from './ModalDetalle'
 import PrintNota          from './PrintNota'
 import ModalBuscarCliente from './ModalBuscarCliente'
