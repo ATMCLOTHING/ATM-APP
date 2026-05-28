@@ -145,8 +145,8 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   // ════════ VENDEDOR ════════
   async function cargarVendedor(ced) {
     if (!ced) return
-    const {data} = await supabase.from('vendedores').select('*').eq('cedula',ced).maybeSingle()
-    setVendedor(data||null)
+    const {data} = await supabase.from('vendedores').select('*').eq('cedula', ced).limit(1)
+    setVendedor(data && data.length > 0 ? data[0] : null)
   }
 
   // ════════ ARTÍCULOS ════════
