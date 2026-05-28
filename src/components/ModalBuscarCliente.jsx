@@ -14,10 +14,10 @@ export default function ModalBuscarCliente({ supabase, onSelect, onClose }) {
     setBuscando(true)
     const esNum = /^\d+$/.test(busqueda.trim())
     const q = supabase.from('clientes')
-      .select('id,nombre,cedula,celular,ciudad,direcicion,nomempresa,departamen')
+      .select('id,cedula,nombre,celular,ciudad,direccion,nom_empresa,departamento')
     const {data} = await (esNum
-      ? q.or(`cedula.ilike.%${busqueda}%`)
-      : q.ilike('nombre',`%${busqueda}%`)
+      ? q.ilike('cedula', `%${busqueda}%`)
+      : q.ilike('nombre', `%${busqueda}%`)
     ).limit(20)
     setResultados(data||[])
     setBuscado(true)

@@ -111,7 +111,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     // tiene valor → buscar en BD
     setBusy(true)
     const {data} = await supabase.from('clientes').select('*')
-      .or(`cedula.eq.${ced},cedula.ilike.%${ced}%`)
+      .ilike('cedula', ced)
       .maybeSingle()
     setBusy(false)
     if (data) {
@@ -124,7 +124,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   function aplicarCliente(c) {
     setCliente(c)
-    setCedula(c.cedrifclie || c.id)
+    setCedula(c.cedula || String(c.id))
     setCliTxt(c.nombre)
     setMsg(null)
   }
