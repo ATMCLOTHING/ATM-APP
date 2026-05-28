@@ -110,15 +110,21 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     }
     // tiene valor → buscar en BD
     setBusy(true)
-    const {data} = await supabase.from('clientes').select('*')
-      .ilike('cedula', ced)
-      .maybeSingle()
+    const {data, error} = await supabase.from('clientes').select('*')
+      .eq('cedula', ced)
+      .limit(1)
     setBusy(false)
-    if (data) {
-      aplicarCliente(data)
+    if (data && data.length > 0) {
+      aplicarCliente(data[0])
     } else {
-      setMsg({tipo:'warn', texto:`Cédula "${ced}" no encontrada. Puedes escribir el nombre o buscar con el botón 🔍`})
-      setCliTxt(''); setCliente(null)
+      const {data:d2} = await supabase.from('clientes').select('*')
+        .ilike('cedula', '%' + ced + '%').limit(1)
+      if (d2 && d2.length > 0) {
+        aplicarCliente(d2[0])
+      } else {
+        setMsg({tipo:'warn', texto:`Cédula "${ced}" no encontrada. Usa el botón 🔍 para buscar por nombre.`})
+        setCliTxt(''); setCliente(null)
+      }
     }
   }
 
