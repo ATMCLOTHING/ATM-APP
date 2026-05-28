@@ -5,12 +5,12 @@ import { useState } from 'react'
 
 export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClose }) {
   const [form, setForm] = useState({
-    nombreclie: cliente?.nombreclie || '',
-    direcicion: cliente?.direcicion || '',
+    nombre: cliente?.nombre || '',
+    direccion: cliente?.direccion || '',
     celular:    cliente?.celular    || '',
     ciudad:     cliente?.ciudad     || '',
-    departamen: cliente?.departamen || '',
-    nomempresa: cliente?.nomempresa || '',
+    departamento: cliente?.departamento || '',
+    nom_empresa: cliente?.nom_empresa || '',
   })
   const [guardando, setGuardando] = useState(false)
   const [msg,       setMsg]       = useState(null)
@@ -18,11 +18,11 @@ export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClo
   function upd(campo, val) { setForm(prev=>({...prev,[campo]:val})) }
 
   async function guardar() {
-    if (!form.nombreclie.trim()) { setMsg('El nombre es obligatorio.'); return }
+    if (!form.nombre.trim()) { setMsg('El nombre es obligatorio.'); return }
     setGuardando(true)
     const {error} = await supabase.from('clientes')
       .update(form)
-      .eq('codclient', cliente.codclient)
+      .eq('codclient', cliente.id)
     if (error) {
       setMsg(`Error: ${error.message}`)
     } else {
@@ -35,7 +35,7 @@ export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClo
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>✎ EDITAR CLIENTE — {cliente?.cedrifclie||cliente?.codclient}</span>
+          <span>✎ EDITAR CLIENTE — {cliente?.cedrifclie||cliente?.id}</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -43,13 +43,13 @@ export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClo
 
         <div style={S.grid}>
           <Campo label="Nombre / Razón Social" span={2}>
-            <input style={S.inp} value={form.nombreclie} onChange={e=>upd('nombreclie',e.target.value)} />
+            <input style={S.inp} value={form.nombre} onChange={e=>upd('nombre',e.target.value)} />
           </Campo>
           <Campo label="Empresa">
-            <input style={S.inp} value={form.nomempresa} onChange={e=>upd('nomempresa',e.target.value)} />
+            <input style={S.inp} value={form.nomempresa} onChange={e=>upd('nom_empresa',e.target.value)} />
           </Campo>
           <Campo label="Dirección" span={2}>
-            <input style={S.inp} value={form.direcicion} onChange={e=>upd('direcicion',e.target.value)} />
+            <input style={S.inp} value={form.direcicion} onChange={e=>upd('direccion',e.target.value)} />
           </Campo>
           <Campo label="Celular">
             <input style={S.inp} value={form.celular} onChange={e=>upd('celular',e.target.value)} />
@@ -58,7 +58,7 @@ export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClo
             <input style={S.inp} value={form.ciudad} onChange={e=>upd('ciudad',e.target.value)} />
           </Campo>
           <Campo label="Departamento">
-            <input style={S.inp} value={form.departamen} onChange={e=>upd('departamen',e.target.value)} />
+            <input style={S.inp} value={form.departamen} onChange={e=>upd('departamento',e.target.value)} />
           </Campo>
         </div>
 

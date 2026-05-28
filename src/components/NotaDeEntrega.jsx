@@ -111,7 +111,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     // tiene valor → buscar en BD
     setBusy(true)
     const {data} = await supabase.from('clientes').select('*')
-      .or(`cedrifclie.eq.${ced},codclient.eq.${ced}`)
+      .or(`cedula.eq.${ced},cedula.ilike.%${ced}%`)
       .maybeSingle()
     setBusy(false)
     if (data) {
@@ -124,14 +124,14 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   function aplicarCliente(c) {
     setCliente(c)
-    setCedula(c.cedrifclie || c.codclient)
-    setCliTxt(c.nombreclie)
+    setCedula(c.cedrifclie || c.id)
+    setCliTxt(c.nombre)
     setMsg(null)
   }
 
   function onClienteEditado(cActualizado) {
     setCliente(cActualizado)
-    setCliTxt(cActualizado.nombreclie)
+    setCliTxt(cActualizado.nombre)
     setModal(null)
     setMsg({tipo:'ok', texto:'Datos del cliente actualizados correctamente.'})
   }
@@ -226,8 +226,8 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setCedula(enc.cedrifclie||''); setCedVend(enc.cedvended||'')
     if (enc.cedvended) cargarVendedor(enc.cedvended)
 
-    const {data:cli} = await supabase.from('clientes').select('*').eq('codclient',enc.codclient).maybeSingle()
-    setCliente(cli||null); setCliTxt(cli?.nombreclie||enc.nombreclie||'')
+    const {data:cli} = await supabase.from('clientes').select('*').eq('id',enc.id).maybeSingle()
+    setCliente(cli||null); setCliTxt(cli?.nombre||enc.nombre||'')
 
     const {data:det} = await supabase.from('detnotaen').select('*').eq('numnotaent',id)
     const extras=Math.max(0,FILAS_BASE-(det?.length||0))
@@ -264,14 +264,14 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       const enc = {
         numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
         formapago:plazo, mediopago:medio,
-        codclient:cliente?.codclient||'99',
-        nombreclie:cliente?.nombreclie||cliTxt,
-        cedrifclie:cedula||cliente?.cedrifclie||'',
-        direcicion:cliente?.direcicion||'',
+        codclient:cliente?.id||'99',
+        nombreclie:cliente?.nombre||cliTxt,
+        cedrifclie:cedula||cliente?.cedula||'',
+        direcicion:cliente?.direccion||'',
         celular:cliente?.celular||'',
         ciudad:cliente?.ciudad||'',
-        departamen:cliente?.departamen||'',
-        nomempresa:cliente?.nomempresa||'',
+        departamen:cliente?.departamento||'',
+        nomempresa:cliente?.nom_empresa||'',
         porcdescue:pDesc, porciva:pIva,
         subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
         valabono:abonos, saldo, cedvended:cedVend,
@@ -400,16 +400,16 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             </Fld>
 
             <Fld label="Empresa" w={220}>
-              <input style={{...P.inp,...P.ro,fontSize:13}} value={cliente?.nomempresa||''} readOnly/>
+              <input style={{...P.inp,...P.ro,fontSize:13}} value={cliente?.nom_empresa||''} readOnly/>
             </Fld>
           </div>
 
           {/* FILA 2 — dirección, celular, ciudad, depto */}
           <div style={P.fila}>
-            <Fld label="Dirección" w={250}><input style={{...P.inp,...P.ro}} value={cliente?.direcicion||''} readOnly/></Fld>
+            <Fld label="Dirección" w={250}><input style={{...P.inp,...P.ro}} value={cliente?.direccion||''} readOnly/></Fld>
             <Fld label="Celular"   w={140}><input style={{...P.inp,...P.ro}} value={cliente?.celular||''} readOnly/></Fld>
             <Fld label="Ciudad"    w={160}><input style={{...P.inp,...P.ro}} value={cliente?.ciudad||''} readOnly/></Fld>
-            <Fld label="Depto."    w={130}><input style={{...P.inp,...P.ro}} value={cliente?.departamen||''} readOnly/></Fld>
+            <Fld label="Depto."    w={130}><input style={{...P.inp,...P.ro}} value={cliente?.departamento||''} readOnly/></Fld>
           </div>
 
           {/* FILA 3 — fechas */}

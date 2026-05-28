@@ -14,10 +14,10 @@ export default function ModalBuscarCliente({ supabase, onSelect, onClose }) {
     setBuscando(true)
     const esNum = /^\d+$/.test(busqueda.trim())
     const q = supabase.from('clientes')
-      .select('codclient,nombreclie,cedrifclie,celular,ciudad,direcicion,nomempresa,departamen')
+      .select('id,nombre,cedula,celular,ciudad,direcicion,nomempresa,departamen')
     const {data} = await (esNum
-      ? q.or(`cedrifclie.ilike.%${busqueda}%,codclient.ilike.%${busqueda}%`)
-      : q.ilike('nombreclie',`%${busqueda}%`)
+      ? q.or(`cedula.ilike.%${busqueda}%`)
+      : q.ilike('nombre',`%${busqueda}%`)
     ).limit(20)
     setResultados(data||[])
     setBuscado(true)
@@ -64,11 +64,11 @@ export default function ModalBuscarCliente({ supabase, onSelect, onClose }) {
               </thead>
               <tbody>
                 {resultados.map((c,i) => (
-                  <tr key={c.codclient}
+                  <tr key={c.id}
                     style={{background:i%2===0?'#fff':'#f5f7fc',cursor:'pointer'}}
                     onClick={()=>onSelect(c)}>
-                    <td style={S.td}><strong>{c.cedrifclie||c.codclient}</strong></td>
-                    <td style={S.td}>{c.nombreclie}</td>
+                    <td style={S.td}><strong>{c.cedula}</strong></td>
+                    <td style={S.td}>{c.nombre}</td>
                     <td style={S.td}>{c.ciudad}</td>
                     <td style={S.td}>{c.celular}</td>
                     <td style={{...S.td,textAlign:'center'}}>
