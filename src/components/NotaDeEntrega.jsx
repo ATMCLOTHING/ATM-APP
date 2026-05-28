@@ -388,7 +388,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   return (
     <div style={P.pagina}>
       {modal==='abonos'        && <ModalAbonos        supabase={supabase} nroDoc={nroDoc} totalNota={total} totalAbonos={abonos} onClose={async()=>{setModal(null);await cargarDoc(nroDoc)}}/>}
-      {modal==='resumen'       && <ModalResumen       supabase={supabase} onSelect={id=>{setModal(null);cargarDoc(id)}} onClose={()=>setModal(null)}/>}
+      {modal==='buscarNota'    && <ModalBuscarNota    supabase={supabase} onSelect={id=>{setModal(null);cargarDoc(id)}} onClose={()=>setModal(null)}/>}
       {modal==='detalle'       && <ModalDetalle       nroDoc={nroDoc} lineas={detValidas} onClose={()=>setModal(null)}/>}
       {modal==='print'         && <PrintNota          datos={dataNota} onClose={()=>setModal(null)}/>}
       {modal==='buscarCliente' && <ModalBuscarCliente supabase={supabase} onSelect={c=>{aplicarCliente(c);setModal(null)}} onClose={()=>setModal(null)}/>}
@@ -563,12 +563,12 @@ export default function NotaDeEntrega({ supabase, onClose }) {
               <IBtn src={WZBACK}   onClick={navAnterior}             title="Anterior"/>
               <IBtn src={WZNEXT}   onClick={navSiguiente}            title="Siguiente"/>
               <IBtn src={WZEND}    onClick={navUltimo}               title="Última nota"/>
-              <IBtn src={WZLOCATE} onClick={()=>setModal('resumen')} title="Buscar nota"/>
+              <IBtn src={WZLOCATE} onClick={()=>setModal('buscarNota')} title="Buscar nota"/>
             </div>
             <div style={P.btnFila}>
               <IBtn src={WZNEW}    onClick={nuevaNota}    title="Nueva nota"  disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
               <IBtn src={WZSAVE}   onClick={guardar}      title="Guardar"     disabled={busy||anulada}/>
-              <IBtn src={WZUNDO}   onClick={revertirNueva}title="Revertir"    disabled={!modoNueva}/>
+              <IBtn src={WZUNDO}   onClick={revertirNueva} title="Revertir"   disabled={!modoNueva}/>
               <IBtn src={WZDELETE} onClick={anularNota}   title="Anular"      disabled={anulada||modoNueva}/>
               <IBtn src={WZPRINT}  onClick={()=>setModal('print')} title="Imprimir"/>
               <IBtn src={WZCLOSE}  onClick={onClose}      title="Volver al menú"/>
@@ -609,7 +609,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             <div style={P.acciones}>
               <BtnAcc onClick={abrirAbonos} icon="💵">Abonos</BtnAcc>
               <BtnAcc onClick={()=>setModal('detalle')} icon="🔍">Detalle</BtnAcc>
-              <BtnAcc onClick={()=>setModal('resumen')} icon="📊">Resumen</BtnAcc>
+              <BtnAcc onClick={()=>setModal('buscarNota')} icon="📊">Resumen</BtnAcc>
               <BtnAcc onClick={()=>setModal('print')}   icon="🖨">Imprimir</BtnAcc>
             </div>
           </div>
