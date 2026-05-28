@@ -725,9 +725,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             <div style={P.acciones}>
               <BtnAcc onClick={abrirAbonos} icon="💵">Abonos</BtnAcc>
               <BtnAcc onClick={pagarTodo}   icon="💰">Pagar Todo</BtnAcc>
-              <BtnAcc onClick={()=>setModal('detalle')} icon="🔍">Detalle</BtnAcc>
-              <BtnAcc onClick={()=>setModal('buscarNota')} icon="📊">Resumen</BtnAcc>
-              <BtnAcc onClick={()=>setModal('print')}   icon="🖨">Imprimir</BtnAcc>
             </div>
           </div>
         </div>
