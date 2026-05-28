@@ -2,10 +2,15 @@ import { useState } from 'react'
 import { supabase } from './lib/supabase'
 import { LOGO } from './lib/assets'
 import NotaDeEntrega from './components/NotaDeEntrega'
+import Articulos     from './components/Articulos'
+import Proveedores   from './components/Proveedores'
 
 export default function App() {
   const [modulo, setModulo] = useState(null)
-  if (modulo === 'nota') return <NotaDeEntrega supabase={supabase} onClose={() => setModulo(null)} />
+
+  if (modulo === 'nota')       return <NotaDeEntrega supabase={supabase} onClose={()=>setModulo(null)}/>
+  if (modulo === 'articulos')  return <Articulos     supabase={supabase} onClose={()=>setModulo(null)}/>
+  if (modulo === 'proveedores')return <Proveedores   supabase={supabase} onClose={()=>setModulo(null)}/>
 
   return (
     <div style={s.pagina}>
@@ -19,12 +24,12 @@ export default function App() {
         </div>
         <div style={s.divisor} />
         <div style={s.grid}>
-          <Btn icon="📋" label="Nota de Entrega" color="#1a3a6b" onClick={() => setModulo('nota')} />
-          <Btn icon="👥" label="Clientes"        color="#2e7d32" disabled />
-          <Btn icon="📦" label="Artículos"       color="#e65100" disabled />
-          <Btn icon="💰" label="Cartera"         color="#6a1b9a" disabled />
-          <Btn icon="🛒" label="Compras"         color="#00838f" disabled />
-          <Btn icon="📊" label="Inventario"      color="#c62828" disabled />
+          <Btn icon="📋" label="Nota de Entrega" color="#1a3a6b" onClick={()=>setModulo('nota')}/>
+          <Btn icon="📦" label="Artículos"        color="#e65100" onClick={()=>setModulo('articulos')}/>
+          <Btn icon="🏭" label="Proveedores"      color="#00838f" onClick={()=>setModulo('proveedores')}/>
+          <Btn icon="👥" label="Clientes"         color="#2e7d32" disabled/>
+          <Btn icon="💰" label="Cartera"          color="#6a1b9a" disabled/>
+          <Btn icon="📊" label="Inventario"       color="#c62828" disabled/>
         </div>
         <div style={s.pie}>© 2026 ATM Clothing — Todos los derechos reservados</div>
       </div>
