@@ -48,7 +48,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   useEffect(() => { init() }, [])
   useEffect(() => {
-    supabase.from('vendedores').select('id,cedula,nombre,celular').eq('activo',true).order('nombre')
+    supabase.from('vendedores').select('id,cedula,nombre,celular').order('nombre')
       .then(({data}) => { if(data) setListaVend(data) })
   }, [])
 
