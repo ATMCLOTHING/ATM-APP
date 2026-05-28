@@ -103,9 +103,9 @@ export default function PrintNota({ datos, onClose }) {
       </style></head><body>
 
       <div class="header">
-        <div>
-          <div class="logo-txt">ATM</div>
-          <div class="subtitulo">A TU MEDIDA</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="${LOGO}" alt="ATM" style="height:60px;object-fit:contain;"/>
+          <div class="subtitulo" style="font-size:11px;">A TU MEDIDA<br/>Control de Inventarios</div>
         </div>
         <div class="doc-info">
           <div class="doc-titulo">NOTA DE ENTREGA</div>
