@@ -327,14 +327,19 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       const avisos = []
       for (const k of todasKeys) {
         const [cod,tall] = k.split('|')
-        const diff = (cantNueva[k]||0) - (cantAnt[k]||0) // positivo=venta nueva, negativo=devolución
+        const diff = (cantNueva[k]||0) - (cantAnt[k]||0)
         if (diff===0) continue
-        // leer existencia actual
-        const {data:art} = await supabase.from('articomp').select('id,existencia').eq('codartic',cod).eq('talla',tall).limit(1)
-        if (!art||!art.length) continue
-        const nuevaExist = (art[0].existencia||0) - diff
-        await supabase.from('articomp').update({existencia:nuevaExist}).eq('id',art[0].id)
-        if (nuevaExist < 0) avisos.push(`${cod} T:${tall} (existencia: ${nuevaExist})`)
+        // usar función SQL para actualizar inventario de forma segura
+        await supabase.rpc('ajustar_inventario', {
+          p_codartic: cod,
+          p_talla:    tall,
+          p_cantidad: diff
+        })
+        // verificar si quedó negativo
+        const {data:art} = await supabase.from('articomp')
+          .select('existencia').eq('codartic',cod).eq('talla',tall).limit(1)
+        if (art&&art.length&&(art[0].existencia||0)<0)
+          avisos.push(`${cod} T:${tall} (existencia: ${art[0].existencia})`)
       }
 
       setGuardada(true); setModoNueva(false)
@@ -364,10 +369,11 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       // ── INVENTARIO: devolver existencias al anular ──
       const {data:det} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
       for (const l of (det||[])) {
-        const {data:art} = await supabase.from('articomp').select('id,existencia').eq('codartic',l.codartic).eq('talla',l.talla).limit(1)
-        if (art&&art.length) {
-          await supabase.from('articomp').update({existencia:(art[0].existencia||0)+Number(l.cantidad)}).eq('id',art[0].id)
-        }
+        await supabase.rpc('ajustar_inventario', {
+          p_codartic: l.codartic,
+          p_talla:    l.talla,
+          p_cantidad: -Number(l.cantidad)  // negativo = devolver
+        })
       }
       setAnulada(true)
       setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada. Inventario restaurado.`})
