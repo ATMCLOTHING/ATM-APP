@@ -345,7 +345,42 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de registrar abonos.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de registrar abonos.'}); return }
     if (!guardada) {
-      await guardar()
+      // guardar directo en BD sin depender del estado React
+      try {
+        const enc = {
+          numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
+          formapago:plazo, mediopago:medio,
+          codclient:cliente?.id||99,
+          nombreclie:cliente?.nombre||cliTxt,
+          cedrifclie:cedula||cliente?.cedula||'',
+          direcicion:cliente?.direccion||'',
+          celular:cliente?.celular||'',
+          ciudad:cliente?.ciudad||'',
+          departamen:cliente?.departamento||'',
+          nomempresa:cliente?.nom_empresa||'',
+          porcdescue:pDesc, porciva:pIva,
+          subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
+          valabono:abonos, saldo, cedvended:cedVend,
+          cantotal:prendas, anulada:'N',
+        }
+        const {error:e1} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
+        if (e1) throw e1
+        await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
+        const {error:e2} = await supabase.from('detnotaen').insert(
+          detValidas.map(l=>({
+            numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic,
+            talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
+            subtotal:Number(l.cantidad)*Number(l.valunit),
+            porciva:l.porciva, valiva:l.valiva,
+            porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
+          }))
+        )
+        if (e2) throw e2
+        setGuardada(true); setModoNueva(false)
+        await recargarIds()
+      } catch(e) {
+        setMsg({tipo:'err',texto:`❌ Error al guardar: ${e.message}`}); return
+      }
     }
     setModal('abonos')
   }
@@ -531,11 +566,12 @@ export default function NotaDeEntrega({ supabase, onClose }) {
               <IBtn src={WZLOCATE} onClick={()=>setModal('resumen')} title="Buscar nota"/>
             </div>
             <div style={P.btnFila}>
-              <IBtn src={WZNEW}    onClick={nuevaNota}   title="Nueva nota" disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
-              <IBtn src={WZSAVE}   onClick={guardar}     title="Guardar"    disabled={busy||anulada}/>
-              <IBtn src={WZDELETE} onClick={anularNota}  title="Anular"     disabled={anulada||modoNueva}/>
+              <IBtn src={WZNEW}    onClick={nuevaNota}    title="Nueva nota"  disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
+              <IBtn src={WZSAVE}   onClick={guardar}      title="Guardar"     disabled={busy||anulada}/>
+              <IBtn src={WZUNDO}   onClick={revertirNueva}title="Revertir"    disabled={!modoNueva}/>
+              <IBtn src={WZDELETE} onClick={anularNota}   title="Anular"      disabled={anulada||modoNueva}/>
               <IBtn src={WZPRINT}  onClick={()=>setModal('print')} title="Imprimir"/>
-              <IBtn src={WZCLOSE}  onClick={onClose}     title="Volver al menú"/>
+              <IBtn src={WZCLOSE}  onClick={onClose}      title="Volver al menú"/>
             </div>
           </div>
 
@@ -573,7 +609,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             <div style={P.acciones}>
               <BtnAcc onClick={abrirAbonos} icon="💵">Abonos</BtnAcc>
               <BtnAcc onClick={()=>setModal('detalle')} icon="🔍">Detalle</BtnAcc>
-              <BtnAcc onClick={revertirNueva} icon="↩️" style={{display:modoNueva?'flex':'none'}}>Revertir</BtnAcc>
               <BtnAcc onClick={()=>setModal('resumen')} icon="📊">Resumen</BtnAcc>
               <BtnAcc onClick={()=>setModal('print')}   icon="🖨">Imprimir</BtnAcc>
             </div>
