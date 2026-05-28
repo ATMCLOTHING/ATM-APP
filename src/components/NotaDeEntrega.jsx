@@ -8,7 +8,7 @@ import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
-const hoy = () => new Date().toISOString().slice(0,10)
+const hoy = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 const VACIA = {codartic:'',descartic:'',talla:'',cantidad:'',valunit:0,porciva:0,valiva:0,porcdescue:0,valdescue:0,valtotal:0}
 const FILAS_BASE = 12
 const FILAS = () => Array.from({length:FILAS_BASE},()=>({...VACIA}))
