@@ -9,7 +9,7 @@ import ModalEditarCliente from './ModalEditarCliente'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
-const VACIA = {codartic:'',descartic:'',talla:'',cantidad:1,valunit:0,porciva:0,valiva:0,porcdescue:0,valdescue:0,valtotal:0}
+const VACIA = {codartic:'',descartic:'',talla:'',cantidad:0,valunit:0,porciva:0,valiva:0,porcdescue:0,valdescue:0,valtotal:0}
 const FILAS_BASE = 12
 const FILAS = () => Array.from({length:FILAS_BASE},()=>({...VACIA}))
 const PLAZOS = ['CONTADO','15 DÍAS','30 DÍAS','60 DÍAS','90 DÍAS']
@@ -142,11 +142,18 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   async function buscarArt(txt, idx) {
     setLineas(prev=>{const n=[...prev];n[idx]={...n[idx],codartic:txt};return n})
-    if (txt.length<2){setArtSugg([]);setArtIdx(null);return}
+    if (txt.length<1){setArtSugg([]);setArtIdx(null);return}
     const {data} = await supabase.from('articomp')
       .select('codartic,descartic,talla,preciovent,preciovend,preciovenv,porciva')
       .ilike('codartic',`%${txt}%`).limit(10)
-    setArtSugg(data||[]); setArtIdx(idx)
+    if (!data||!data.length){setArtSugg([]);setArtIdx(null);return}
+    // si hay una sola coincidencia exacta, cargar directo sin mostrar lista
+    const exacto = data.find(a=>a.codartic.toString()===txt.toString())
+    if (exacto && data.filter(a=>a.codartic.toString()===txt.toString()).length===1) {
+      elegirArt(exacto, idx)
+    } else {
+      setArtSugg(data); setArtIdx(idx)
+    }
   }
 
   async function buscarDesc(txt, idx) {
@@ -322,9 +329,20 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
 
+  // ── abrir modal de abonos: guarda primero si no está guardada ──
+  async function abrirAbonos() {
+    if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de registrar abonos.'}); return }
+    if (!guardada) {
+      await guardar()
+      // si guardar falló, no abrir modal
+      if (!guardada) return
+    }
+    setModal('abonos')
+  }
+
   return (
     <div style={P.pagina}>
-      {modal==='abonos'        && <ModalAbonos        supabase={supabase} nroDoc={nroDoc} totalNota={total} totalAbonos={abonos} onClose={()=>{setModal(null);cargarDoc(nroDoc)}}/>}
+      {modal==='abonos'        && <ModalAbonos        supabase={supabase} nroDoc={nroDoc} totalNota={total} totalAbonos={abonos} onClose={async()=>{setModal(null);await cargarDoc(nroDoc)}}/>}
       {modal==='resumen'       && <ModalResumen       supabase={supabase} onSelect={id=>{setModal(null);cargarDoc(id)}} onClose={()=>setModal(null)}/>}
       {modal==='detalle'       && <ModalDetalle       nroDoc={nroDoc} lineas={detValidas} onClose={()=>setModal(null)}/>}
       {modal==='print'         && <PrintNota          datos={dataNota} onClose={()=>setModal(null)}/>}
@@ -542,7 +560,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
               ))}
             </div>
             <div style={P.acciones}>
-              <BtnAcc onClick={()=>setModal('abonos')}  icon="💵">Abonos</BtnAcc>
+              <BtnAcc onClick={abrirAbonos} icon="💵">Abonos</BtnAcc>
               <BtnAcc onClick={()=>setModal('detalle')} icon="🔍">Detalle</BtnAcc>
               <BtnAcc onClick={()=>setModal('resumen')} icon="📊">Resumen</BtnAcc>
               <BtnAcc onClick={()=>setModal('print')}   icon="🖨">Imprimir</BtnAcc>
