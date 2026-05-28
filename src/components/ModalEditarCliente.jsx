@@ -22,7 +22,7 @@ export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClo
     setGuardando(true)
     const {error} = await supabase.from('clientes')
       .update(form)
-      .eq('codclient', cliente.id)
+      .eq('id', cliente.id)
     if (error) {
       setMsg(`Error: ${error.message}`)
     } else {
@@ -35,7 +35,7 @@ export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClo
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>✎ EDITAR CLIENTE — {cliente?.cedrifclie||cliente?.id}</span>
+          <span>✎ EDITAR CLIENTE — {cliente?.cedula||cliente?.id}</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
