@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { LOGO, WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE } from '../lib/assets'
+import { LOGO, WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO } from '../lib/assets'
 import ModalAbonos        from './ModalAbonos'
 import ModalResumen       from './ModalResumen'
 import ModalDetalle       from './ModalDetalle'
