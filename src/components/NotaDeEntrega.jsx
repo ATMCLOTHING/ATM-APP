@@ -510,7 +510,10 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       <div style={P.ventana}>
         {/* TÍTULO */}
         <div style={P.titulo}>
-          <img src={LOGO} alt="ATM" style={{height:38,filter:'brightness(0) invert(1)',marginRight:14}}/>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start',marginRight:14,lineHeight:1}}>
+            <span style={{fontFamily:'Arial Black, Arial, sans-serif',fontWeight:900,fontSize:22,color:'#fff',letterSpacing:3}}>ATM</span>
+            <span style={{fontFamily:'Arial, sans-serif',fontWeight:400,fontSize:9,color:'rgba(255,255,255,0.8)',letterSpacing:2,textTransform:'uppercase'}}>A TU MEDIDA</span>
+          </div>
           <span style={P.titTxt}>NOTA DE ENTREGA</span>
           <div style={P.titNro}>
             N° <strong style={{fontSize:22}}>{nroDoc}</strong>
