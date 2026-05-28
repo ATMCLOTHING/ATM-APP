@@ -8,7 +8,7 @@ const fmt = (n) =>
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
-export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, guardada, onClose }) {
+export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, onClose }) {
   const [abonos,    setAbonos]    = useState([])
   const [fecha,     setFecha]     = useState(hoy())
   const [valor,     setValor]     = useState('')
@@ -31,10 +31,6 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
   }
 
   async function registrarAbono() {
-    if (!guardada) {
-      setMsg({ tipo: 'err', texto: 'Debes guardar la nota antes de registrar un abono.' })
-      return
-    }
     const val = Number(valor)
     if (!val || val <= 0) { setMsg({ tipo: 'err', texto: 'Ingresa un valor válido.' }); return }
     if (val > saldoActual + 0.01) { setMsg({ tipo: 'err', texto: `El abono ($${fmt(val)}) supera el saldo ($${fmt(saldoActual)}).` }); return }
