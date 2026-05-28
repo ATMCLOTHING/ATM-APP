@@ -8,8 +8,8 @@ import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
-const hoy = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
-const VACIA = {codartic:'',descartic:'',talla:'',cantidad:'',valunit:0,porciva:0,valiva:0,porcdescue:0,valdescue:0,valtotal:0}
+const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
+const VACIA = {codartic:'',descartic:'',talla:'',cantidad:1,valunit:0,porciva:0,valiva:0,porcdescue:0,valdescue:0,valtotal:0}
 const FILAS_BASE = 12
 const FILAS = () => Array.from({length:FILAS_BASE},()=>({...VACIA}))
 const PLAZOS = ['CONTADO','15 DÍAS','30 DÍAS','60 DÍAS','90 DÍAS']
@@ -39,51 +39,48 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   const [busy,      setBusy]      = useState(false)
   const [msg,       setMsg]       = useState(null)
   const [modal,     setModal]     = useState(null)
-  // estado de la nota actual
-  const [guardada,  setGuardada]  = useState(false) // fue guardada en BD?
+  const [guardada,  setGuardada]  = useState(false)
   const [anulada,   setAnulada]   = useState(false)
+  const [modoNueva, setModoNueva] = useState(false) // true = usuario presionó Nueva, aún sin guardar
 
   const cedulaRef = useRef()
-  const nroDocRef = useRef('')  // ref para saber el nro actual sin stale closure
 
-  useEffect(() => { init() }, [])
+  // ── cargar vendedores al montar ──
   useEffect(() => {
-    supabase.from('vendedores').select('id,cedula,nombre,celular').order('nombre')
+    supabase.from('vendedores').select('id,cedula,nombre').order('nombre')
       .then(({data}) => { if(data) setListaVend(data) })
   }, [])
 
-  // ════════ INIT: cargar la última nota ════════
+  // ── init: mostrar última nota ──
+  useEffect(() => { init() }, [])
+
   async function init() {
     setBusy(true)
     const {data} = await supabase.from('encnotaen')
-      .select('numnotaent')
-      .order('numnotaent', {ascending:false})
+      .select('numnotaent').order('numnotaent',{ascending:false})
     const ids = (data||[]).map(r=>r.numnotaent).reverse()
     setAllIds(ids)
     if (ids.length > 0) {
-      // mostrar la última nota guardada
       await cargarDoc(ids[ids.length-1], ids)
     } else {
-      // no hay notas — preparar nueva
       await prepararNueva()
     }
     setBusy(false)
   }
 
-  // ════════ CONSECUTIVO SEGURO ════════
+  // ── consecutivo ──
   async function siguienteConsecutivo() {
-    const {data, error} = await supabase.rpc('siguiente_nota')
+    const {data,error} = await supabase.rpc('siguiente_nota')
     if (!error && data) return String(data)
-    // fallback
     const {data:d2} = await supabase.from('encnotaen')
       .select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
     return String(d2?.length ? Number(d2[0].numnotaent)+1 : 1)
   }
 
-  // ════════ PREPARAR NOTA NUEVA (sin guardar aún) ════════
+  // ── preparar formulario en blanco ──
   async function prepararNueva() {
     const nro = await siguienteConsecutivo()
-    setNroDoc(nro); nroDocRef.current = nro
+    setNroDoc(nro)
     setFecha(hoy()); setFechaPago(hoy())
     setPlazo('CONTADO'); setMedio('Efectivo')
     setPDesc(0); setPIva(0); setTipoVta('Mayor')
@@ -91,82 +88,64 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setCedVend(''); setVendedor(null)
     setLineas(FILAS()); setAbonos(0)
     setMsg(null); setNavPos(null)
-    setGuardada(false); setAnulada(false)
+    setGuardada(false); setAnulada(false); setModoNueva(true)
     setTimeout(()=>cedulaRef.current?.focus(), 100)
   }
 
-  // ════════ BOTÓN NUEVA NOTA ════════
+  // ── botón nueva nota ──
   async function nuevaNota() {
-    // si hay una nota en pantalla sin guardar con datos, preguntar
-    if (!guardada && (cliente || cliTxt || lineas.some(l=>l.codartic))) {
-      const ok = window.confirm('¿Descartar los cambios sin guardar de la nota actual?')
-      if (!ok) return
+    if (modoNueva && (cliente || cliTxt || lineas.some(l=>l.codartic))) {
+      if (!window.confirm('¿Descartar los cambios sin guardar?')) return
     }
     await prepararNueva()
   }
 
-  // ════════ CLIENTE — campo cédula ════════
+  // ── cliente ──
   async function onCedulaEnter() {
     const ced = cedula.trim()
-    if (!ced) {
-      // vacío → abrir ventana de búsqueda
-      setModal('buscarCliente')
-      return
-    }
-    // tiene valor → buscar en BD
+    if (!ced) { setModal('buscarCliente'); return }
     setBusy(true)
-    const {data, error} = await supabase.from('clientes').select('*')
-      .eq('cedula', ced)
-      .limit(1)
+    const {data} = await supabase.from('clientes').select('*').eq('cedula',ced).limit(1)
     setBusy(false)
     if (data && data.length > 0) {
       aplicarCliente(data[0])
     } else {
-      const {data:d2} = await supabase.from('clientes').select('*')
-        .ilike('cedula', '%' + ced + '%').limit(1)
-      if (d2 && d2.length > 0) {
-        aplicarCliente(d2[0])
-      } else {
-        setMsg({tipo:'warn', texto:`Cédula "${ced}" no encontrada. Usa el botón 🔍 para buscar por nombre.`})
-        setCliTxt(''); setCliente(null)
-      }
+      setMsg({tipo:'warn',texto:`Cédula "${ced}" no encontrada. Usa 🔍 para buscar.`})
+      setCliTxt(''); setCliente(null)
     }
   }
 
   function aplicarCliente(c) {
     setCliente(c)
-    setCedula(c.cedula || String(c.id))
+    setCedula(c.cedula||String(c.id))
     setCliTxt(c.nombre)
     setMsg(null)
   }
 
-  function onClienteEditado(cActualizado) {
-    setCliente(cActualizado)
-    setCliTxt(cActualizado.nombre)
-    setModal(null)
-    setMsg({tipo:'ok', texto:'Datos del cliente actualizados correctamente.'})
+  function onClienteEditado(c) {
+    setCliente(c); setCliTxt(c.nombre); setModal(null)
+    setMsg({tipo:'ok',texto:'Cliente actualizado.'})
   }
 
-  // ════════ VENDEDOR ════════
-  function elegirVendedor(v) {
-    if (!v) { setCedVend(''); setVendedor(null); return }
-    setCedVend(v.cedula)
-    setVendedor(v)
+  // ── vendedor ──
+  function elegirVendedor(cedSel) {
+    const v = listaVend.find(x=>x.cedula===cedSel)||null
+    setCedVend(cedSel); setVendedor(v)
   }
 
-  // ════════ ARTÍCULOS ════════
+  // ── artículos ──
   function precioSegunTipo(art) {
-    if (tipoVta==='Detal')    return art.preciovend || 0
-    if (tipoVta==='Vendedor') return art.preciovenv || 0
-    return art.preciovent || 0
+    if (tipoVta==='Detal')    return art.preciovend||0
+    if (tipoVta==='Vendedor') return art.preciovenv||0
+    return art.preciovent||0
   }
 
   async function buscarArt(txt, idx) {
     setLineas(prev=>{const n=[...prev];n[idx]={...n[idx],codartic:txt};return n})
     if (txt.length<2){setArtSugg([]);setArtIdx(null);return}
     const {data} = await supabase.from('articomp')
-      .select('codartic,descartic,talla,preciovent,preciovend,preciovenv,porciva,existencia')
-      .or(`codartic.ilike.%${txt}%,descartic.ilike.%${txt}%`).limit(10)
+      .select('codartic,descartic,talla,preciovent,preciovend,preciovenv,porciva')
+      .ilike('codartic',`%${txt}%`).limit(10)
     setArtSugg(data||[]); setArtIdx(idx)
   }
 
@@ -174,17 +153,34 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setLineas(prev=>{const n=[...prev];n[idx]={...n[idx],descartic:txt};return n})
     if (txt.length<2){setArtSugg([]);setArtIdx(null);return}
     const {data} = await supabase.from('articomp')
-      .select('codartic,descartic,talla,preciovent,preciovend,preciovenv,porciva,existencia')
+      .select('codartic,descartic,talla,preciovent,preciovend,preciovenv,porciva')
       .ilike('descartic',`%${txt}%`).limit(10)
     setArtSugg(data||[]); setArtIdx(idx)
   }
 
   function elegirArt(art, idx) {
-    upd(idx,{codartic:art.codartic,descartic:art.descartic,talla:art.talla||'',valunit:precioSegunTipo(art),porciva:art.porciva||0})
+    // si el artículo ya existe en otra línea, sumar cantidad
+    setLineas(prev => {
+      const sig = [...prev]
+      const existeIdx = sig.findIndex((l,i) => i!==idx && l.codartic===art.codartic && l.talla===art.talla)
+      if (existeIdx >= 0) {
+        // sumar en la línea existente
+        const nueva = recalc({...sig[existeIdx], cantidad: Number(sig[existeIdx].cantidad||0)+1})
+        sig[existeIdx] = nueva
+        // limpiar la línea actual
+        sig[idx] = {...VACIA}
+        return sig
+      }
+      // no existe — poner en la línea actual con cantidad 1
+      const precio = precioSegunTipo(art)
+      sig[idx] = recalc({...sig[idx], codartic:art.codartic, descartic:art.descartic, talla:art.talla||'', valunit:precio, porciva:art.porciva||0, cantidad:1})
+      if (idx===sig.length-1) sig.push({...VACIA})
+      return sig
+    })
     setArtSugg([]); setArtIdx(null)
   }
 
-  // ════════ LÍNEAS ════════
+  // ── cálculo de línea ──
   function recalc(lin) {
     const cant = Number(lin.cantidad)||0
     const sub  = cant*(Number(lin.valunit)||0)
@@ -211,44 +207,45 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     })
   }
 
-  // ════════ TOTALES ════════
+  // ── totales ──
   const detValidas = lineas.filter(l=>l.codartic&&Number(l.cantidad)>0)
-  const subtotal   = lineas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
-  const totDcto    = lineas.reduce((s,l)=>s+(l.valdescue||0),0)
-  const totIva     = lineas.reduce((s,l)=>s+(l.valiva||0),0)
-  const total      = lineas.reduce((s,l)=>s+(l.valtotal||0),0)
+  const subtotal   = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
+  const totDcto    = detValidas.reduce((s,l)=>s+(l.valdescue||0),0)
+  const totIva     = detValidas.reduce((s,l)=>s+(l.valiva||0),0)
+  const total      = detValidas.reduce((s,l)=>s+(l.valtotal||0),0)
   const saldo      = total-abonos
-  const prendas    = lineas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
+  const prendas    = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
 
-  // ════════ CARGAR NOTA ════════
+  // ── cargar nota ──
   async function cargarDoc(id, idsParam) {
     setBusy(true); setMsg(null)
-    const {data:enc} = await supabase.from('encnotaen').select('*').eq('numnotaent',id).maybeSingle()
-    if (!enc){setBusy(false);return}
+    const {data:enc} = await supabase.from('encnotaen').select('*').eq('numnotaent',id).limit(1)
+    if (!enc||!enc.length){setBusy(false);return}
+    const e = enc[0]
     const ids = idsParam||allIds
-    const pos = ids.indexOf(id)
-
-    setNroDoc(enc.numnotaent); nroDocRef.current=enc.numnotaent
-    setNavPos(pos)
-    setFecha(enc.fechanotae?.slice(0,10)||hoy())
-    setFechaPago(enc.fechavence?.slice(0,10)||hoy())
-    setPlazo(enc.formapago||'CONTADO'); setMedio(enc.mediopago||'Efectivo')
-    setPDesc(enc.porcdescue||0); setPIva(enc.porciva||0)
-    setCedula(enc.cedrifclie||''); setCedVend(enc.cedvended||'')
-    if (enc.cedvended) cargarVendedor(enc.cedvended)
-
-    const {data:cli} = await supabase.from('clientes').select('*').eq('id',enc.id).maybeSingle()
-    setCliente(cli||null); setCliTxt(cli?.nombre||enc.nombre||'')
-
+    setNavPos(ids.indexOf(id))
+    setNroDoc(e.numnotaent)
+    setFecha(e.fechanotae?.slice(0,10)||hoy())
+    setFechaPago(e.fechavence?.slice(0,10)||hoy())
+    setPlazo(e.formapago||'CONTADO'); setMedio(e.mediopago||'Efectivo')
+    setPDesc(e.porcdescue||0); setPIva(e.porciva||0)
+    setCedula(e.cedrifclie||'')
+    // vendedor
+    const cedV = e.cedvended||''
+    setCedVend(cedV)
+    setVendedor(listaVend.find(v=>v.cedula===cedV)||null)
+    // cliente
+    const {data:cli} = await supabase.from('clientes').select('*').eq('id',e.codclient).limit(1)
+    setCliente(cli&&cli.length?cli[0]:null)
+    setCliTxt(cli&&cli.length?cli[0].nombre:e.nombreclie||'')
+    // líneas
     const {data:det} = await supabase.from('detnotaen').select('*').eq('numnotaent',id)
-    const extras=Math.max(0,FILAS_BASE-(det?.length||0))
+    const extras = Math.max(0,FILAS_BASE-(det?.length||0))
     setLineas(det?.length?[...det,...Array.from({length:extras},()=>({...VACIA}))]:FILAS())
-
+    // abonos — solo de ESTA nota
     const {data:ab} = await supabase.from('detabonos').select('valabono').eq('numnotaent',id)
     setAbonos((ab||[]).reduce((s,r)=>s+(r.valabono||0),0))
-
-    setGuardada(true)
-    setAnulada(enc.anulada==='S')
+    setGuardada(true); setAnulada(e.anulada==='S'); setModoNueva(false)
     setBusy(false)
   }
 
@@ -257,25 +254,22 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     const ids=(data||[]).map(r=>r.numnotaent); setAllIds(ids); return ids
   }
 
-  function navPrimero()   {if(allIds.length){setNavPos(0);cargarDoc(allIds[0])}}
-  function navAnterior()  {if(navPos>0){setNavPos(navPos-1);cargarDoc(allIds[navPos-1])}}
-  function navSiguiente() {if(navPos!==null&&navPos<allIds.length-1){setNavPos(navPos+1);cargarDoc(allIds[navPos+1])}}
-  function navUltimo()    {if(allIds.length){const l=allIds.length-1;setNavPos(l);cargarDoc(allIds[l])}}
+  // ── navegación ──
+  function navPrimero()   { if(allIds.length){setNavPos(0);cargarDoc(allIds[0])} }
+  function navAnterior()  { if(navPos!==null&&navPos>0){cargarDoc(allIds[navPos-1])} }
+  function navSiguiente() { if(navPos!==null&&navPos<allIds.length-1){cargarDoc(allIds[navPos+1])} }
+  function navUltimo()    { if(allIds.length){cargarDoc(allIds[allIds.length-1])} }
 
-  // ════════ GUARDAR ════════
+  // ── guardar ──
   async function guardar() {
-    if (!cliente && !cliTxt.trim()) {
-      setMsg({tipo:'err',texto:'Ingresa un cliente antes de guardar.'}); return
-    }
-    if (!detValidas.length) {
-      setMsg({tipo:'err',texto:'Agrega al menos un artículo con cantidad.'}); return
-    }
+    if (!cliente&&!cliTxt.trim()){setMsg({tipo:'err',texto:'Ingresa un cliente antes de guardar.'}); return}
+    if (!detValidas.length){setMsg({tipo:'err',texto:'Agrega al menos un artículo con cantidad.'}); return}
     setBusy(true)
     try {
       const enc = {
         numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
         formapago:plazo, mediopago:medio,
-        codclient:cliente?.id||'99',
+        codclient:cliente?.id||99,
         nombreclie:cliente?.nombre||cliTxt,
         cedrifclie:cedula||cliente?.cedula||'',
         direcicion:cliente?.direccion||'',
@@ -301,7 +295,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
         }))
       )
       if(e2)throw e2
-      setGuardada(true)
+      setGuardada(true); setModoNueva(false)
       setMsg({tipo:'ok',texto:`✅ Nota ${nroDoc} guardada correctamente.`})
       const ids=await recargarIds()
       setNavPos(ids.indexOf(nroDoc))
@@ -311,53 +305,41 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setBusy(false)
   }
 
-  // ════════ ANULAR (marca, no borra) ════════
+  // ── anular ──
   async function anularNota() {
-    if (!guardada) {
-      setMsg({tipo:'warn',texto:'Esta nota aún no está guardada, no hay nada que anular.'}); return
-    }
-    if (anulada) {
-      setMsg({tipo:'warn',texto:'Esta nota ya está anulada.'}); return
-    }
-    const motivo=window.prompt(`Motivo de anulación de la nota ${nroDoc} (opcional):`)
+    if (!guardada){setMsg({tipo:'warn',texto:'Esta nota no está guardada aún.'}); return}
+    if (anulada){setMsg({tipo:'warn',texto:'Esta nota ya está anulada.'}); return}
+    const motivo=window.prompt(`Motivo de anulación (opcional):`)
     if (motivo===null) return
     setBusy(true)
     const {error}=await supabase.from('encnotaen').update({
-      anulada:'S', fechaanula:hoy(),
-      motivoanula:motivo||'Anulada por el usuario',
+      anulada:'S',fechaanula:hoy(),motivoanula:motivo||'Anulada'
     }).eq('numnotaent',nroDoc)
-    if(error){
-      setMsg({tipo:'err',texto:`❌ ${error.message}`})
-    } else {
-      setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada. El consecutivo queda en el historial.`})
-      setAnulada(true)
-      await recargarIds()
-    }
+    if(error){setMsg({tipo:'err',texto:`❌ ${error.message}`})}
+    else {setAnulada(true); setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada.`})}
     setBusy(false)
   }
 
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
 
-  // ════════ RENDER ════════
   return (
     <div style={P.pagina}>
       {modal==='abonos'        && <ModalAbonos        supabase={supabase} nroDoc={nroDoc} totalNota={total} totalAbonos={abonos} onClose={()=>{setModal(null);cargarDoc(nroDoc)}}/>}
-      {modal==='resumen'       && <ModalResumen       supabase={supabase} onClose={()=>setModal(null)}/>}
+      {modal==='resumen'       && <ModalResumen       supabase={supabase} onSelect={id=>{setModal(null);cargarDoc(id)}} onClose={()=>setModal(null)}/>}
       {modal==='detalle'       && <ModalDetalle       nroDoc={nroDoc} lineas={detValidas} onClose={()=>setModal(null)}/>}
       {modal==='print'         && <PrintNota          datos={dataNota} onClose={()=>setModal(null)}/>}
       {modal==='buscarCliente' && <ModalBuscarCliente supabase={supabase} onSelect={c=>{aplicarCliente(c);setModal(null)}} onClose={()=>setModal(null)}/>}
       {modal==='editarCliente' && <ModalEditarCliente supabase={supabase} cliente={cliente} onGuardar={onClienteEditado} onClose={()=>setModal(null)}/>}
 
       <div style={P.ventana}>
-
         {/* TÍTULO */}
         <div style={P.titulo}>
-          <img src={LOGO} alt="ATM" style={{height:40,filter:'brightness(0) invert(1)',marginRight:14}}/>
+          <img src={LOGO} alt="ATM" style={{height:38,filter:'brightness(0) invert(1)',marginRight:14}}/>
           <span style={P.titTxt}>NOTA DE ENTREGA</span>
           <div style={P.titNro}>
-            N° <strong style={{fontSize:20}}>{nroDoc}</strong>
-            {!guardada && <span style={{fontSize:11,marginLeft:8,background:'rgba(255,255,255,0.2)',borderRadius:4,padding:'1px 6px'}}>NUEVA</span>}
-            {anulada   && <span style={{fontSize:11,marginLeft:8,background:'#e74c3c',borderRadius:4,padding:'1px 6px'}}>ANULADA</span>}
+            N° <strong style={{fontSize:22}}>{nroDoc}</strong>
+            {modoNueva && <span style={P.badgeNueva}>NUEVA</span>}
+            {anulada   && <span style={P.badgeAnul}>ANULADA</span>}
           </div>
         </div>
 
@@ -367,106 +349,96 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             background:msg.tipo==='ok'?'#e8f5e9':msg.tipo==='warn'?'#fff8e1':'#ffebee',
             color:msg.tipo==='ok'?'#2e7d32':msg.tipo==='warn'?'#e65100':'#c62828',
             border:`1px solid ${msg.tipo==='ok'?'#a5d6a7':msg.tipo==='warn'?'#ffe082':'#ef9a9a'}`}}>
-            {msg.texto}
-            <button onClick={()=>setMsg(null)} style={P.alertaX}>✕</button>
+            {msg.texto}<button onClick={()=>setMsg(null)} style={P.alertaX}>✕</button>
           </div>
         )}
 
-        {/* DATOS */}
+        {/* ENCABEZADO — grid 2 columnas para aprovechar espacio */}
         <div style={P.bloque}>
-
-          {/* FILA 1 — cédula, nombre, empresa */}
+          {/* FILA 1 */}
           <div style={P.fila}>
             <Fld label="Cédula / NIT" w={140}>
               <div style={{display:'flex',gap:4}}>
-                <input
-                  ref={cedulaRef}
-                  style={{...P.inp,flex:1,fontWeight:700,fontSize:14}}
-                  value={cedula}
-                  onChange={e=>setCedula(e.target.value)}
+                <input ref={cedulaRef} style={{...P.inp,flex:1,fontWeight:700,fontSize:14}}
+                  value={cedula} onChange={e=>setCedula(e.target.value)}
                   onKeyDown={e=>e.key==='Enter'&&onCedulaEnter()}
-                  placeholder="Cédula o NIT…"
-                  disabled={anulada}
-                />
-                <button onClick={()=>setModal('buscarCliente')} title="Buscar cliente"
-                  style={{...P.inp,width:34,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:16,background:'#eef2ff'}}>
+                  placeholder="Cédula o NIT…" disabled={anulada}/>
+                <button onClick={()=>setModal('buscarCliente')}
+                  style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:15,background:'#eef2ff'}}>
                   🔍
                 </button>
               </div>
             </Fld>
-
-            <Fld label="Nombre / Razón Social" w={360}>
+            <Fld label="Nombre / Razón Social" w={300}>
               <div style={{display:'flex',gap:4}}>
-                <input style={{...P.inp,flex:1,fontSize:14}} value={cliTxt}
+                <input style={{...P.inp,flex:1,fontSize:13}} value={cliTxt}
                   onChange={e=>setCliTxt(e.target.value)}
-                  placeholder="Nombre del cliente…"
-                  disabled={anulada}/>
-                {cliente && (
-                  <button onClick={()=>setModal('editarCliente')} title="Editar datos del cliente"
-                    style={{...P.inp,width:34,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:16,background:'#fff3cd'}}>
-                    ✎
-                  </button>
-                )}
+                  placeholder="Nombre…" disabled={anulada}/>
+                {cliente && <button onClick={()=>setModal('editarCliente')}
+                  style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:15,background:'#fff3cd'}}>✎</button>}
               </div>
             </Fld>
-
-            <Fld label="Empresa" w={220}>
-              <input style={{...P.inp,...P.ro,fontSize:13}} value={cliente?.nom_empresa||''} readOnly/>
+            <Fld label="Empresa" w={200}>
+              <input style={{...P.inp,...P.ro}} value={cliente?.nom_empresa||''} readOnly/>
+            </Fld>
+            <Fld label="Celular" w={130}>
+              <input style={{...P.inp,...P.ro}} value={cliente?.celular||''} readOnly/>
+            </Fld>
+            <Fld label="Ciudad" w={140}>
+              <input style={{...P.inp,...P.ro}} value={cliente?.ciudad||''} readOnly/>
             </Fld>
           </div>
 
-          {/* FILA 2 — dirección, celular, ciudad, depto */}
+          {/* FILA 2 */}
           <div style={P.fila}>
-            <Fld label="Dirección" w={250}><input style={{...P.inp,...P.ro}} value={cliente?.direccion||''} readOnly/></Fld>
-            <Fld label="Celular"   w={140}><input style={{...P.inp,...P.ro}} value={cliente?.celular||''} readOnly/></Fld>
-            <Fld label="Ciudad"    w={160}><input style={{...P.inp,...P.ro}} value={cliente?.ciudad||''} readOnly/></Fld>
-            <Fld label="Depto."    w={130}><input style={{...P.inp,...P.ro}} value={cliente?.departamento||''} readOnly/></Fld>
-          </div>
-
-          {/* FILA 3 — fechas */}
-          <div style={P.fila}>
-            <Fld label="Fecha" w={150}>
+            <Fld label="Dirección" w={260}>
+              <input style={{...P.inp,...P.ro}} value={cliente?.direccion||''} readOnly/>
+            </Fld>
+            <Fld label="Fecha" w={140}>
               <input type="date" style={P.inp} value={fecha} onChange={e=>setFecha(e.target.value)} disabled={anulada}/>
             </Fld>
-            <Fld label="Plazo de Pago" w={160}>
+            <Fld label="Plazo de Pago" w={150}>
               <select style={P.inp} value={plazo} onChange={e=>setPlazo(e.target.value)} disabled={anulada}>
                 {PLAZOS.map(p=><option key={p}>{p}</option>)}
               </select>
             </Fld>
-            <Fld label="Fecha de Pago" w={150}>
+            <Fld label="Fecha de Pago" w={140}>
               <input type="date" style={P.inp} value={fechaPago} onChange={e=>setFechaPago(e.target.value)} disabled={anulada}/>
             </Fld>
-            <Fld label="% Descuento" w={110}>
+            <Fld label="% Dcto." w={80}>
               <input type="number" style={P.inp} value={pDesc} min={0} max={100} onChange={e=>setPDesc(Number(e.target.value))} disabled={anulada}/>
             </Fld>
-            <Fld label="% IVA" w={90}>
+            <Fld label="% IVA" w={70}>
               <input type="number" style={P.inp} value={pIva} min={0} max={100} onChange={e=>setPIva(Number(e.target.value))} disabled={anulada}/>
             </Fld>
           </div>
 
-          {/* FILA 4 — tipo venta + vendedor */}
+          {/* FILA 3 — precio + vendedor */}
           <div style={{...P.fila,alignItems:'center'}}>
-            <span style={{fontSize:12,fontWeight:800,color:'#1a3a6b',marginRight:4}}>PRECIO:</span>
+            <span style={{fontSize:12,fontWeight:800,color:'#1a3a6b',marginRight:6}}>PRECIO:</span>
             {['Mayor','Detal','Vendedor'].map(t=>(
               <label key={t} style={P.radio}>
                 <input type="radio" name="tipo" checked={tipoVta===t} onChange={()=>setTipoVta(t)} disabled={anulada}/>{' '}{t}
               </label>
             ))}
-            <Fld label="Vendedor" w={240}>
-              <select style={{...P.inp,cursor:'pointer'}} value={cedVend} onChange={e=>elegirVendedor(listaVend.find(v=>v.cedula===e.target.value)||null)} disabled={anulada}>
+            <Fld label="Vendedor" w={260}>
+              <select style={{...P.inp,cursor:'pointer'}}
+                value={cedVend}
+                onChange={e=>elegirVendedor(e.target.value)}
+                disabled={anulada}>
                 <option value="">-- Selecciona vendedor --</option>
                 {listaVend.map(v=>(
                   <option key={v.id} value={v.cedula}>{v.cedula} - {v.nombre}</option>
                 ))}
               </select>
             </Fld>
-            <Fld label="Celular Vendedor" w={140}>
-              <input style={{...P.inp,...P.ro}} value={vendedor?.celular||''} readOnly/>
+            <Fld label="Depto." w={130}>
+              <input style={{...P.inp,...P.ro}} value={cliente?.departamento||''} readOnly/>
             </Fld>
           </div>
         </div>
 
-        {/* TABLA */}
+        {/* TABLA ARTÍCULOS */}
         <div style={{margin:'0 12px 8px'}}>
           <div style={P.tablaWrap}>
             <table style={P.tabla}>
@@ -480,45 +452,39 @@ export default function NotaDeEntrega({ supabase, onClose }) {
               <tbody>
                 {lineas.map((l,i)=>(
                   <tr key={i} style={{background:i%2===0?'#fff':'#f8faff'}}>
-                    <td style={{...P.td,textAlign:'center',color:'#aaa',width:28,fontSize:11}}>
-                      {l.codartic?i+1:''}
-                    </td>
+                    <td style={{...P.td,textAlign:'center',color:'#aaa',width:26,fontSize:11}}>{l.codartic?i+1:''}</td>
                     <td style={P.td}>
                       <div style={{position:'relative'}}>
                         <input style={{...P.ci,width:88}} value={l.codartic}
-                          onChange={e=>buscarArt(e.target.value,i)} placeholder="Código"
-                          disabled={anulada}/>
+                          onChange={e=>buscarArt(e.target.value,i)}
+                          placeholder="Código" disabled={anulada}/>
                         {artIdx===i&&artSugg.length>0&&(
                           <ul style={{...P.drop,width:460,zIndex:99}}>
                             {artSugg.map((a,ai)=>(
                               <li key={ai} style={P.dropItem} onClick={()=>elegirArt(a,i)}>
                                 <strong>{a.codartic}</strong> · {a.descartic}
-                                <span style={{color:'#999',fontSize:11}}>
-                                  {' '}T:{a.talla} | M:${fmt(a.preciovent)} D:${fmt(a.preciovend)} V:${fmt(a.preciovenv)}
-                                </span>
+                                <span style={{color:'#999',fontSize:11}}> T:{a.talla} | ${fmt(precioSegunTipo(a))}</span>
                               </li>
                             ))}
                           </ul>
                         )}
                       </div>
                     </td>
-                    <td style={{...P.td,minWidth:170}}>
+                    <td style={{...P.td,minWidth:160}}>
                       <input style={{...P.ci,width:'100%'}} value={l.descartic}
-                        onChange={e=>buscarDesc(e.target.value,i)} placeholder="Descripción"
-                        disabled={anulada}/>
+                        onChange={e=>buscarDesc(e.target.value,i)}
+                        placeholder="Descripción" disabled={anulada}/>
                     </td>
-                    <td style={P.td}><input style={{...P.ci,width:48,textAlign:'center'}} value={l.talla} onChange={e=>upd(i,{talla:e.target.value})} disabled={anulada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:64,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} min={0} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:96,textAlign:'right',fontSize:13}} value={l.valunit} min={0} onChange={e=>upd(i,{valunit:Number(e.target.value)})} disabled={anulada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:48,textAlign:'right'}} value={l.porciva} min={0} onChange={e=>upd(i,{porciva:Number(e.target.value)})} disabled={anulada}/></td>
-                    <td style={{...P.td,textAlign:'right',paddingRight:8,color:'#555',fontSize:12}}>{l.valiva?fmt(l.valiva):''}</td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:48,textAlign:'right'}} value={l.porcdescue} min={0} max={100} onChange={e=>upd(i,{porcdescue:Number(e.target.value)})} disabled={anulada}/></td>
-                    <td style={{...P.td,textAlign:'right',paddingRight:8,color:'#c0392b',fontSize:12}}>{l.valdescue?fmt(l.valdescue):''}</td>
-                    <td style={{...P.td,textAlign:'right',paddingRight:8,fontWeight:700,color:'#1a3a6b',fontSize:13}}>{l.valtotal?fmt(l.valtotal):''}</td>
-                    <td style={{...P.td,textAlign:'center',width:28}}>
-                      {l.codartic&&!anulada&&(
-                        <button onClick={()=>quitarLinea(i)} style={P.btnX} title="Quitar">✕</button>
-                      )}
+                    <td style={P.td}><input style={{...P.ci,width:46,textAlign:'center'}} value={l.talla} onChange={e=>upd(i,{talla:e.target.value})} disabled={anulada}/></td>
+                    <td style={P.td}><input type="number" style={{...P.ci,width:60,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} min={1} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada}/></td>
+                    <td style={P.td}><input type="number" style={{...P.ci,width:96,textAlign:'right'}} value={l.valunit} min={0} onChange={e=>upd(i,{valunit:Number(e.target.value)})} disabled={anulada}/></td>
+                    <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porciva} min={0} onChange={e=>upd(i,{porciva:Number(e.target.value)})} disabled={anulada}/></td>
+                    <td style={{...P.td,textAlign:'right',paddingRight:6,color:'#555',fontSize:12}}>{l.valiva?fmt(l.valiva):''}</td>
+                    <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porcdescue} min={0} max={100} onChange={e=>upd(i,{porcdescue:Number(e.target.value)})} disabled={anulada}/></td>
+                    <td style={{...P.td,textAlign:'right',paddingRight:6,color:'#c0392b',fontSize:12}}>{l.valdescue?fmt(l.valdescue):''}</td>
+                    <td style={{...P.td,textAlign:'right',paddingRight:6,fontWeight:700,color:'#1a3a6b',fontSize:13}}>{l.valtotal?fmt(l.valtotal):''}</td>
+                    <td style={{...P.td,textAlign:'center',width:26}}>
+                      {l.codartic&&!anulada&&<button onClick={()=>quitarLinea(i)} style={P.btnX}>✕</button>}
                     </td>
                   </tr>
                 ))}
@@ -530,38 +496,41 @@ export default function NotaDeEntrega({ supabase, onClose }) {
         {/* FOOTER */}
         <div style={P.footer}>
 
+          {/* BOTONES */}
           <div style={P.footCol}>
             <div style={P.btnFila}>
-              <IBtn src={WZTOP}    onClick={navPrimero}             title="Primera nota"/>
-              <IBtn src={WZBACK}   onClick={navAnterior}            title="Anterior"/>
-              <IBtn src={WZNEXT}   onClick={navSiguiente}           title="Siguiente"/>
-              <IBtn src={WZEND}    onClick={navUltimo}              title="Última nota"/>
-              <IBtn src={WZLOCATE} onClick={()=>setModal('resumen')}title="Resumen de ventas"/>
+              <IBtn src={WZTOP}    onClick={navPrimero}              title="Primera nota"/>
+              <IBtn src={WZBACK}   onClick={navAnterior}             title="Anterior"/>
+              <IBtn src={WZNEXT}   onClick={navSiguiente}            title="Siguiente"/>
+              <IBtn src={WZEND}    onClick={navUltimo}               title="Última nota"/>
+              <IBtn src={WZLOCATE} onClick={()=>setModal('resumen')} title="Buscar nota"/>
             </div>
             <div style={P.btnFila}>
-              <IBtn src={WZNEW}    onClick={nuevaNota}              title="Nueva nota"/>
-              <IBtn src={WZSAVE}   onClick={guardar}                title="Guardar" disabled={busy||anulada}/>
-              <IBtn src={WZDELETE} onClick={anularNota}             title="Anular nota" disabled={anulada}/>
-              <IBtn src={WZPRINT}  onClick={()=>setModal('print')}  title="Imprimir"/>
-              <IBtn src={WZCLOSE}  onClick={onClose}                title="Volver al menú"/>
+              <IBtn src={WZNEW}    onClick={nuevaNota}   title="Nueva nota" disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
+              <IBtn src={WZSAVE}   onClick={guardar}     title="Guardar"    disabled={busy||anulada}/>
+              <IBtn src={WZDELETE} onClick={anularNota}  title="Anular"     disabled={anulada||modoNueva}/>
+              <IBtn src={WZPRINT}  onClick={()=>setModal('print')} title="Imprimir"/>
+              <IBtn src={WZCLOSE}  onClick={onClose}     title="Volver al menú"/>
             </div>
           </div>
 
+          {/* TOTALES */}
           <div style={{...P.footCol,flex:1}}>
             <div style={P.prendas}>
-              <span style={{fontWeight:700,color:'#856404',fontSize:14}}>CANTIDAD DE PRENDAS</span>
-              <span style={{fontSize:28,fontWeight:900,color:'#856404'}}>{prendas}</span>
+              <span style={{fontWeight:800,color:'#856404',fontSize:14}}>CANTIDAD DE PRENDAS</span>
+              <span style={{fontSize:26,fontWeight:900,color:'#856404'}}>{prendas}</span>
             </div>
             <div style={P.totGrid}>
-              <span style={P.tL}>$ SUBTOTAL</span><span style={P.tL}>$ DESCUENTO</span><span style={P.tL}>$ IVA</span>
-              <span style={P.tV}>{fmt(subtotal)}</span><span style={{...P.tV,color:'#c62828'}}>{fmt(totDcto)}</span><span style={P.tV}>{fmt(totIva)}</span>
-              <span style={{...P.tL,fontWeight:900,color:'#1a3a6b'}}>$ TOTAL</span><span style={P.tL}>$ ABONO</span><span style={{...P.tL,color:'#c62828'}}>$ SALDO</span>
-              <span style={{...P.tV,fontWeight:900,color:'#1a3a6b',fontSize:16}}>{fmt(total)}</span>
-              <span style={{...P.tV,color:'#2e7d32',fontSize:14}}>{fmt(abonos)}</span>
-              <span style={{...P.tV,color:saldo>0?'#c62828':'#2e7d32',fontWeight:700,fontSize:14}}>{fmt(saldo)}</span>
+              <TotFila label="$ SUBTOTAL"  val={fmt(subtotal)} />
+              <TotFila label="$ DESCUENTO" val={fmt(totDcto)}  color="#c62828"/>
+              <TotFila label="$ IVA"       val={fmt(totIva)}   />
+              <TotFila label="$ TOTAL"     val={fmt(total)}    color="#1a3a6b" grande/>
+              <TotFila label="$ ABONO"     val={fmt(abonos)}   color="#2e7d32"/>
+              <TotFila label="$ SALDO"     val={fmt(saldo)}    color={saldo>0?'#c62828':'#2e7d32'} grande/>
             </div>
           </div>
 
+          {/* MEDIO PAGO + ACCIONES */}
           <div style={P.footCol}>
             <div style={P.medios}>
               {MEDIOS.map(m=>(
@@ -577,18 +546,26 @@ export default function NotaDeEntrega({ supabase, onClose }) {
               <BtnAcc onClick={()=>setModal('print')}   icon="🖨">Imprimir</BtnAcc>
             </div>
           </div>
-
         </div>
       </div>
     </div>
   )
 }
 
+// ── sub-componentes ──
 function Fld({label,w,children}){
   return(
     <div style={{display:'flex',flexDirection:'column',width:w,flexShrink:0}}>
-      <span style={{fontSize:11,fontWeight:700,color:'#5577aa',marginBottom:3,textTransform:'uppercase',letterSpacing:0.5}}>{label}</span>
+      <span style={{fontSize:10,fontWeight:700,color:'#5577aa',marginBottom:2,textTransform:'uppercase',letterSpacing:0.5}}>{label}</span>
       {children}
+    </div>
+  )
+}
+function TotFila({label,val,color,grande}){
+  return(
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'2px 0',borderBottom:'1px solid #eef0f5'}}>
+      <span style={{fontSize:11,fontWeight:700,color:'#5577aa',textTransform:'uppercase'}}>{label}</span>
+      <span style={{fontSize:grande?16:13,fontWeight:grande?900:600,color:color||'#333',fontVariantNumeric:'tabular-nums'}}>{val}</span>
     </div>
   )
 }
@@ -610,34 +587,34 @@ function BtnAcc({onClick,icon,children}){
 }
 
 const P={
-  pagina:   {minHeight:'100vh',background:'#dde3ee',padding:12},
-  ventana:  {background:'#f4f6fb',borderRadius:12,border:'1px solid #c8d5ea',boxShadow:'0 4px 24px rgba(0,0,0,0.12)',maxWidth:1200,margin:'0 auto',overflow:'hidden'},
-  titulo:   {background:'linear-gradient(90deg,#1a3a6b,#2c5fa8)',color:'#fff',padding:'10px 18px',display:'flex',alignItems:'center'},
-  titTxt:   {fontWeight:900,fontSize:17,letterSpacing:2,flex:1,textAlign:'center'},
-  titNro:   {background:'rgba(255,255,255,0.2)',borderRadius:6,padding:'5px 16px',fontSize:14,whiteSpace:'nowrap'},
-  alerta:   {margin:'8px 12px',padding:'10px 16px',borderRadius:6,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center'},
-  alertaX:  {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:16},
-  bloque:   {margin:'8px 12px',background:'#fff',borderRadius:8,border:'1px solid #e0e7f0',padding:'14px 16px',display:'flex',flexDirection:'column',gap:10},
-  fila:     {display:'flex',flexWrap:'wrap',gap:10,alignItems:'flex-end'},
-  inp:      {height:30,border:'1px solid #c8d5ea',borderRadius:5,padding:'0 8px',fontSize:13,background:'#fff',outline:'none',width:'100%',color:'#1a3a6b'},
-  ro:       {background:'#f8faff',color:'#555'},
-  radio:    {display:'flex',alignItems:'center',gap:4,fontSize:13,cursor:'pointer',fontWeight:600,color:'#1a3a6b',marginRight:10},
-  drop:     {position:'absolute',top:'100%',left:0,background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,listStyle:'none',margin:0,padding:0,zIndex:50,boxShadow:'0 8px 24px rgba(0,0,0,0.15)',maxHeight:260,overflowY:'auto',minWidth:280},
-  dropItem: {padding:'8px 14px',cursor:'pointer',borderBottom:'1px solid #f0f0f0',fontSize:13},
-  tablaWrap:{overflowX:'auto',borderRadius:6,border:'1px solid #e0e7f0',maxHeight:320,overflowY:'auto'},
-  tabla:    {width:'100%',borderCollapse:'collapse',fontSize:12},
-  thead:    {background:'#1a3a6b',position:'sticky',top:0,zIndex:2},
-  th:       {padding:'7px 8px',textAlign:'center',fontWeight:700,color:'#fff',borderRight:'1px solid #2c5fa8',whiteSpace:'nowrap',fontSize:12},
-  td:       {padding:'3px 4px',borderRight:'1px solid #e8eef5',borderBottom:'1px solid #e8eef5',verticalAlign:'middle'},
-  ci:       {border:'none',background:'transparent',fontSize:12,padding:'3px 4px',outline:'none',color:'#1a3a6b',height:26},
-  btnX:     {background:'none',border:'none',color:'#c0392b',cursor:'pointer',fontSize:13,fontWeight:700},
-  footer:   {display:'flex',gap:14,flexWrap:'wrap',padding:'12px 14px',background:'#eef2ff',borderTop:'2px solid #c8d5ea',alignItems:'flex-start'},
-  footCol:  {display:'flex',flexDirection:'column',gap:7},
-  btnFila:  {display:'flex',gap:5},
-  prendas:  {display:'flex',justifyContent:'space-between',alignItems:'center',background:'#fff3cd',border:'1px solid #ffc107',borderRadius:6,padding:'5px 14px',marginBottom:5},
-  totGrid:  {display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'3px 14px',background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'8px 14px'},
-  tL:       {fontSize:11,color:'#5577aa',fontWeight:700,textAlign:'center',textTransform:'uppercase'},
-  tV:       {fontSize:13,textAlign:'right',fontVariantNumeric:'tabular-nums',fontWeight:600,color:'#333'},
-  medios:   {display:'flex',flexDirection:'column',gap:6,background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'10px 14px'},
-  acciones: {display:'grid',gridTemplateColumns:'1fr 1fr',gap:5},
+  pagina:    {minHeight:'100vh',background:'#dde3ee',padding:12},
+  ventana:   {background:'#f4f6fb',borderRadius:12,border:'1px solid #c8d5ea',boxShadow:'0 4px 24px rgba(0,0,0,0.12)',maxWidth:1300,margin:'0 auto',overflow:'hidden'},
+  titulo:    {background:'linear-gradient(90deg,#1a3a6b,#2c5fa8)',color:'#fff',padding:'10px 18px',display:'flex',alignItems:'center'},
+  titTxt:    {fontWeight:900,fontSize:17,letterSpacing:2,flex:1,textAlign:'center'},
+  titNro:    {background:'rgba(255,255,255,0.2)',borderRadius:6,padding:'5px 16px',fontSize:14,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:8},
+  badgeNueva:{fontSize:10,background:'rgba(255,255,255,0.25)',borderRadius:4,padding:'2px 7px'},
+  badgeAnul: {fontSize:10,background:'#e74c3c',borderRadius:4,padding:'2px 7px'},
+  alerta:    {margin:'6px 12px',padding:'8px 14px',borderRadius:6,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center'},
+  alertaX:   {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:16},
+  bloque:    {margin:'8px 12px',background:'#fff',borderRadius:8,border:'1px solid #e0e7f0',padding:'12px 14px',display:'flex',flexDirection:'column',gap:8},
+  fila:      {display:'flex',flexWrap:'wrap',gap:8,alignItems:'flex-end'},
+  inp:       {height:30,border:'1px solid #c8d5ea',borderRadius:5,padding:'0 8px',fontSize:13,background:'#fff',outline:'none',width:'100%',color:'#1a3a6b'},
+  ro:        {background:'#f8faff',color:'#555'},
+  radio:     {display:'flex',alignItems:'center',gap:4,fontSize:13,cursor:'pointer',fontWeight:600,color:'#1a3a6b',marginRight:10},
+  drop:      {position:'absolute',top:'100%',left:0,background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,listStyle:'none',margin:0,padding:0,zIndex:50,boxShadow:'0 8px 24px rgba(0,0,0,0.15)',maxHeight:260,overflowY:'auto',minWidth:280},
+  dropItem:  {padding:'8px 14px',cursor:'pointer',borderBottom:'1px solid #f0f0f0',fontSize:13},
+  tablaWrap: {overflowX:'auto',borderRadius:6,border:'1px solid #e0e7f0',maxHeight:300,overflowY:'auto'},
+  tabla:     {width:'100%',borderCollapse:'collapse',fontSize:12},
+  thead:     {background:'#1a3a6b',position:'sticky',top:0,zIndex:2},
+  th:        {padding:'7px 8px',textAlign:'center',fontWeight:700,color:'#fff',borderRight:'1px solid #2c5fa8',whiteSpace:'nowrap',fontSize:12},
+  td:        {padding:'3px 4px',borderRight:'1px solid #e8eef5',borderBottom:'1px solid #e8eef5',verticalAlign:'middle'},
+  ci:        {border:'none',background:'transparent',fontSize:12,padding:'3px 4px',outline:'none',color:'#1a3a6b',height:26},
+  btnX:      {background:'none',border:'none',color:'#c0392b',cursor:'pointer',fontSize:13,fontWeight:700},
+  footer:    {display:'flex',gap:12,flexWrap:'wrap',padding:'10px 14px',background:'#eef2ff',borderTop:'2px solid #c8d5ea',alignItems:'flex-start'},
+  footCol:   {display:'flex',flexDirection:'column',gap:6},
+  btnFila:   {display:'flex',gap:4},
+  prendas:   {display:'flex',justifyContent:'space-between',alignItems:'center',background:'#fff3cd',border:'1px solid #ffc107',borderRadius:6,padding:'5px 14px',marginBottom:6},
+  totGrid:   {background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'8px 14px',display:'flex',flexDirection:'column',gap:2},
+  medios:    {display:'flex',flexDirection:'column',gap:6,background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'10px 14px'},
+  acciones:  {display:'grid',gridTemplateColumns:'1fr 1fr',gap:5},
 }

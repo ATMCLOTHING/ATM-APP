@@ -12,7 +12,7 @@ const unMesAtras = () => {
   return d.toISOString().slice(0, 10)
 }
 
-export default function ModalResumen({ supabase, onClose }) {
+export default function ModalResumen({ supabase, onClose, onSelect }) {
   const [desde,    setDesde]   = useState(unMesAtras())
   const [hasta,    setHasta]   = useState(hoy())
   const [notas,    setNotas]   = useState([])
