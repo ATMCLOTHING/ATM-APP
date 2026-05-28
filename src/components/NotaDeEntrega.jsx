@@ -355,7 +355,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
         {/* ENCABEZADO — grid 2 columnas para aprovechar espacio */}
         <div style={P.bloque}>
-          {/* FILA 1 */}
+          {/* FILA 1: cédula, búsqueda, nombre, edición, empresa, celular, dirección, ciudad, departamento */}
           <div style={P.fila}>
             <Fld label="Cédula / NIT" w={140}>
               <div style={{display:'flex',gap:4}}>
@@ -369,7 +369,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
                 </button>
               </div>
             </Fld>
-            <Fld label="Nombre / Razón Social" w={300}>
+            <Fld label="Nombre / Razón Social" w={280}>
               <div style={{display:'flex',gap:4}}>
                 <input style={{...P.inp,flex:1,fontSize:13}} value={cliTxt}
                   onChange={e=>setCliTxt(e.target.value)}
@@ -378,22 +378,25 @@ export default function NotaDeEntrega({ supabase, onClose }) {
                   style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:15,background:'#fff3cd'}}>✎</button>}
               </div>
             </Fld>
-            <Fld label="Empresa" w={200}>
+            <Fld label="Empresa" w={180}>
               <input style={{...P.inp,...P.ro}} value={cliente?.nom_empresa||''} readOnly/>
             </Fld>
-            <Fld label="Celular" w={130}>
+            <Fld label="Celular" w={120}>
               <input style={{...P.inp,...P.ro}} value={cliente?.celular||''} readOnly/>
             </Fld>
-            <Fld label="Ciudad" w={140}>
+            <Fld label="Dirección" w={200}>
+              <input style={{...P.inp,...P.ro}} value={cliente?.direccion||''} readOnly/>
+            </Fld>
+            <Fld label="Ciudad" w={130}>
               <input style={{...P.inp,...P.ro}} value={cliente?.ciudad||''} readOnly/>
+            </Fld>
+            <Fld label="Departamento" w={140}>
+              <input style={{...P.inp,...P.ro}} value={cliente?.departamento||''} readOnly/>
             </Fld>
           </div>
 
-          {/* FILA 2 */}
+          {/* FILA 2: fecha, plazo, fecha pago, % descto, % iva, precio, vendedor */}
           <div style={P.fila}>
-            <Fld label="Dirección" w={260}>
-              <input style={{...P.inp,...P.ro}} value={cliente?.direccion||''} readOnly/>
-            </Fld>
             <Fld label="Fecha" w={140}>
               <input type="date" style={P.inp} value={fecha} onChange={e=>setFecha(e.target.value)} disabled={anulada}/>
             </Fld>
@@ -411,29 +414,22 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             <Fld label="% IVA" w={70}>
               <input type="number" style={P.inp} value={pIva} min={0} max={100} onChange={e=>setPIva(Number(e.target.value))} disabled={anulada}/>
             </Fld>
-          </div>
-
-          {/* FILA 3 — precio + vendedor */}
-          <div style={{...P.fila,alignItems:'center'}}>
-            <span style={{fontSize:12,fontWeight:800,color:'#1a3a6b',marginRight:6}}>PRECIO:</span>
-            {['Mayor','Detal','Vendedor'].map(t=>(
-              <label key={t} style={P.radio}>
-                <input type="radio" name="tipo" checked={tipoVta===t} onChange={()=>setTipoVta(t)} disabled={anulada}/>{' '}{t}
-              </label>
-            ))}
-            <Fld label="Vendedor" w={260}>
+            <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
+              <span style={{fontSize:12,fontWeight:800,color:'#1a3a6b',marginBottom:6}}>PRECIO:</span>
+              {['Mayor','Detal','Vendedor'].map(t=>(
+                <label key={t} style={{...P.radio,marginBottom:4}}>
+                  <input type="radio" name="tipo" checked={tipoVta===t} onChange={()=>setTipoVta(t)} disabled={anulada}/>{' '}{t}
+                </label>
+              ))}
+            </div>
+            <Fld label="Vendedor" w={240}>
               <select style={{...P.inp,cursor:'pointer'}}
-                value={cedVend}
-                onChange={e=>elegirVendedor(e.target.value)}
-                disabled={anulada}>
+                value={cedVend} onChange={e=>elegirVendedor(e.target.value)} disabled={anulada}>
                 <option value="">-- Selecciona vendedor --</option>
                 {listaVend.map(v=>(
                   <option key={v.id} value={v.cedula}>{v.cedula} - {v.nombre}</option>
                 ))}
               </select>
-            </Fld>
-            <Fld label="Depto." w={130}>
-              <input style={{...P.inp,...P.ro}} value={cliente?.departamento||''} readOnly/>
             </Fld>
           </div>
         </div>
@@ -514,19 +510,25 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             </div>
           </div>
 
-          {/* TOTALES */}
+          {/* TOTALES — igual al original */}
           <div style={{...P.footCol,flex:1}}>
             <div style={P.prendas}>
-              <span style={{fontWeight:800,color:'#856404',fontSize:14}}>CANTIDAD DE PRENDAS</span>
-              <span style={{fontSize:26,fontWeight:900,color:'#856404'}}>{prendas}</span>
+              <span style={{fontWeight:800,color:'#856404',fontSize:13}}>CANTIDAD DE PRENDAS</span>
+              <input readOnly value={fmt(prendas)} style={{width:80,textAlign:'right',fontWeight:900,fontSize:15,color:'#856404',border:'1px solid #ffc107',borderRadius:3,padding:'1px 5px',background:'#fff'}}/>
             </div>
             <div style={P.totGrid}>
-              <TotFila label="$ SUBTOTAL"  val={fmt(subtotal)} />
-              <TotFila label="$ DESCUENTO" val={fmt(totDcto)}  color="#c62828"/>
-              <TotFila label="$ IVA"       val={fmt(totIva)}   />
-              <TotFila label="$ TOTAL"     val={fmt(total)}    color="#1a3a6b" grande/>
-              <TotFila label="$ ABONO"     val={fmt(abonos)}   color="#2e7d32"/>
-              <TotFila label="$ SALDO"     val={fmt(saldo)}    color={saldo>0?'#c62828':'#2e7d32'} grande/>
+              <span style={P.tL}>$SUB TOTAL</span>
+              <span style={P.tL}>$ DESCUENTO</span>
+              <span style={P.tL}>$ IVA</span>
+              <span style={P.tV}>{fmt(subtotal)}</span>
+              <span style={{...P.tV,color:'#333'}}>{fmt(totDcto)}</span>
+              <span style={P.tV}>{fmt(totIva)}</span>
+              <span style={{...P.tL,fontWeight:900,color:'#1a3a6b'}}>$ TOTAL</span>
+              <span style={P.tL}>$ ABONO</span>
+              <span style={{...P.tL,color:'#c62828',fontWeight:700}}>$ SALDO</span>
+              <span style={{...P.tV,fontWeight:900,color:'#1a3a6b',fontSize:14}}>{fmt(total)}</span>
+              <span style={{...P.tV,color:'#333'}}>{fmt(abonos)}</span>
+              <span style={{...P.tV,color:saldo>0?'#c62828':'#2e7d32',fontWeight:700,fontSize:14}}>{fmt(saldo)}</span>
             </div>
           </div>
 
@@ -617,4 +619,7 @@ const P={
   totGrid:   {background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'8px 14px',display:'flex',flexDirection:'column',gap:2},
   medios:    {display:'flex',flexDirection:'column',gap:6,background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'10px 14px'},
   acciones:  {display:'grid',gridTemplateColumns:'1fr 1fr',gap:5},
+  tL:        {fontSize:11,color:'#1a3a6b',fontWeight:600,textAlign:'center'},
+  tV:        {fontSize:12,textAlign:'right',fontVariantNumeric:'tabular-nums',fontWeight:600,color:'#333'},
+  totGrid:   {display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'2px 8px',background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'6px 10px'},
 }
