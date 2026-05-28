@@ -8,7 +8,7 @@ import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
-const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+const hoy = () => new Date().toISOString().slice(0,10)
 const VACIA = {codartic:'',descartic:'',talla:'',cantidad:'',valunit:0,porciva:0,valiva:0,porcdescue:0,valdescue:0,valtotal:0}
 const FILAS_BASE = 12
 const FILAS = () => Array.from({length:FILAS_BASE},()=>({...VACIA}))
@@ -145,7 +145,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   // ════════ VENDEDOR ════════
   async function cargarVendedor(ced) {
     if (!ced) return
-    const {data} = await supabase.from('vendedor').select('*').eq('cedvended',ced).maybeSingle()
+    const {data} = await supabase.from('vendedores').select('*').eq('cedula',ced).maybeSingle()
     setVendedor(data||null)
   }
 
@@ -451,7 +451,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
               <input style={P.inp} value={cedVend} onChange={e=>setCedVend(e.target.value)} onBlur={()=>cargarVendedor(cedVend)} disabled={anulada}/>
             </Fld>
             <Fld label="Nombre Vendedor" w={200}>
-              <input style={{...P.inp,...P.ro}} value={vendedor?.nomvended||''} readOnly/>
+              <input style={{...P.inp,...P.ro}} value={vendedor?.nombre||''} readOnly/>
             </Fld>
             <Fld label="Celular" w={140}>
               <input style={{...P.inp,...P.ro}} value={vendedor?.celular||''} readOnly/>
