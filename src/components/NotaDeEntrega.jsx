@@ -47,13 +47,14 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   const nroDocRef = useRef('')  // ref para saber el nro actual sin stale closure
 
   useEffect(() => { init() }, [])
+  useEffect(() => {
+    supabase.from('vendedores').select('id,cedula,nombre,celular').eq('activo',true).order('nombre')
+      .then(({data}) => { if(data) setListaVend(data) })
+  }, [])
 
   // ════════ INIT: cargar la última nota ════════
   async function init() {
     setBusy(true)
-    // cargar lista de vendedores
-    const {data:vdata} = await supabase.from('vendedores').select('id,cedula,nombre').eq('activo',true).order('nombre')
-    setListaVend(vdata||[])
     const {data} = await supabase.from('encnotaen')
       .select('numnotaent')
       .order('numnotaent', {ascending:false})
