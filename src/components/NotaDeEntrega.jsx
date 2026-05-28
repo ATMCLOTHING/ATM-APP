@@ -154,17 +154,24 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   async function buscarArt(txt, idx) {
     setLineas(prev=>{const n=[...prev];n[idx]={...n[idx],codartic:txt};return n})
     if (txt.length<1){setArtSugg([]);setArtIdx(null);return}
+    // primero buscar coincidencia exacta
+    const {data:exactos} = await supabase.from('articomp')
+      .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
+      .eq('codartic', txt).limit(10)
+    if (exactos&&exactos.length===1) {
+      // una sola coincidencia exacta — cargar directo
+      elegirArt(exactos[0], idx); return
+    }
+    if (exactos&&exactos.length>1) {
+      // varias tallas del mismo código — mostrar lista
+      setArtSugg(exactos); setArtIdx(idx); return
+    }
+    // no hay exacta — buscar parcial
     const {data} = await supabase.from('articomp')
       .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
       .ilike('codartic',`%${txt}%`).limit(10)
     if (!data||!data.length){setArtSugg([]);setArtIdx(null);return}
-    // si hay una sola coincidencia exacta, cargar directo sin mostrar lista
-    const exacto = data.find(a=>a.codartic.toString()===txt.toString())
-    if (exacto && data.filter(a=>a.codartic.toString()===txt.toString()).length===1) {
-      elegirArt(exacto, idx)
-    } else {
-      setArtSugg(data); setArtIdx(idx)
-    }
+    setArtSugg(data); setArtIdx(idx)
   }
 
   async function buscarDesc(txt, idx) {
@@ -382,6 +389,69 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   }
 
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
+
+  // ── pagar todo el saldo de una vez ──
+  async function pagarTodo() {
+    if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de pagar.'}); return }
+    if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de pagar.'}); return }
+    if (saldo <= 0) { setMsg({tipo:'warn',texto:'Esta nota no tiene saldo pendiente.'}); return }
+    if (!window.confirm(`¿Registrar pago total de $${fmt(saldo)}?`)) return
+    setBusy(true)
+    try {
+      // guardar nota si no está guardada
+      if (!guardada) {
+        const enc = {
+          numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
+          formapago:plazo, mediopago:medio,
+          codclient:cliente?.id||99,
+          nombreclie:cliente?.nombre||cliTxt,
+          cedrifclie:cedula||cliente?.cedula||'',
+          direcicion:cliente?.direccion||'',
+          celular:cliente?.celular||'',
+          ciudad:cliente?.ciudad||'',
+          departamen:cliente?.departamento||'',
+          nomempresa:cliente?.nom_empresa||'',
+          porcdescue:pDesc, porciva:pIva,
+          subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
+          valabono:abonos, saldo, cedvended:cedVend,
+          cantotal:prendas, anulada:'N',
+        }
+        const {error:eg} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
+        if (eg) throw eg
+        await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
+        const {error:eg2} = await supabase.from('detnotaen').insert(
+          detValidas.map(l=>({
+            numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic,
+            talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
+            subtotal:Number(l.cantidad)*Number(l.valunit),
+            porciva:l.porciva, valiva:l.valiva,
+            porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
+          }))
+        )
+        if (eg2) throw eg2
+        setGuardada(true); setModoNueva(false)
+      }
+      // registrar abono por el saldo completo
+      const {error:ea} = await supabase.from('detabonos').insert({
+        numnotaent: nroDoc,
+        fechaabono: hoy(),
+        valabono:   saldo,
+        mediopago:  medio,
+        observacio: 'Pago total',
+      })
+      if (ea) throw ea
+      // actualizar encnotaen
+      const nuevoAbono = abonos + saldo
+      await supabase.from('encnotaen').update({
+        valabono: nuevoAbono, saldo: 0
+      }).eq('numnotaent', nroDoc)
+      setMsg({tipo:'ok',texto:`✅ Pago total de $${fmt(saldo)} registrado.`})
+      await cargarDoc(nroDoc)
+    } catch(e) {
+      setMsg({tipo:'err',texto:`❌ Error: ${e.message}`})
+    }
+    setBusy(false)
+  }
 
   // ── abrir modal de abonos: guarda automáticamente si no está guardada ──
   async function abrirAbonos() {
@@ -651,6 +721,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             </div>
             <div style={P.acciones}>
               <BtnAcc onClick={abrirAbonos} icon="💵">Abonos</BtnAcc>
+              <BtnAcc onClick={pagarTodo}   icon="💰">Pagar Todo</BtnAcc>
               <BtnAcc onClick={()=>setModal('detalle')} icon="🔍">Detalle</BtnAcc>
               <BtnAcc onClick={()=>setModal('buscarNota')} icon="📊">Resumen</BtnAcc>
               <BtnAcc onClick={()=>setModal('print')}   icon="🖨">Imprimir</BtnAcc>
