@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { WZNEW, WZSAVE, WZDELETE, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO, WZPRINT } from '../lib/assets'
+import { WZNEW, WZSAVE, WZDELETE, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO, WZDUPLICAR } from '../lib/assets'
 import ModalNuevaMarca       from './ModalNuevaMarca'
 import ModalNuevoProveedor   from './ModalNuevoProveedor'
 import ModalListadoArticulos from './ModalListadoArticulos'
@@ -177,7 +177,14 @@ export default function Articulos({ supabase, onClose }) {
           <div style={P.fila}>
             <Campo label="CÓDIGO" w={100}>
               <input ref={codRef} style={{...P.inp,fontWeight:900,fontSize:14,color:'#c0392b'}}
-                value={form.codartic} onChange={e=>upd('codartic',e.target.value.toUpperCase())}
+                value={form.codartic}
+                onChange={e=>upd('codartic',e.target.value.toUpperCase())}
+                onBlur={async e=>{
+                  const cod = e.target.value.trim()
+                  if(!cod||!modoNueva) return
+                  const {data} = await supabase.from('articulo').select('codartic').eq('codartic',cod).limit(1)
+                  if(data&&data.length>0) setMsg({tipo:'err',texto:`⚠️ El código "${cod}" ya existe. Elige otro código.`})
+                }}
                 disabled={guardado&&!modoNueva} placeholder="Código"/>
             </Campo>
             <Campo label="DESCRIPCIÓN" w={300}>
@@ -279,12 +286,12 @@ export default function Articulos({ supabase, onClose }) {
               <IBtn src={WZLOCATE} onClick={()=>setModal('listado')} title="Listado de artículos"/>
             </div>
             <div style={P.btnFila}>
-              <IBtn src={WZNEW}    onClick={nuevoArt} title="Nuevo artículo"/>
-              <IBtn src={WZSAVE}   onClick={guardar}  title="Guardar" disabled={busy}/>
-              <IBtn src={WZUNDO}   onClick={duplicar} title="Duplicar datos"/>
-              <IBtn src={WZPRINT}  onClick={()=>setModal('listado')} title="Imprimir listado"/>
-              <IBtn src={WZDELETE} onClick={eliminar} title="Eliminar" disabled={modoNueva&&!guardado}/>
-              <IBtn src={WZCLOSE}  onClick={onClose}  title="Volver al menú"/>
+              <IBtn src={WZNEW}      onClick={nuevoArt}             title="Nuevo artículo"/>
+              <IBtn src={WZSAVE}     onClick={guardar}              title="Guardar" disabled={busy}/>
+              <IBtn src={WZDUPLICAR} onClick={duplicar}             title="Duplicar datos"/>
+              <IBtn src={WZUNDO}     onClick={()=>{if(modoNueva&&!guardado){setForm({...VACIO});setMsg(null);setTimeout(()=>codRef.current?.focus(),100)}}} title="Revertir" disabled={!modoNueva||guardado}/>
+              <IBtn src={WZDELETE}   onClick={eliminar}             title="Eliminar" disabled={modoNueva&&!guardado}/>
+              <IBtn src={WZCLOSE}    onClick={onClose}              title="Volver al menú"/>
             </div>
           </div>
 
