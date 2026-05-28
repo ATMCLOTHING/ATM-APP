@@ -302,6 +302,12 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       }
       const {error:e1}=await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
       if(e1)throw e1
+
+      // ── INVENTARIO: obtener líneas anteriores para calcular diferencia ──
+      const {data:detAnt} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
+      const cantAnt = {} // {codartic|talla: cantidad}
+      ;(detAnt||[]).forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantAnt[k]=(cantAnt[k]||0)+Number(l.cantidad) })
+
       await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
       const {error:e2}=await supabase.from('detnotaen').insert(
         detValidas.map(l=>({
@@ -313,8 +319,28 @@ export default function NotaDeEntrega({ supabase, onClose }) {
         }))
       )
       if(e2)throw e2
+
+      // ── INVENTARIO: descontar diferencia por codartic+talla ──
+      const cantNueva = {}
+      detValidas.forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantNueva[k]=(cantNueva[k]||0)+Number(l.cantidad) })
+      const todasKeys = new Set([...Object.keys(cantAnt),...Object.keys(cantNueva)])
+      const avisos = []
+      for (const k of todasKeys) {
+        const [cod,tall] = k.split('|')
+        const diff = (cantNueva[k]||0) - (cantAnt[k]||0) // positivo=venta nueva, negativo=devolución
+        if (diff===0) continue
+        // leer existencia actual
+        const {data:art} = await supabase.from('articomp').select('id,existencia').eq('codartic',cod).eq('talla',tall).limit(1)
+        if (!art||!art.length) continue
+        const nuevaExist = (art[0].existencia||0) - diff
+        await supabase.from('articomp').update({existencia:nuevaExist}).eq('id',art[0].id)
+        if (nuevaExist < 0) avisos.push(`${cod} T:${tall} (existencia: ${nuevaExist})`)
+      }
+
       setGuardada(true); setModoNueva(false)
-      setMsg({tipo:'ok',texto:`✅ Nota ${nroDoc} guardada correctamente.`})
+      const msgBase = `✅ Nota ${nroDoc} guardada.`
+      const msgFinal = avisos.length ? `${msgBase} ⚠️ Inventario negativo en: ${avisos.join(', ')}` : msgBase
+      setMsg({tipo: avisos.length?'warn':'ok', texto:msgFinal})
       const ids=await recargarIds()
       setNavPos(ids.indexOf(nroDoc))
     } catch(e){
@@ -334,7 +360,18 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       anulada:'S',fechaanula:hoy(),motivoanula:motivo||'Anulada'
     }).eq('numnotaent',nroDoc)
     if(error){setMsg({tipo:'err',texto:`❌ ${error.message}`})}
-    else {setAnulada(true); setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada.`})}
+    else {
+      // ── INVENTARIO: devolver existencias al anular ──
+      const {data:det} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
+      for (const l of (det||[])) {
+        const {data:art} = await supabase.from('articomp').select('id,existencia').eq('codartic',l.codartic).eq('talla',l.talla).limit(1)
+        if (art&&art.length) {
+          await supabase.from('articomp').update({existencia:(art[0].existencia||0)+Number(l.cantidad)}).eq('id',art[0].id)
+        }
+      }
+      setAnulada(true)
+      setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada. Inventario restaurado.`})
+    }
     setBusy(false)
   }
 
