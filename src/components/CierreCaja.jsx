@@ -166,11 +166,32 @@ export default function CierreCaja({ supabase, onClose }) {
       .map(n=>({...n, diasVencido: Math.floor((new Date()-new Date(n.fechanotae))/(1000*60*60*24))}))
   }
 
+  function calcVentasCliente() {
+    if (!datos) return {mostrador:[], clientes:[]}
+    const { notas } = datos
+    const MOSTRADOR = ['99','9','999','5031']
+    const mostrador = notas.filter(n=>MOSTRADOR.includes(String(n.codclient||'')))
+    const clientes  = notas.filter(n=>!MOSTRADOR.includes(String(n.codclient||'')))
+    // agrupar por cliente
+    const map = {}
+    clientes.forEach(n=>{
+      const k = n.cedrifclie||String(n.codclient)
+      if(!map[k]) map[k]={cedula:k,nombre:n.nombreclie,notas:0,total:0,abonado:0,saldo:0}
+      map[k].notas++
+      map[k].total   += n.valtotal||0
+      map[k].abonado += n.valabono||0
+      map[k].saldo   += n.saldo||0
+    })
+    const totMostrador = mostrador.reduce((s,n)=>s+(n.valtotal||0),0)
+    return { mostrador, clientes:Object.values(map).sort((a,b)=>b.total-a.total), totMostrador }
+  }
+
   const cons = calcConsolidado()
   const marcas = calcMarcas()
   const resumen = calcResumen()
   const topArts = calcTopArticulos()
   const cartera = calcCartera()
+  const ventasCli = calcVentasCliente()
 
   function imprimirConsolidado() {
     if (!cons) return
@@ -228,6 +249,133 @@ export default function CierreCaja({ supabase, onClose }) {
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
   }
 
+  function imprimirMarcas() {
+    if (!marcas) return
+    const w = window.open('','_blank','width=700,height=500')
+    w.document.write(`<html><head><title>Ventas por Marca</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}
+    h2{color:#1a3a6b;text-align:center;}
+    .sub{text-align:center;color:#555;margin-bottom:12px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#1a3a6b;color:#fff;padding:6px 8px;text-align:right;font-size:10px;}
+    th:first-child{text-align:left;}
+    td{padding:5px 8px;border-bottom:1px solid #eee;text-align:right;}
+    td:first-child{text-align:left;}
+    tr:nth-child(even){background:#f5f7fc;}
+    .tot{font-weight:900;background:#dde3ee;}
+    </style></head><body>
+    <h2>ATM — VENTAS POR MARCA</h2>
+    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <table><thead><tr><th>Marca</th><th>Unidades</th><th>$ Promedio</th><th>$ Total</th></tr></thead>
+    <tbody>
+    ${Object.entries(marcas).sort((a,b)=>b[1].total-a[1].total).map(([m,v])=>`
+      <tr><td>${m}</td><td>${v.unidades}</td>
+      <td>$${fmt(v.unidades>0?v.total/v.unidades:0)}</td>
+      <td>$${fmt(v.total)}</td></tr>`).join('')}
+    <tr class="tot"><td>TOTALES</td>
+    <td>${Object.values(marcas).reduce((s,v)=>s+v.unidades,0)}</td><td></td>
+    <td>$${fmt(Object.values(marcas).reduce((s,v)=>s+v.total,0))}</td></tr>
+    </tbody></table></body></html>`)
+    w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
+  }
+
+  function imprimirTop() {
+    const w = window.open('','_blank','width=700,height=500')
+    w.document.write(`<html><head><title>Top Artículos</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}
+    h2{color:#1a3a6b;text-align:center;}
+    .sub{text-align:center;color:#555;margin-bottom:12px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#1a3a6b;color:#fff;padding:6px 8px;text-align:left;font-size:10px;}
+    td{padding:5px 8px;border-bottom:1px solid #eee;}
+    tr:nth-child(even){background:#f5f7fc;}
+    </style></head><body>
+    <h2>ATM — TOP 10 ARTÍCULOS</h2>
+    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <table><thead><tr><th>#</th><th>Código</th><th>Descripción</th><th style="text-align:right">Unidades</th><th style="text-align:right">$ Total</th></tr></thead>
+    <tbody>
+    ${topArts.map((a,i)=>`
+      <tr><td>${i+1}</td><td>${a.codartic}</td><td>${a.descartic}</td>
+      <td style="text-align:right">${a.unidades}</td>
+      <td style="text-align:right">$${fmt(a.total)}</td></tr>`).join('')}
+    </tbody></table></body></html>`)
+    w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
+  }
+
+  function imprimirCartera() {
+    const w = window.open('','_blank','width=900,height=600')
+    w.document.write(`<html><head><title>Cartera</title>
+    <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px;}
+    h2{color:#1a3a6b;text-align:center;}
+    .sub{text-align:center;color:#555;margin-bottom:12px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#1a3a6b;color:#fff;padding:6px 8px;font-size:10px;}
+    td{padding:5px 8px;border-bottom:1px solid #eee;}
+    tr:nth-child(even){background:#f5f7fc;}
+    .tot{font-weight:900;background:#dde3ee;}
+    .mora{color:#c62828;font-weight:700;}
+    </style></head><body>
+    <h2>ATM — CARTERA PENDIENTE</h2>
+    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <table><thead><tr>
+      <th>Nota</th><th>Fecha</th><th>Cliente</th>
+      <th style="text-align:right">Total</th><th style="text-align:right">Abonado</th>
+      <th style="text-align:right">Saldo</th><th style="text-align:right">Días</th>
+    </tr></thead><tbody>
+    ${cartera.map(n=>`
+      <tr><td>${n.numnotaent}</td><td>${n.fechanotae}</td><td>${n.nombreclie}</td>
+      <td style="text-align:right">$${fmt(n.valtotal)}</td>
+      <td style="text-align:right">$${fmt(n.valabono)}</td>
+      <td style="text-align:right;font-weight:700;color:#c62828">$${fmt(n.saldo)}</td>
+      <td style="text-align:right" class="${n.diasVencido>30?'mora':''}">${n.diasVencido}d</td></tr>`).join('')}
+    <tr class="tot"><td colspan="5">TOTAL PENDIENTE</td>
+    <td style="text-align:right">$${fmt(cartera.reduce((s,n)=>s+n.saldo,0))}</td><td></td></tr>
+    </tbody></table></body></html>`)
+    w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
+  }
+
+  function imprimirVentasCliente() {
+    const w = window.open('','_blank','width=900,height=600')
+    w.document.write(`<html><head><title>Ventas por Cliente</title>
+    <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px;}
+    h2{color:#1a3a6b;text-align:center;}
+    .sub{text-align:center;color:#555;margin-bottom:12px;}
+    .seccion{font-weight:900;background:#1a3a6b;color:#fff;padding:5px 8px;margin-top:12px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#dde3ee;color:#1a3a6b;padding:5px 8px;font-size:10px;font-weight:700;}
+    td{padding:5px 8px;border-bottom:1px solid #eee;}
+    tr:nth-child(even){background:#f5f7fc;}
+    .tot{font-weight:900;background:#dde3ee;}
+    </style></head><body>
+    <h2>ATM — VENTAS POR CLIENTE</h2>
+    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <div class="seccion">VENTAS MOSTRADOR (CLIENTE GENERAL) — $${fmt(ventasCli.totMostrador)}</div>
+    <table><thead><tr><th>Nota</th><th>Fecha</th><th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Saldo</th></tr></thead>
+    <tbody>
+    ${ventasCli.mostrador.map(n=>`
+      <tr><td>${n.numnotaent}</td><td>${n.fechanotae}</td>
+      <td style="text-align:right">$${fmt(n.valtotal)}</td>
+      <td style="text-align:right">$${fmt(n.valabono)}</td>
+      <td style="text-align:right">$${fmt(n.saldo)}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="seccion">VENTAS A CLIENTES ESPECÍFICOS</div>
+    <table><thead><tr><th>Cédula</th><th>Cliente</th><th style="text-align:right">Notas</th><th style="text-align:right">Total</th><th style="text-align:right">Abonado</th><th style="text-align:right">Saldo</th></tr></thead>
+    <tbody>
+    ${ventasCli.clientes.map(cl=>`
+      <tr><td>${cl.cedula}</td><td>${cl.nombre}</td>
+      <td style="text-align:right">${cl.notas}</td>
+      <td style="text-align:right">$${fmt(cl.total)}</td>
+      <td style="text-align:right">$${fmt(cl.abonado)}</td>
+      <td style="text-align:right;color:#c62828">$${fmt(cl.saldo)}</td></tr>`).join('')}
+    <tr class="tot"><td colspan="3">TOTALES</td>
+    <td style="text-align:right">$${fmt(ventasCli.clientes.reduce((s,c)=>s+c.total,0))}</td>
+    <td style="text-align:right">$${fmt(ventasCli.clientes.reduce((s,c)=>s+c.abonado,0))}</td>
+    <td style="text-align:right;color:#c62828">$${fmt(ventasCli.clientes.reduce((s,c)=>s+c.saldo,0))}</td></tr>
+    </tbody></table>
+    </body></html>`)
+    w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
+  }
+
   function imprimirResumen() {
     if (!resumen) return
     const w = window.open('','_blank','width=700,height=500')
@@ -265,6 +413,7 @@ export default function CierreCaja({ supabase, onClose }) {
   const TABS = [
     {id:'consolidado', label:'📊 Consolidado por Vendedor'},
     {id:'marcas',      label:'🏷️ Ventas por Marca'},
+    {id:'clientes',    label:'👥 Ventas por Cliente'},
     {id:'resumen',     label:'💰 Resumen del Día'},
     {id:'top',         label:'🏆 Top Artículos'},
     {id:'cartera',     label:'📋 Cartera Pendiente'},
@@ -296,8 +445,12 @@ export default function CierreCaja({ supabase, onClose }) {
           </button>
           {datos && (
             <div style={{marginLeft:'auto',display:'flex',gap:8}}>
-              <button onClick={imprimirConsolidado} style={P.btnPrint}>🖨 Consolidado</button>
-              <button onClick={imprimirResumen}     style={P.btnPrint}>🖨 Resumen</button>
+              {tab==='consolidado' && <button onClick={imprimirConsolidado} style={P.btnPrint}>🖨 Imprimir</button>}
+              {tab==='marcas'      && <button onClick={imprimirMarcas}      style={P.btnPrint}>🖨 Imprimir</button>}
+              {tab==='clientes'    && <button onClick={imprimirVentasCliente} style={P.btnPrint}>🖨 Imprimir</button>}
+              {tab==='resumen'     && <button onClick={imprimirResumen}     style={P.btnPrint}>🖨 Imprimir</button>}
+              {tab==='top'         && <button onClick={imprimirTop}         style={P.btnPrint}>🖨 Imprimir</button>}
+              {tab==='cartera'     && <button onClick={imprimirCartera}     style={P.btnPrint}>🖨 Imprimir</button>}
             </div>
           )}
         </div>
@@ -444,6 +597,53 @@ export default function CierreCaja({ supabase, onClose }) {
                         </tr>
                       ))}
                       {topArts.length===0&&<tr><td colSpan={5} style={{textAlign:'center',padding:20,color:'#888'}}>Sin ventas en el período.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* ── VENTAS POR CLIENTE ── */}
+              {tab==='clientes' && ventasCli && (
+                <div>
+                  <div style={P.secTit}>👥 Ventas por Cliente — {desde} al {hasta}</div>
+                  <div style={{background:'#1a3a6b',color:'#fff',padding:'6px 12px',borderRadius:5,marginBottom:8,fontWeight:700,fontSize:13}}>
+                    VENTAS MOSTRADOR (CLIENTE GENERAL) — ${fmt(ventasCli.totMostrador)}
+                    <span style={{marginLeft:16,fontSize:11,fontWeight:400,opacity:0.8}}>{ventasCli.mostrador.length} notas</span>
+                  </div>
+                  <div style={{marginBottom:14,fontSize:12,color:'#555'}}>
+                    Ventas de mostrador: notas donde el cliente es General (código 99)
+                  </div>
+                  <div style={{background:'#1a3a6b',color:'#fff',padding:'6px 12px',borderRadius:5,marginBottom:8,fontWeight:700,fontSize:13}}>
+                    VENTAS A CLIENTES ESPECÍFICOS
+                  </div>
+                  <table style={P.tabla}>
+                    <thead>
+                      <tr style={P.thead}>
+                        {['Cédula','Cliente','Notas','Total','Abonado','Saldo'].map(h=>(
+                          <th key={h} style={{...P.th,textAlign:['Notas','Total','Abonado','Saldo'].includes(h)?'right':'left'}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ventasCli.clientes.map((cl,i)=>(
+                        <tr key={cl.cedula} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
+                          <td style={P.td}>{cl.cedula}</td>
+                          <td style={{...P.td,fontWeight:600}}>{cl.nombre}</td>
+                          <td style={{...P.td,textAlign:'right'}}>{cl.notas}</td>
+                          <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#1a3a6b'}}>${fmt(cl.total)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(cl.abonado)}</td>
+                          <td style={{...P.td,textAlign:'right',color:cl.saldo>0?'#c62828':'#2e7d32',fontWeight:700}}>${fmt(cl.saldo)}</td>
+                        </tr>
+                      ))}
+                      {ventasCli.clientes.length>0&&(
+                        <tr style={P.totRow}>
+                          <td colSpan={3} style={P.td}><strong>TOTALES</strong></td>
+                          <td style={{...P.td,textAlign:'right',fontSize:14,color:'#1a3a6b'}}>${fmt(ventasCli.clientes.reduce((s,c)=>s+c.total,0))}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(ventasCli.clientes.reduce((s,c)=>s+c.abonado,0))}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#c62828',fontSize:14}}>${fmt(ventasCli.clientes.reduce((s,c)=>s+c.saldo,0))}</td>
+                        </tr>
+                      )}
+                      {ventasCli.clientes.length===0&&<tr><td colSpan={6} style={{textAlign:'center',padding:20,color:'#888'}}>Sin ventas a clientes específicos en este período.</td></tr>}
                     </tbody>
                   </table>
                 </div>
