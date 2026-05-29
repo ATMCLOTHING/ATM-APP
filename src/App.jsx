@@ -4,7 +4,7 @@ import { LOGO } from './lib/assets'
 import NotaDeEntrega from './components/NotaDeEntrega'
 import Articulos     from './components/Articulos'
 import Proveedores   from './components/Proveedores'
-import CierreCaja    from './components/CierreCaja'
+import CierreCaja    from './components/CierreCaja' 
 
 export default function App() {
   const [modulo, setModulo] = useState(null)
