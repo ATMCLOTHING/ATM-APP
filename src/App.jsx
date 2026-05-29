@@ -4,6 +4,7 @@ import { LOGO } from './lib/assets'
 import NotaDeEntrega from './components/NotaDeEntrega'
 import Articulos     from './components/Articulos'
 import Proveedores   from './components/Proveedores'
+import CierreCaja    from './components/CierreCaja'
 
 export default function App() {
   const [modulo, setModulo] = useState(null)
@@ -11,6 +12,7 @@ export default function App() {
   if (modulo === 'nota')       return <NotaDeEntrega supabase={supabase} onClose={()=>setModulo(null)}/>
   if (modulo === 'articulos')  return <Articulos     supabase={supabase} onClose={()=>setModulo(null)}/>
   if (modulo === 'proveedores')return <Proveedores   supabase={supabase} onClose={()=>setModulo(null)}/>
+  if (modulo === 'cierre')      return <CierreCaja    supabase={supabase} onClose={()=>setModulo(null)}/>
 
   return (
     <div style={s.pagina}>
@@ -28,7 +30,7 @@ export default function App() {
           <Btn icon="📦" label="Artículos"        color="#e65100" onClick={()=>setModulo('articulos')}/>
           <Btn icon="🏭" label="Proveedores"      color="#00838f" onClick={()=>setModulo('proveedores')}/>
           <Btn icon="👥" label="Clientes"         color="#2e7d32" disabled/>
-          <Btn icon="💰" label="Cartera"          color="#6a1b9a" disabled/>
+          <Btn icon="💰" label="Cierre de Caja"   color="#6a1b9a" onClick={()=>setModulo('cierre')}/>
           <Btn icon="📊" label="Inventario"       color="#c62828" disabled/>
         </div>
         <div style={s.pie}>© 2026 ATM Clothing — Todos los derechos reservados</div>
