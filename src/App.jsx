@@ -8,6 +8,7 @@ import Articulos       from './components/Articulos'
 import Proveedores     from './components/Proveedores'
 import CierreCaja      from './components/CierreCaja'
 import GestionUsuarios from './components/GestionUsuarios'
+import Cartera         from './components/Cartera'
 
 export default function App() {
   const [usuario, setUsuarioState] = useState(null)
@@ -51,6 +52,7 @@ export default function App() {
   if (modulo === 'proveedores')return <Proveedores      supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'cierre')     return <CierreCaja       supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'usuarios')   return <GestionUsuarios  supabase={supabase} usuario={usuario} onClose={onClose}/>
+  if (modulo === 'cartera')    return <Cartera          supabase={supabase} usuario={usuario} onClose={onClose}/>
 
   // Dashboard
   return (
