@@ -233,13 +233,17 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   }
 
   // ── totales ──
-  const detValidas = lineas.filter(l=>l.codartic&&Number(l.cantidad)>0)
-  const subtotal   = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
-  const totDcto    = detValidas.reduce((s,l)=>s+(l.valdescue||0),0)
-  const totIva     = detValidas.reduce((s,l)=>s+(l.valiva||0),0)
-  const total      = detValidas.reduce((s,l)=>s+(l.valtotal||0),0)
-  const saldo      = total-abonos
-  const prendas    = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
+  const detValidas   = lineas.filter(l=>l.codartic&&Number(l.cantidad)>0)
+  const subtotal     = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
+  const totDctoLinea = detValidas.reduce((s,l)=>s+(l.valdescue||0),0)
+  // descuento global del encabezado sobre el subtotal
+  const dctoGlobal   = subtotal * ((Number(pDesc)||0)/100)
+  const totDcto      = totDctoLinea + dctoGlobal
+  const baseIva      = subtotal - totDcto
+  const totIva       = baseIva * ((Number(pIva)||0)/100)
+  const total        = baseIva + totIva
+  const saldo        = total - abonos
+  const prendas      = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
 
   // ── cargar nota ──
   async function cargarDoc(id, idsParam) {
