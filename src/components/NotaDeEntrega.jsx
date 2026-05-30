@@ -399,8 +399,8 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
           subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
           valabono:abonos, saldo, cedvended:cedVend,
           cantotal:prendas, anulada:'N',
-        }
           usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+        }
         const {error:eg} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
         if (eg) throw eg
         await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
@@ -449,8 +449,8 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
           subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
           valabono:abonos, saldo, cedvended:cedVend,
           cantotal:prendas, anulada:'N',
-        }
           usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+        }
         const {error:e1} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
         if (e1) throw e1
         await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
