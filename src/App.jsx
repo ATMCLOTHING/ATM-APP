@@ -9,6 +9,7 @@ import Proveedores     from './components/Proveedores'
 import CierreCaja      from './components/CierreCaja'
 import GestionUsuarios from './components/GestionUsuarios'
 import Cartera         from './components/Cartera'
+import Comisiones      from './components/Comisiones'
 import Clientes        from './components/Clientes'
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
   if (modulo === 'cierre')     return <CierreCaja       supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'usuarios')   return <GestionUsuarios  supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'cartera')    return <Cartera          supabase={supabase} usuario={usuario} onClose={onClose}/>
+  if (modulo === 'comisiones') return <Comisiones       supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'clientes')   return <Clientes         supabase={supabase} usuario={usuario} onClose={onClose}/>
 
   return (
