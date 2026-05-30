@@ -35,8 +35,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   const [artSugg,   setArtSugg]   = useState([])
   const [artIdx,    setArtIdx]    = useState(null)
   const [abonos,    setAbonos]    = useState(0)
-  const [allIds,    setAllIds]    = useState([])
-  const [navPos,    setNavPos]    = useState(null)
+  const [totalNotas, setTotalNotas] = useState(0)
   const [busy,      setBusy]      = useState(false)
   const [msg,       setMsg]       = useState(null)
   const [modal,     setModal]     = useState(null)
@@ -57,12 +56,14 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   async function init() {
     setBusy(true)
-    const {data} = await supabase.from('encnotaen')
-      .select('numnotaent').order('numnotaent',{ascending:false})
-    const ids = (data||[]).map(r=>r.numnotaent).reverse()
-    setAllIds(ids)
-    if (ids.length > 0) {
-      await cargarDoc(ids[ids.length-1], ids)
+    // solo contar y cargar la última nota — sin traer todos los IDs
+    const {count} = await supabase.from('encnotaen')
+      .select('numnotaent', {count:'exact', head:true})
+    setTotalNotas(count||0)
+    if ((count||0) > 0) {
+      const {data} = await supabase.from('encnotaen')
+        .select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
+      if (data?.length) await cargarDoc(data[0].numnotaent)
     } else {
       await prepararNueva()
     }
@@ -86,7 +87,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setCedula(''); setCliTxt(''); setCliente(null)
     setCedVend(''); setVendedor(null)
     setLineas(FILAS()); setAbonos(0)
-    setMsg(null); setNavPos(null)
+    setMsg(null)
     setGuardada(false); setAnulada(false); setModoNueva(true)
     setTimeout(()=>cedulaRef.current?.focus(), 100)
   }
@@ -100,11 +101,10 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   async function revertirNueva() {
     if (!modoNueva) return
-    if (allIds.length > 0) {
-      await cargarDoc(allIds[allIds.length-1])
-    } else {
-      setMsg({tipo:'warn',texto:'No hay notas guardadas a las cuales volver.'})
-    }
+    const {data} = await supabase.from('encnotaen')
+      .select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
+    if (data?.length) await cargarDoc(data[0].numnotaent)
+    else setMsg({tipo:'warn',texto:'No hay notas guardadas a las cuales volver.'})
   }
 
   // ── CLIENTE: si no existe, abre modal para crear ──
@@ -232,13 +232,11 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   const saldo        = total - abonos
   const prendas      = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
 
-  async function cargarDoc(id, idsParam) {
+  async function cargarDoc(id) {
     setBusy(true); setMsg(null)
     const {data:enc} = await supabase.from('encnotaen').select('*').eq('numnotaent',id).limit(1)
     if (!enc||!enc.length){setBusy(false);return}
     const e = enc[0]
-    const ids = idsParam||allIds
-    setNavPos(ids.indexOf(id))
     setNroDoc(e.numnotaent)
     setFecha(e.fechanotae?.slice(0,10)||hoy())
     setFechaPago(e.fechavence?.slice(0,10)||hoy())
@@ -261,14 +259,37 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   }
 
   async function recargarIds() {
-    const {data}=await supabase.from('encnotaen').select('numnotaent').order('numnotaent',{ascending:true})
-    const ids=(data||[]).map(r=>r.numnotaent); setAllIds(ids); return ids
+    const {count} = await supabase.from('encnotaen')
+      .select('numnotaent',{count:'exact',head:true})
+    setTotalNotas(count||0)
   }
 
-  function navPrimero()   { if(allIds.length){setNavPos(0);cargarDoc(allIds[0])} }
-  function navAnterior()  { if(navPos!==null&&navPos>0){cargarDoc(allIds[navPos-1])} }
-  function navSiguiente() { if(navPos!==null&&navPos<allIds.length-1){cargarDoc(allIds[navPos+1])} }
-  function navUltimo()    { if(allIds.length){cargarDoc(allIds[allIds.length-1])} }
+  async function navPrimero() {
+    const {data} = await supabase.from('encnotaen')
+      .select('numnotaent').order('numnotaent',{ascending:true}).limit(1)
+    if (data?.length) cargarDoc(data[0].numnotaent)
+  }
+  async function navAnterior() {
+    if (!nroDoc) return
+    const {data} = await supabase.from('encnotaen')
+      .select('numnotaent').lt('numnotaent', nroDoc)
+      .order('numnotaent',{ascending:false}).limit(1)
+    if (data?.length) cargarDoc(data[0].numnotaent)
+    else setMsg({tipo:'warn',texto:'Esta es la primera nota.'})
+  }
+  async function navSiguiente() {
+    if (!nroDoc) return
+    const {data} = await supabase.from('encnotaen')
+      .select('numnotaent').gt('numnotaent', nroDoc)
+      .order('numnotaent',{ascending:true}).limit(1)
+    if (data?.length) cargarDoc(data[0].numnotaent)
+    else setMsg({tipo:'warn',texto:'Esta es la última nota.'})
+  }
+  async function navUltimo() {
+    const {data} = await supabase.from('encnotaen')
+      .select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
+    if (data?.length) cargarDoc(data[0].numnotaent)
+  }
 
   async function guardar() {
     if (!cliente&&!cliTxt.trim()){setMsg({tipo:'err',texto:'Ingresa un cliente antes de guardar.'}); return}
@@ -324,8 +345,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       setGuardada(true); setModoNueva(false)
       const msgBase = `✅ Nota ${nroDoc} guardada.`
       setMsg({tipo:avisos.length?'warn':'ok', texto:avisos.length?`${msgBase} ⚠️ Inventario negativo en: ${avisos.join(', ')}`:msgBase})
-      const ids=await recargarIds()
-      setNavPos(ids.indexOf(nroDoc))
+      await recargarIds()
     } catch(e){
       setMsg({tipo:'err',texto:`❌ Error: ${e.message}`})
     }
