@@ -246,9 +246,11 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     const cedV = e.cedvended||''
     setCedVend(cedV)
     setVendedor(listaVend.find(v=>v.cedula===cedV)||null)
-    const {data:cli} = await supabase.from('clientes').select('*').eq('id',e.codclient).limit(1)
+    const {data:cli} = e.codclient && e.codclient !== '99' && e.codclient !== '9' && e.codclient !== '999'
+      ? (await supabase.from('clientes').select('*').eq('id', e.codclient).limit(1)).data
+      : null
     setCliente(cli&&cli.length?cli[0]:null)
-    setCliTxt(cli&&cli.length?cli[0].nombre:e.nombreclie||'')
+    setCliTxt(cli&&cli.length?cli[0].nombre:(e.nombreclie||''))
     const {data:det} = await supabase.from('detnotaen').select('*').eq('numnotaent',id)
     const extras = Math.max(0,FILAS_BASE-(det?.length||0))
     setLineas(det?.length?[...det,...Array.from({length:extras},()=>({...VACIA}))]:FILAS())

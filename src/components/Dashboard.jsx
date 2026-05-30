@@ -66,6 +66,7 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
     {id:'proveedores',icon:'🏭', label:'Proveedores',     color:'#00838f', roles:['admin','bodega']},
     {id:'cierre',     icon:'💰', label:'Cierre de Caja',  color:'#6a1b9a', roles:['admin']},
     {id:'cartera',    icon:'📊', label:'Cartera',         color:'#2e7d32', roles:['admin','vendedor']},
+    {id:'comisiones', icon:'💼', label:'Comisiones',      color:'#f57c00', roles:['admin']},
     {id:'usuarios',   icon:'👥', label:'Usuarios',        color:'#c62828', roles:['admin']},
   ]
 
