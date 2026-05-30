@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { LOGO, WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO } from '../lib/assets'
 import ModalAbonos        from './ModalAbonos'
-import ModalBuscarNota from './ModalBuscarNota'
+import ModalBuscarNota    from './ModalBuscarNota'
 import ModalDetalle       from './ModalDetalle'
 import PrintNota          from './PrintNota'
 import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
+import ModalNuevoCliente  from './ModalNuevoCliente'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
@@ -41,17 +42,17 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   const [modal,     setModal]     = useState(null)
   const [guardada,  setGuardada]  = useState(false)
   const [anulada,   setAnulada]   = useState(false)
-  const [modoNueva, setModoNueva] = useState(false) // true = usuario presionó Nueva, aún sin guardar
+  const [modoNueva, setModoNueva] = useState(false)
+  // cédula que no se encontró — para pasarla al modal de nuevo cliente
+  const [cedulaNueva, setCedulaNueva] = useState('')
 
   const cedulaRef = useRef()
 
-  // ── cargar vendedores al montar ──
   useEffect(() => {
     supabase.from('vendedores').select('id,cedula,nombre').order('nombre')
       .then(({data}) => { if(data) setListaVend(data) })
   }, [])
 
-  // ── init: mostrar última nota ──
   useEffect(() => { init() }, [])
 
   async function init() {
@@ -68,7 +69,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setBusy(false)
   }
 
-  // ── consecutivo ──
   async function siguienteConsecutivo() {
     const {data,error} = await supabase.rpc('siguiente_nota')
     if (!error && data) return String(data)
@@ -77,7 +77,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     return String(d2?.length ? Number(d2[0].numnotaent)+1 : 1)
   }
 
-  // ── preparar formulario en blanco ──
   async function prepararNueva() {
     const nro = await siguienteConsecutivo()
     setNroDoc(nro)
@@ -92,7 +91,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setTimeout(()=>cedulaRef.current?.focus(), 100)
   }
 
-  // ── botón nueva nota ──
   async function nuevaNota() {
     if (modoNueva && (cliente || cliTxt || lineas.some(l=>l.codartic))) {
       if (!window.confirm('¿Descartar los cambios sin guardar?')) return
@@ -100,37 +98,43 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     await prepararNueva()
   }
 
-  // ── revertir nueva nota: vuelve a la última guardada ──
   async function revertirNueva() {
     if (!modoNueva) return
-    const ids = allIds
-    if (ids.length > 0) {
-      await cargarDoc(ids[ids.length-1])
+    if (allIds.length > 0) {
+      await cargarDoc(allIds[allIds.length-1])
     } else {
       setMsg({tipo:'warn',texto:'No hay notas guardadas a las cuales volver.'})
     }
   }
 
-  // ── cliente ──
+  // ── CLIENTE: si no existe, abre modal para crear ──
   async function onCedulaEnter() {
     const ced = cedula.trim()
     if (!ced) { setModal('buscarCliente'); return }
     setBusy(true)
-    const {data} = await supabase.from('clientes').select('*').eq('cedula',ced).limit(1)
+    const {data} = await supabase.from('clientes').select('*').eq('cedula', ced).limit(1)
     setBusy(false)
     if (data && data.length > 0) {
       aplicarCliente(data[0])
     } else {
-      setMsg({tipo:'warn',texto:`Cédula "${ced}" no encontrada. Usa 🔍 para buscar.`})
-      setCliTxt(''); setCliente(null)
+      // cédula no encontrada → abrir modal para crear cliente nuevo
+      setCedulaNueva(ced)
+      setModal('nuevoCliente')
     }
   }
 
   function aplicarCliente(c) {
     setCliente(c)
-    setCedula(c.cedula||String(c.id))
+    setCedula(c.cedula || String(c.id))
     setCliTxt(c.nombre)
     setMsg(null)
+  }
+
+  // se llama cuando ModalNuevoCliente guarda exitosamente
+  function onClienteCreado(c) {
+    aplicarCliente(c)
+    setModal(null)
+    setMsg({tipo:'ok', texto:`✅ Cliente "${c.nombre}" creado y aplicado a la nota.`})
   }
 
   function onClienteEditado(c) {
@@ -138,13 +142,11 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setMsg({tipo:'ok',texto:'Cliente actualizado.'})
   }
 
-  // ── vendedor ──
   function elegirVendedor(cedSel) {
     const v = listaVend.find(x=>x.cedula===cedSel)||null
     setCedVend(cedSel); setVendedor(v)
   }
 
-  // ── artículos ──
   function precioSegunTipo(art) {
     if (tipoVta==='Detal')    return art.preciovend||0
     if (tipoVta==='Vendedor') return art.preciovenv||0
@@ -154,19 +156,11 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   async function buscarArt(txt, idx) {
     setLineas(prev=>{const n=[...prev];n[idx]={...n[idx],codartic:txt};return n})
     if (txt.length<1){setArtSugg([]);setArtIdx(null);return}
-    // primero buscar coincidencia exacta
     const {data:exactos} = await supabase.from('articomp')
       .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
       .eq('codartic', txt).limit(10)
-    if (exactos&&exactos.length===1) {
-      // una sola coincidencia exacta — cargar directo
-      elegirArt(exactos[0], idx); return
-    }
-    if (exactos&&exactos.length>1) {
-      // varias tallas del mismo código — mostrar lista
-      setArtSugg(exactos); setArtIdx(idx); return
-    }
-    // no hay exacta — buscar parcial
+    if (exactos&&exactos.length===1) { elegirArt(exactos[0], idx); return }
+    if (exactos&&exactos.length>1)   { setArtSugg(exactos); setArtIdx(idx); return }
     const {data} = await supabase.from('articomp')
       .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
       .ilike('codartic',`%${txt}%`).limit(10)
@@ -184,19 +178,15 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   }
 
   function elegirArt(art, idx) {
-    // si el artículo ya existe en otra línea, sumar cantidad
     setLineas(prev => {
       const sig = [...prev]
       const existeIdx = sig.findIndex((l,i) => i!==idx && l.codartic===art.codartic && l.talla===art.talla)
       if (existeIdx >= 0) {
-        // sumar en la línea existente
         const nueva = recalc({...sig[existeIdx], cantidad: Number(sig[existeIdx].cantidad||0)+1})
         sig[existeIdx] = nueva
-        // limpiar la línea actual
         sig[idx] = {...VACIA}
         return sig
       }
-      // no existe — poner en la línea actual con cantidad 1
       const precio = precioSegunTipo(art)
       sig[idx] = recalc({...sig[idx], codartic:art.codartic, descartic:art.descartic, talla:art.talla||'', valunit:precio, porciva:art.porciva||0, cantidad:1})
       if (idx===sig.length-1) sig.push({...VACIA})
@@ -205,7 +195,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setArtSugg([]); setArtIdx(null)
   }
 
-  // ── cálculo de línea ──
   function recalc(lin) {
     const cant = Number(lin.cantidad)||0
     const sub  = cant*(Number(lin.valunit)||0)
@@ -232,11 +221,9 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     })
   }
 
-  // ── totales ──
   const detValidas   = lineas.filter(l=>l.codartic&&Number(l.cantidad)>0)
   const subtotal     = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
   const totDctoLinea = detValidas.reduce((s,l)=>s+(l.valdescue||0),0)
-  // descuento global del encabezado sobre el subtotal
   const dctoGlobal   = subtotal * ((Number(pDesc)||0)/100)
   const totDcto      = totDctoLinea + dctoGlobal
   const baseIva      = subtotal - totDcto
@@ -245,7 +232,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   const saldo        = total - abonos
   const prendas      = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
 
-  // ── cargar nota ──
   async function cargarDoc(id, idsParam) {
     setBusy(true); setMsg(null)
     const {data:enc} = await supabase.from('encnotaen').select('*').eq('numnotaent',id).limit(1)
@@ -259,19 +245,15 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setPlazo(e.formapago||'CONTADO'); setMedio(e.mediopago||'Efectivo')
     setPDesc(e.porcdescue||0); setPIva(e.porciva||0)
     setCedula(e.cedrifclie||'')
-    // vendedor
     const cedV = e.cedvended||''
     setCedVend(cedV)
     setVendedor(listaVend.find(v=>v.cedula===cedV)||null)
-    // cliente
     const {data:cli} = await supabase.from('clientes').select('*').eq('id',e.codclient).limit(1)
     setCliente(cli&&cli.length?cli[0]:null)
     setCliTxt(cli&&cli.length?cli[0].nombre:e.nombreclie||'')
-    // líneas
     const {data:det} = await supabase.from('detnotaen').select('*').eq('numnotaent',id)
     const extras = Math.max(0,FILAS_BASE-(det?.length||0))
     setLineas(det?.length?[...det,...Array.from({length:extras},()=>({...VACIA}))]:FILAS())
-    // abonos — solo de ESTA nota
     const {data:ab} = await supabase.from('detabonos').select('valabono').eq('numnotaent',id)
     setAbonos((ab||[]).reduce((s,r)=>s+(r.valabono||0),0))
     setGuardada(true); setAnulada(e.anulada==='S'); setModoNueva(false)
@@ -283,13 +265,11 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     const ids=(data||[]).map(r=>r.numnotaent); setAllIds(ids); return ids
   }
 
-  // ── navegación ──
   function navPrimero()   { if(allIds.length){setNavPos(0);cargarDoc(allIds[0])} }
   function navAnterior()  { if(navPos!==null&&navPos>0){cargarDoc(allIds[navPos-1])} }
   function navSiguiente() { if(navPos!==null&&navPos<allIds.length-1){cargarDoc(allIds[navPos+1])} }
   function navUltimo()    { if(allIds.length){cargarDoc(allIds[allIds.length-1])} }
 
-  // ── guardar ──
   async function guardar() {
     if (!cliente&&!cliTxt.trim()){setMsg({tipo:'err',texto:'Ingresa un cliente antes de guardar.'}); return}
     if (!detValidas.length){setMsg({tipo:'err',texto:'Agrega al menos un artículo con cantidad.'}); return}
@@ -313,12 +293,9 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       }
       const {error:e1}=await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
       if(e1)throw e1
-
-      // ── INVENTARIO: obtener líneas anteriores para calcular diferencia ──
       const {data:detAnt} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
-      const cantAnt = {} // {codartic|talla: cantidad}
+      const cantAnt = {}
       ;(detAnt||[]).forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantAnt[k]=(cantAnt[k]||0)+Number(l.cantidad) })
-
       await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
       const {error:e2}=await supabase.from('detnotaen').insert(
         detValidas.map(l=>({
@@ -330,8 +307,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
         }))
       )
       if(e2)throw e2
-
-      // ── INVENTARIO: descontar diferencia por codartic+talla ──
       const cantNueva = {}
       detValidas.forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantNueva[k]=(cantNueva[k]||0)+Number(l.cantidad) })
       const todasKeys = new Set([...Object.keys(cantAnt),...Object.keys(cantNueva)])
@@ -340,23 +315,15 @@ export default function NotaDeEntrega({ supabase, onClose }) {
         const [cod,tall] = k.split('|')
         const diff = (cantNueva[k]||0) - (cantAnt[k]||0)
         if (diff===0) continue
-        // usar función SQL para actualizar inventario de forma segura
-        await supabase.rpc('ajustar_inventario', {
-          p_codartic: cod,
-          p_talla:    tall,
-          p_cantidad: diff
-        })
-        // verificar si quedó negativo
+        await supabase.rpc('ajustar_inventario', {p_codartic:cod, p_talla:tall, p_cantidad:diff})
         const {data:art} = await supabase.from('articomp')
           .select('existencia').eq('codartic',cod).eq('talla',tall).limit(1)
         if (art&&art.length&&(art[0].existencia||0)<0)
           avisos.push(`${cod} T:${tall} (existencia: ${art[0].existencia})`)
       }
-
       setGuardada(true); setModoNueva(false)
       const msgBase = `✅ Nota ${nroDoc} guardada.`
-      const msgFinal = avisos.length ? `${msgBase} ⚠️ Inventario negativo en: ${avisos.join(', ')}` : msgBase
-      setMsg({tipo: avisos.length?'warn':'ok', texto:msgFinal})
+      setMsg({tipo:avisos.length?'warn':'ok', texto:avisos.length?`${msgBase} ⚠️ Inventario negativo en: ${avisos.join(', ')}`:msgBase})
       const ids=await recargarIds()
       setNavPos(ids.indexOf(nroDoc))
     } catch(e){
@@ -365,7 +332,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setBusy(false)
   }
 
-  // ── anular ──
   async function anularNota() {
     if (!guardada){setMsg({tipo:'warn',texto:'Esta nota no está guardada aún.'}); return}
     if (anulada){setMsg({tipo:'warn',texto:'Esta nota ya está anulada.'}); return}
@@ -377,14 +343,9 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     }).eq('numnotaent',nroDoc)
     if(error){setMsg({tipo:'err',texto:`❌ ${error.message}`})}
     else {
-      // ── INVENTARIO: devolver existencias al anular ──
       const {data:det} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
       for (const l of (det||[])) {
-        await supabase.rpc('ajustar_inventario', {
-          p_codartic: l.codartic,
-          p_talla:    l.talla,
-          p_cantidad: -Number(l.cantidad)  // negativo = devolver
-        })
+        await supabase.rpc('ajustar_inventario', {p_codartic:l.codartic, p_talla:l.talla, p_cantidad:-Number(l.cantidad)})
       }
       setAnulada(true)
       setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada. Inventario restaurado.`})
@@ -394,7 +355,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
 
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
 
-  // ── pagar todo el saldo de una vez ──
   async function pagarTodo() {
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de pagar.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de pagar.'}); return }
@@ -402,7 +362,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     if (!window.confirm(`¿Registrar pago total de $${fmt(saldo)}?`)) return
     setBusy(true)
     try {
-      // guardar nota si no está guardada
       if (!guardada) {
         const enc = {
           numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
@@ -435,20 +394,11 @@ export default function NotaDeEntrega({ supabase, onClose }) {
         if (eg2) throw eg2
         setGuardada(true); setModoNueva(false)
       }
-      // registrar abono por el saldo completo
       const {error:ea} = await supabase.from('detabonos').insert({
-        numnotaent: nroDoc,
-        fechaabono: hoy(),
-        valabono:   saldo,
-        mediopago:  medio,
-        observacio: 'Pago total',
+        numnotaent:nroDoc, fechaabono:hoy(), valabono:saldo, mediopago:medio, observacio:'Pago total',
       })
       if (ea) throw ea
-      // actualizar encnotaen
-      const nuevoAbono = abonos + saldo
-      await supabase.from('encnotaen').update({
-        valabono: nuevoAbono, saldo: 0
-      }).eq('numnotaent', nroDoc)
+      await supabase.from('encnotaen').update({valabono:abonos+saldo, saldo:0}).eq('numnotaent',nroDoc)
       setMsg({tipo:'ok',texto:`✅ Pago total de $${fmt(saldo)} registrado.`})
       await cargarDoc(nroDoc)
     } catch(e) {
@@ -457,12 +407,10 @@ export default function NotaDeEntrega({ supabase, onClose }) {
     setBusy(false)
   }
 
-  // ── abrir modal de abonos: guarda automáticamente si no está guardada ──
   async function abrirAbonos() {
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de registrar abonos.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de registrar abonos.'}); return }
     if (!guardada) {
-      // guardar directo en BD sin depender del estado React
       try {
         const enc = {
           numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
@@ -510,9 +458,9 @@ export default function NotaDeEntrega({ supabase, onClose }) {
       {modal==='print'         && <PrintNota          datos={dataNota} onClose={()=>setModal(null)}/>}
       {modal==='buscarCliente' && <ModalBuscarCliente supabase={supabase} onSelect={c=>{aplicarCliente(c);setModal(null)}} onClose={()=>setModal(null)}/>}
       {modal==='editarCliente' && <ModalEditarCliente supabase={supabase} cliente={cliente} onGuardar={onClienteEditado} onClose={()=>setModal(null)}/>}
+      {modal==='nuevoCliente'  && <ModalNuevoCliente  supabase={supabase} cedulaInicial={cedulaNueva} onGuardado={onClienteCreado} onClose={()=>setModal(null)}/>}
 
       <div style={P.ventana}>
-        {/* TÍTULO */}
         <div style={P.titulo}>
           <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start',marginRight:14,lineHeight:1}}>
             <span style={{fontFamily:'Arial Black, Arial, sans-serif',fontWeight:900,fontSize:22,color:'#fff',letterSpacing:3}}>ATM</span>
@@ -526,7 +474,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
           </div>
         </div>
 
-        {/* MENSAJE */}
         {msg && (
           <div style={{...P.alerta,
             background:msg.tipo==='ok'?'#e8f5e9':msg.tipo==='warn'?'#fff8e1':'#ffebee',
@@ -536,9 +483,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
           </div>
         )}
 
-        {/* ENCABEZADO — grid 2 columnas para aprovechar espacio */}
         <div style={P.bloque}>
-          {/* FILA 1: cédula, búsqueda, nombre, edición, empresa, celular, dirección, ciudad, departamento */}
           <div style={P.fila}>
             <Fld label="Cédula / NIT" w={140}>
               <div style={{display:'flex',gap:4}}>
@@ -578,7 +523,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             </Fld>
           </div>
 
-          {/* FILA 2: fecha, plazo, fecha pago, % descto, % iva, precio, vendedor */}
           <div style={P.fila}>
             <Fld label="Fecha" w={140}>
               <input type="date" style={P.inp} value={fecha} onChange={e=>setFecha(e.target.value)} disabled={anulada}/>
@@ -617,7 +561,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
           </div>
         </div>
 
-        {/* TABLA ARTÍCULOS */}
         <div style={{margin:'0 12px 8px'}}>
           <div style={P.tablaWrap}>
             <table style={P.tabla}>
@@ -673,29 +616,25 @@ export default function NotaDeEntrega({ supabase, onClose }) {
           </div>
         </div>
 
-        {/* FOOTER */}
         <div style={P.footer}>
-
-          {/* BOTONES */}
           <div style={P.footCol}>
             <div style={P.btnFila}>
-              <IBtn src={WZTOP}    onClick={navPrimero}              title="Primera nota"/>
-              <IBtn src={WZBACK}   onClick={navAnterior}             title="Anterior"/>
-              <IBtn src={WZNEXT}   onClick={navSiguiente}            title="Siguiente"/>
-              <IBtn src={WZEND}    onClick={navUltimo}               title="Última nota"/>
+              <IBtn src={WZTOP}    onClick={navPrimero}                title="Primera nota"/>
+              <IBtn src={WZBACK}   onClick={navAnterior}               title="Anterior"/>
+              <IBtn src={WZNEXT}   onClick={navSiguiente}              title="Siguiente"/>
+              <IBtn src={WZEND}    onClick={navUltimo}                 title="Última nota"/>
               <IBtn src={WZLOCATE} onClick={()=>setModal('buscarNota')} title="Buscar nota"/>
             </div>
             <div style={P.btnFila}>
-              <IBtn src={WZNEW}    onClick={nuevaNota}    title="Nueva nota"  disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
-              <IBtn src={WZSAVE}   onClick={guardar}      title="Guardar"     disabled={busy||anulada}/>
-              <IBtn src={WZUNDO}   onClick={revertirNueva} title="Revertir"   disabled={!modoNueva}/>
-              <IBtn src={WZDELETE} onClick={anularNota}   title="Anular"      disabled={anulada||modoNueva}/>
+              <IBtn src={WZNEW}    onClick={nuevaNota}     title="Nueva nota"  disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
+              <IBtn src={WZSAVE}   onClick={guardar}       title="Guardar"     disabled={busy||anulada}/>
+              <IBtn src={WZUNDO}   onClick={revertirNueva} title="Revertir"    disabled={!modoNueva}/>
+              <IBtn src={WZDELETE} onClick={anularNota}    title="Anular"      disabled={anulada||modoNueva}/>
               <IBtn src={WZPRINT}  onClick={()=>setModal('print')} title="Imprimir"/>
-              <IBtn src={WZCLOSE}  onClick={onClose}      title="Volver al menú"/>
+              <IBtn src={WZCLOSE}  onClick={onClose}       title="Volver al menú"/>
             </div>
           </div>
 
-          {/* TOTALES — igual al original */}
           <div style={{...P.footCol,flex:1}}>
             <div style={P.prendas}>
               <span style={{fontWeight:800,color:'#856404',fontSize:13}}>CANTIDAD DE PRENDAS</span>
@@ -717,7 +656,6 @@ export default function NotaDeEntrega({ supabase, onClose }) {
             </div>
           </div>
 
-          {/* MEDIO PAGO + ACCIONES */}
           <div style={P.footCol}>
             <div style={P.medios}>
               {MEDIOS.map(m=>(
@@ -737,20 +675,11 @@ export default function NotaDeEntrega({ supabase, onClose }) {
   )
 }
 
-// ── sub-componentes ──
 function Fld({label,w,children}){
   return(
     <div style={{display:'flex',flexDirection:'column',width:w,flexShrink:0}}>
       <span style={{fontSize:10,fontWeight:700,color:'#5577aa',marginBottom:2,textTransform:'uppercase',letterSpacing:0.5}}>{label}</span>
       {children}
-    </div>
-  )
-}
-function TotFila({label,val,color,grande}){
-  return(
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'2px 0',borderBottom:'1px solid #eef0f5'}}>
-      <span style={{fontSize:11,fontWeight:700,color:'#5577aa',textTransform:'uppercase'}}>{label}</span>
-      <span style={{fontSize:grande?16:13,fontWeight:grande?900:600,color:color||'#333',fontVariantNumeric:'tabular-nums'}}>{val}</span>
     </div>
   )
 }
@@ -799,7 +728,6 @@ const P={
   footCol:   {display:'flex',flexDirection:'column',gap:6},
   btnFila:   {display:'flex',gap:4},
   prendas:   {display:'flex',justifyContent:'space-between',alignItems:'center',background:'#fff3cd',border:'1px solid #ffc107',borderRadius:6,padding:'5px 14px',marginBottom:6},
-  totGrid:   {background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'8px 14px',display:'flex',flexDirection:'column',gap:2},
   medios:    {display:'flex',flexDirection:'column',gap:6,background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'10px 14px'},
   acciones:  {display:'grid',gridTemplateColumns:'1fr 1fr',gap:5},
   tL:        {fontSize:11,color:'#1a3a6b',fontWeight:600,textAlign:'center'},
