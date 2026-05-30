@@ -43,9 +43,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
     supabase.from('vendedores').select('cedula,nombre').order('nombre')
       .then(({data}) => setVendedores(data||[]))
     // vendedor ve solo sus notas
-    if (usuario?.rol === 'vendedor' && usuario?.cedula_vendedor) {
-      setFiltVend(usuario.cedula_vendedor)
-    }
+    // vendedor ve sus notas — la cédula se resuelve en generar()
   }, [])
 
   // ── GENERAR ──────────────────────────────────────────────────────────────
@@ -61,7 +59,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
       .order('fechanotae', {ascending:true})
 
     // filtro vendedor
-    const cedVend = filtVend || (usuario?.rol==='vendedor' ? usuario?.cedula_vendedor : '')
+    const cedVend = filtVend
     if (cedVend) q = q.eq('cedvended', cedVend)
 
     // filtro estado
@@ -72,6 +70,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
     if (filtCliente.trim()) q = q.ilike('nombreclie', `%${filtCliente.trim()}%`)
 
     const {data, error} = await q.limit(5000)
+    if (error) { console.error('Cartera error:', error); setTotales({valor:0,abonado:0,saldo:0}); setNotas([]); setResumen([]); setGenerado(true); setCargando(false); return }
 
     let resultado = (data||[]).map(n => ({
       ...n,
