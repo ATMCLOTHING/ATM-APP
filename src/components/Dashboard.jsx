@@ -15,7 +15,6 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
     setCargando(true)
     const hoyStr = hoy()
 
-    // Notas de hoy
     const {data:notas} = await supabase.from('encnotaen')
       .select('valtotal,valabono,saldo,cedvended,anulada,cantotal')
       .gte('fechanotae', hoyStr).lte('fechanotae', hoyStr)
@@ -25,17 +24,14 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
     const totalAbonos  = notasActivas.reduce((s,n)=>s+(n.valabono||0),0)
     const totalPrendas = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
 
-    // Cartera total pendiente
     const {data:cartera} = await supabase.from('encnotaen')
       .select('saldo').eq('anulada','N').gt('saldo',0)
     const totalCartera = (cartera||[]).reduce((s,n)=>s+(n.saldo||0),0)
 
-    // Artículos con existencia baja
     const {data:bajos} = await supabase.from('articulo')
       .select('codartic,descartic,existencia,existminim')
       .filter('existencia','lte','existminim').eq('estado','A').limit(5)
 
-    // Top vendedoras hoy
     const {data:vends} = await supabase.from('vendedores').select('cedula,nombre')
     const vendMap = {}
     ;(vends||[]).forEach(v=>{ vendMap[v.cedula]=v.nombre })
@@ -57,27 +53,22 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
   }
 
   const MODULOS = [
-    {id:'nota',       icon:'📋', label:'Nota de Entrega', color:'#1a3a6b', modulo:'notas'},
-    {id:'articulos',  icon:'📦', label:'Artículos',       color:'#e65100', modulo:'articulos'},
-    {id:'proveedores',icon:'🏭', label:'Proveedores',     color:'#00838f', modulo:'articulos'},
-    {id:'cierre',     icon:'💰', label:'Cierre de Caja',  color:'#6a1b9a', modulo:'cierre'},
-    {id:'cartera',    icon:'📊', label:'Cartera',         color:'#2e7d32', modulo:'cartera'},
-    {id:'usuarios',   icon:'👥', label:'Usuarios',        color:'#c62828', modulo:'usuarios'},
+    {id:'nota',       icon:'📋', label:'Nota de Entrega', color:'#1a3a6b', roles:['admin','cajera','vendedor']},
+    {id:'clientes',   icon:'👤', label:'Clientes',        color:'#1565c0', roles:['admin','cajera','vendedor']},
+    {id:'articulos',  icon:'📦', label:'Artículos',       color:'#e65100', roles:['admin','bodega']},
+    {id:'proveedores',icon:'🏭', label:'Proveedores',     color:'#00838f', roles:['admin','bodega']},
+    {id:'cierre',     icon:'💰', label:'Cierre de Caja',  color:'#6a1b9a', roles:['admin']},
+    {id:'cartera',    icon:'📊', label:'Cartera',         color:'#2e7d32', roles:['admin','vendedor']},
+    {id:'usuarios',   icon:'👥', label:'Usuarios',        color:'#c62828', roles:['admin']},
   ]
 
-  // Filtrar módulos según permisos
   const modulosVisibles = MODULOS.filter(m => {
     if (usuario.rol === 'admin') return true
-    if (usuario.rol === 'cajera') return m.id === 'nota'
-    if (usuario.rol === 'bodega') return ['articulos','proveedores'].includes(m.id)
-    if (usuario.rol === 'vendedor') return ['nota','cartera'].includes(m.id)
-    const perm = (usuario.permisos||[]).find(p=>p.modulo===m.modulo)
-    return perm?.puede_ver || false
+    return m.roles.includes(usuario.rol)
   })
 
   return (
     <div style={S.pagina}>
-      {/* HEADER */}
       <div style={S.header}>
         <img src={LOGO} alt="ATM" style={{height:40,objectFit:'contain'}}/>
         <div style={{flex:1}}>
@@ -94,7 +85,6 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
       </div>
 
       <div style={S.contenido}>
-        {/* MÉTRICAS DEL DÍA — solo admin */}
         {usuario.rol === 'admin' && (
           <div style={S.seccion}>
             <div style={S.secTit}>📈 Resumen del día</div>
@@ -113,12 +103,12 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
         )}
 
         <div style={{display:'grid',gridTemplateColumns:usuario.rol==='admin'?'1fr 1fr':'1fr',gap:16}}>
-          {/* MÓDULOS */}
           <div style={S.seccion}>
             <div style={S.secTit}>🚀 Módulos</div>
             <div style={S.modulosGrid}>
               {modulosVisibles.map(m=>(
-                <button key={m.id} onClick={()=>onModulo(m.id)} style={{...S.moduloBtn,border:`2px solid ${m.color}`,boxShadow:`0 4px 12px ${m.color}22`}}>
+                <button key={m.id} onClick={()=>onModulo(m.id)}
+                  style={{...S.moduloBtn,border:`2px solid ${m.color}`,boxShadow:`0 4px 12px ${m.color}22`}}>
                   <span style={{fontSize:30}}>{m.icon}</span>
                   <span style={{fontSize:12,fontWeight:800,color:m.color,textAlign:'center'}}>{m.label}</span>
                 </button>
@@ -126,7 +116,6 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
             </div>
           </div>
 
-          {/* TOP VENDEDORAS + ALERTAS — solo admin */}
           {usuario.rol === 'admin' && metricas && (
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
               {metricas.topVend.length > 0 && (
