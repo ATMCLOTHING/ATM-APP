@@ -2,6 +2,27 @@ import { useState } from 'react'
 import { WZCLOSE, WZPRINT, WZLOCATE } from '../lib/assets'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
+
+// Normaliza mediopago — históricas tienen E/T/M/C, nuevas tienen texto completo
+const normMedio = m => {
+  if (!m) return 'efectivo'
+  const v = String(m).trim().toUpperCase()
+  if (v==='E' || v==='EFECTIVO')        return 'efectivo'
+  if (v==='T' || v==='TRANSFERENCIA')   return 'transferencia'
+  if (v==='M' || v==='MIXTO')           return 'mixto'
+  if (v==='C' || v==='CREDITO' || v==='CRÉDITO') return 'credito'
+  return 'efectivo'
+}
+
+// Determina quién hizo la nota según número
+const quienHizoNota = num => {
+  const n = Number(num)||0
+  if (n < 1000000)              return 'Vendedor/Admin'
+  if (n >= 1000000 && n <= 1999999) return 'Cajera 1'
+  if (n >= 2000000 && n <= 2999999) return 'Cajera 2'
+  if (n >= 3000000 && n <= 3999999) return 'Cajera 3'
+  return 'Otro'
+}
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 const ayer = () => { const d=new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 
@@ -17,7 +38,7 @@ export default function CierreCaja({ supabase, onClose }) {
     try {
       // Notas del período (no anuladas)
       const {data:notas} = await supabase.from('encnotaen')
-        .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,cantotal,codclient')
+        .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,cantotal,codclient,usuario')
         .gte('fechanotae',desde).lte('fechanotae',hasta)
         .or('anulada.is.null,anulada.neq.S')
 
@@ -62,7 +83,6 @@ export default function CierreCaja({ supabase, onClose }) {
   function calcConsolidado() {
     if (!datos) return null
     const { notas, vendMap } = datos
-    const MOSTRADOR = ['99','9','999','5031'] // códigos cliente general
 
     // Por vendedor
     const porVend = {}
@@ -71,17 +91,16 @@ export default function CierreCaja({ supabase, onClose }) {
       const nombre = vendMap[key]||key
       if (!porVend[nombre]) porVend[nombre] = {efectivo:0,transferencia:0,mixto:0,credito:0,noAbonado:0,total:0}
       const v = porVend[nombre]
-      const esMostrador = MOSTRADOR.includes(String(n.codclient||''))
-      // clasificar
-      if (n.formapago==='CONTADO') {
-        if (n.mediopago==='Efectivo')       v.efectivo      += n.valtotal
-        else if (n.mediopago==='Transferencia') v.transferencia += n.valtotal
-        else if (n.mediopago==='Mixto')     v.mixto         += n.valtotal
-        else                                v.efectivo      += n.valtotal
+      const medio = normMedio(n.mediopago)
+      const esCredito = n.formapago !== 'CONTADO' && n.saldo > 0
+      if (esCredito) {
+        v.credito   += n.valabono||0
+        v.noAbonado += n.saldo||0
       } else {
-        // crédito
-        v.credito   += n.valabono
-        v.noAbonado += n.saldo
+        if (medio==='efectivo')       v.efectivo      += n.valtotal
+        else if (medio==='transferencia') v.transferencia += n.valtotal
+        else if (medio==='mixto')     v.mixto         += n.valtotal
+        else                          v.efectivo      += n.valtotal
       }
       v.total += n.valtotal
     })
@@ -97,7 +116,32 @@ export default function CierreCaja({ supabase, onClose }) {
       totales.total         += v.total
     })
 
-    return {porVend, totales}
+    // Por cajera — usa campo usuario de la BD
+    const LABEL_CAJERA = {
+      'caja1': 'Cajera 1', 'caja2': 'Cajera 2', 'caja3': 'Cajera 3',
+      'admin': 'Admin', 'laura': 'Vendedor Laura', 'prendas': 'Bodega'
+    }
+    const porCajera = {}
+    notas.forEach(n => {
+      const cajera = LABEL_CAJERA[n.usuario] || n.usuario || 'Sin usuario'
+      if (!porCajera[cajera]) porCajera[cajera] = {efectivo:0,transferencia:0,mixto:0,credito:0,noAbonado:0,total:0,notas:0}
+      const v = porCajera[cajera]
+      const medio = normMedio(n.mediopago)
+      const esCredito = n.formapago !== 'CONTADO' && n.saldo > 0
+      if (esCredito) {
+        v.credito   += n.valabono||0
+        v.noAbonado += n.saldo||0
+      } else {
+        if (medio==='efectivo')       v.efectivo      += n.valtotal
+        else if (medio==='transferencia') v.transferencia += n.valtotal
+        else if (medio==='mixto')     { v.efectivo += n.valtotal/2; v.transferencia += n.valtotal/2 }
+        else                          v.efectivo      += n.valtotal
+      }
+      v.total += n.valtotal
+      v.notas++
+    })
+
+    return {porVend, totales, porCajera}
   }
 
   function calcMarcas() {
@@ -124,13 +168,16 @@ export default function CierreCaja({ supabase, onClose }) {
     notas.forEach(n=>{
       totalVentas += n.valtotal
       const esMost = MOSTRADOR.includes(String(n.codclient||''))
-      if (n.formapago==='CONTADO') {
+      const medio = normMedio(n.mediopago)
+      const esCredito = n.formapago !== 'CONTADO' && n.saldo > 0
+      if (!esCredito) {
         totalContado += n.valtotal
-        if (esMost) totalMostrador    += n.valtotal
-        else        totalNoMostrador  += n.valtotal
-        if (n.mediopago==='Efectivo')       totalEfectivo      += n.valtotal
-        else if (n.mediopago==='Transferencia') totalTransferencia += n.valtotal
-        else if (n.mediopago==='Mixto')     { totalEfectivo+=n.valtotal/2; totalTransferencia+=n.valtotal/2 }
+        if (esMost) totalMostrador   += n.valtotal
+        else        totalNoMostrador += n.valtotal
+        if (medio==='efectivo')           totalEfectivo      += n.valtotal
+        else if (medio==='transferencia') totalTransferencia += n.valtotal
+        else if (medio==='mixto')         { totalEfectivo+=n.valtotal/2; totalTransferencia+=n.valtotal/2 }
+        else                              totalEfectivo      += n.valtotal
       } else {
         totalCredito += n.valtotal
       }
@@ -510,6 +557,52 @@ export default function CierreCaja({ supabase, onClose }) {
                       </tr>
                     </tbody>
                   </table>
+
+                  {/* TABLA POR CAJERA */}
+                  <div style={{marginTop:20}}>
+                    <div style={P.secTit}>🏧 Ventas por Cajera / Origen — {desde} al {hasta}</div>
+                    <table style={P.tabla}>
+                      <thead>
+                        <tr style={P.thead}>
+                          {['Origen','Notas','$ Efectivo','$ Transferencia','$ Mixto','$ Crédito','$ Por cobrar','$ Total'].map(h=>(
+                            <th key={h} style={{...P.th,textAlign:h==='Origen'?'left':'right'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {['Cajera 1','Cajera 2','Cajera 3','Admin','Vendedor Laura','Bodega','Sin usuario']
+                          .filter(k => cons.porCajera[k])
+                          .map((k,i) => {
+                            const v = cons.porCajera[k]
+                            return (
+                              <tr key={k} style={{background:i%2===0?'#fff':'#f8faff'}}>
+                                <td style={{...P.td,fontWeight:700}}>{k}</td>
+                                <td style={{...P.td,textAlign:'right'}}>{v.notas}</td>
+                                <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>{v.efectivo?`$${fmt(v.efectivo)}`:'-'}</td>
+                                <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>{v.transferencia?`$${fmt(v.transferencia)}`:'-'}</td>
+                                <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>{v.mixto?`$${fmt(v.mixto)}`:'-'}</td>
+                                <td style={{...P.td,textAlign:'right',color:'#e65100'}}>{v.credito?`$${fmt(v.credito)}`:'-'}</td>
+                                <td style={{...P.td,textAlign:'right',color:'#c62828'}}>{v.noAbonado?`$${fmt(v.noAbonado)}`:'-'}</td>
+                                <td style={{...P.td,textAlign:'right',fontWeight:700}}>${fmt(v.total)}</td>
+                              </tr>
+                            )
+                          })
+                        }
+                      </tbody>
+                      <tfoot>
+                        <tr style={{background:'#e8eaf6',fontWeight:700}}>
+                          <td style={P.td}>TOTALES</td>
+                          <td style={{...P.td,textAlign:'right'}}>{Object.values(cons.porCajera).reduce((s,v)=>s+v.notas,0)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(cons.totales.efectivo)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>${fmt(cons.totales.transferencia)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>${fmt(cons.totales.mixto)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#e65100'}}>${fmt(cons.totales.credito)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#c62828'}}>${fmt(cons.totales.noAbonado)}</td>
+                          <td style={{...P.td,textAlign:'right'}}>${fmt(cons.totales.total)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
               )}
 

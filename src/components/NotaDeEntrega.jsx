@@ -16,7 +16,7 @@ const FILAS = () => Array.from({length:FILAS_BASE},()=>({...VACIA}))
 const PLAZOS = ['CONTADO','15 DÍAS','30 DÍAS','60 DÍAS','90 DÍAS']
 const MEDIOS = ['Efectivo','Transferencia','Mixto','Crédito']
 
-export default function NotaDeEntrega({ supabase, onClose }) {
+export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   const [nroDoc,    setNroDoc]    = useState('')
   const [fecha,     setFecha]     = useState(hoy())
   const [fechaPago, setFechaPago] = useState(hoy())
@@ -311,6 +311,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
         subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
         valabono:abonos, saldo, cedvended:cedVend,
         cantotal:prendas, anulada:'N',
+        usuario: usuario?.usuario || usuario?.nombre || 'sistema',
       }
       const {error:e1}=await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
       if(e1)throw e1
@@ -399,6 +400,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
           valabono:abonos, saldo, cedvended:cedVend,
           cantotal:prendas, anulada:'N',
         }
+          usuario: usuario?.usuario || usuario?.nombre || 'sistema',
         const {error:eg} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
         if (eg) throw eg
         await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
@@ -448,6 +450,7 @@ export default function NotaDeEntrega({ supabase, onClose }) {
           valabono:abonos, saldo, cedvended:cedVend,
           cantotal:prendas, anulada:'N',
         }
+          usuario: usuario?.usuario || usuario?.nombre || 'sistema',
         const {error:e1} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
         if (e1) throw e1
         await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
