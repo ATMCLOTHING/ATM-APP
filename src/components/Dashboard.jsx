@@ -25,12 +25,19 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
     const totalPrendas = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
 
     const {data:cartera} = await supabase.from('encnotaen')
-      .select('saldo').eq('anulada','N').gt('saldo',0)
+      .select('saldo').or('anulada.is.null,anulada.neq.S').gt('saldo',0)
     const totalCartera = (cartera||[]).reduce((s,n)=>s+(n.saldo||0),0)
 
-    const {data:bajos} = await supabase.from('articulo')
+    // Traer artículos activos y filtrar en JS los que tienen existencia <= existminim
+    const {data:artsBajos} = await supabase.from('articulo')
       .select('codartic,descartic,existencia,existminim')
-      .filter('existencia','lte','existminim').eq('estado','A').limit(5)
+      .eq('estado','A')
+      .lte('existencia', 10)   // pre-filtro para no traer todos
+      .order('existencia', {ascending:true})
+      .limit(50)
+    const bajos = (artsBajos||[])
+      .filter(a => Number(a.existencia||0) <= Number(a.existminim||0))
+      .slice(0, 5)
 
     const {data:vends} = await supabase.from('vendedores').select('cedula,nombre')
     const vendMap = {}

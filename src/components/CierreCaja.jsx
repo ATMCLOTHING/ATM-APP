@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { WZCLOSE, WZPRINT, WZLOCATE } from '../lib/assets'  
+import { WZCLOSE, WZPRINT, WZLOCATE } from '../lib/assets'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 
@@ -75,7 +75,14 @@ export default function CierreCaja({ supabase, onClose }) {
         .select('numnotaent,valabono,mediopago,fechaabono')
         .gte('fechaabono',desde).lte('fechaabono',hasta)
 
-      setDatos({ notas:notas||[], detalle, artMap, vendMap, abonos:abonos||[], notasAyer:notasAyer||[] })
+      // Cartera TOTAL — todas las notas con saldo pendiente sin importar fecha
+      const {data:carteraTotal} = await supabase.from('encnotaen')
+        .select('saldo')
+        .or('anulada.is.null,anulada.neq.S')
+        .gt('saldo', 0)
+      const totalCarteraGlobal = (carteraTotal||[]).reduce((s,n)=>s+(n.saldo||0), 0)
+
+      setDatos({ notas:notas||[], detalle, artMap, vendMap, abonos:abonos||[], notasAyer:notasAyer||[], totalCarteraGlobal })
     } catch(e) { console.error(e) }
     setCargando(false)
   }
@@ -197,13 +204,13 @@ export default function CierreCaja({ supabase, onClose }) {
     const totalMostrador     = totalCaja1 + totalCaja2 + totalCaja3
     const totalAbonosCredito = abonos.reduce((s,a)=>s+(a.valabono||0),0)
     const totalAyer          = notasAyer.reduce((s,n)=>s+(n.valtotal||0),0)
-    const totalPendiente     = notas.reduce((s,n)=>s+(n.saldo||0),0)
     const totalIngresado     = totalEfectivo + totalTransferencia + totalMixto
 
     return { totalVentas,totalCredito,totalContado,totalMostrador,totalNoMostrador,
              totalEfectivo,totalTransferencia,totalMixto,totalIngresado,
              totalCaja1,totalCaja2,totalCaja3,
-             totalAbonosCredito,totalAyer,totalPendiente,
+             totalAbonosCredito,totalAyer,
+             totalPendiente: datos.totalCarteraGlobal||0,
              cantNotas:notas.length }
   }
 
