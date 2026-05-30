@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { WZCLOSE, WZPRINT, WZLOCATE } from '../lib/assets'
+import { WZCLOSE, WZPRINT, WZLOCATE } from '../lib/assets'  
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 
