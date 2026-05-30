@@ -88,6 +88,7 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
             <div style={{color:'#fff',fontWeight:700,fontSize:13}}>{usuario.nombre}</div>
             <div style={{color:'rgba(255,255,255,0.7)',fontSize:11,textTransform:'uppercase'}}>{usuario.rol}</div>
           </div>
+          <button onClick={()=>onModulo('manual')} style={{...S.btnSalir,marginRight:4}} title="Ayuda">❓</button>
           <button onClick={onLogout} style={S.btnSalir} title="Cerrar sesión">⏻</button>
         </div>
       </div>
