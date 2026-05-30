@@ -55,7 +55,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
     // así captura null y cualquier valor distinto de 'S'
     let q = supabase.from('encnotaen')
       .select('numnotaent,fechanotae,fechavence,cedrifclie,nombreclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,anulada')
-      .neq('anulada', 'S')
+      .or('anulada.is.null,anulada.neq.S')
       .order('fechanotae', {ascending:true})
 
     // filtro vendedor
