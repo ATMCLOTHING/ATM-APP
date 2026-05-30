@@ -19,7 +19,7 @@ export default function CierreCaja({ supabase, onClose }) {
       const {data:notas} = await supabase.from('encnotaen')
         .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,cantotal,codclient')
         .gte('fechanotae',desde).lte('fechanotae',hasta)
-        .eq('anulada','N')
+        .neq('anulada','S')
 
       // Detalle de notas
       const numNotas = (notas||[]).map(n=>n.numnotaent)
@@ -47,7 +47,7 @@ export default function CierreCaja({ supabase, onClose }) {
 
       // Notas de ayer para comparativo
       const {data:notasAyer} = await supabase.from('encnotaen')
-        .select('valtotal,valabono').gte('fechanotae',ayer()).lte('fechanotae',ayer()).eq('anulada','N')
+        .select('valtotal,valabono').gte('fechanotae',ayer()).lte('fechanotae',ayer()).neq('anulada','S')
 
       // Abonos del período
       const {data:abonos} = await supabase.from('detabonos')
