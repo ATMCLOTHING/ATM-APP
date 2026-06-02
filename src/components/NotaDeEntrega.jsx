@@ -7,6 +7,7 @@ import PrintNota          from './PrintNota'
 import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
 import ModalNuevoCliente  from './ModalNuevoCliente'
+import ModalPin           from './ModalPin'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
@@ -45,9 +46,10 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   const [busy,      setBusy]      = useState(false)
   const [msg,       setMsg]       = useState(null)
   const [modal,     setModal]     = useState(null)
-  const [guardada,  setGuardada]  = useState(false)
-  const [anulada,   setAnulada]   = useState(false)
-  const [modoNueva, setModoNueva] = useState(false)
+  const [guardada,     setGuardada]     = useState(false)
+  const [anulada,      setAnulada]      = useState(false)
+  const [modoNueva,    setModoNueva]    = useState(false)
+  const [desbloqueada, setDesbloqueada] = useState(false) // nota guardada editando con PIN
   // cédula que no se encontró — para pasarla al modal de nuevo cliente
   const [cedulaNueva, setCedulaNueva] = useState('')
 
@@ -72,7 +74,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     const {count} = await qCount
     setTotalNotas(count||0)
     if ((count||0) > 0) {
-      // numnotaent ya es bigint → ORDER BY es numérico, trae correctamente la última
+      // SIEMPRE cargar la ÚLTIMA nota (descending)
       let qLast = supabase.from('encnotaen').select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
       if (rol==='cajera')   qLast = qLast.gte('numnotaent',1000000)
       if (rol==='vendedor') qLast = qLast.lt('numnotaent',1000000)
@@ -362,7 +364,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     setLineas(det?.length?[...det,...Array.from({length:extras},()=>({...VACIA}))]:FILAS())
     const {data:ab} = await supabase.from('detabonos').select('valabono').eq('numnotaent',id)
     setAbonos((ab||[]).reduce((s,r)=>s+(r.valabono||0),0))
-    setGuardada(true); setAnulada(e.anulada==='S'); setModoNueva(false)
+    setGuardada(true); setAnulada(e.anulada==='S'); setModoNueva(false); setDesbloqueada(false)
     setBusy(false)
   }
 
@@ -591,6 +593,15 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       {modal==='buscarCliente' && <ModalBuscarCliente supabase={supabase} onSelect={c=>{aplicarCliente(c);setModal(null)}} onClose={()=>setModal(null)}/>}
       {modal==='editarCliente' && <ModalEditarCliente supabase={supabase} cliente={cliente} onGuardar={onClienteEditado} onClose={()=>setModal(null)}/>}
       {modal==='nuevoCliente'  && <ModalNuevoCliente  supabase={supabase} cedulaInicial={cedulaNueva} onGuardado={onClienteCreado} onClose={()=>setModal(null)}/>}
+      {modal==='desbloquear'   && (
+        <ModalPin
+          supabase={supabase}
+          titulo="Desbloquear Nota"
+          descripcion={`La nota ${nroDoc} está guardada. Con el PIN puedes modificar sus artículos y datos.`}
+          onConfirm={()=>{ setDesbloqueada(true); setModal(null); setMsg({tipo:'warn',texto:`🔓 Nota ${nroDoc} desbloqueada. Recuerda guardar los cambios.`}) }}
+          onClose={()=>setModal(null)}
+        />
+      )}
 
       <div style={P.ventana}>
         <div style={P.titulo}>
@@ -601,8 +612,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
           <span style={P.titTxt}>NOTA DE ENTREGA</span>
           <div style={P.titNro}>
             N° <strong style={{fontSize:22}}>{nroDoc}</strong>
-            {modoNueva && <span style={P.badgeNueva}>NUEVA</span>}
-            {anulada   && <span style={P.badgeAnul}>ANULADA</span>}
+            {modoNueva    && <span style={P.badgeNueva}>NUEVA</span>}
+            {anulada      && <span style={P.badgeAnul}>ANULADA</span>}
+            {desbloqueada && <span style={{...P.badgeNueva,background:'#ffc107',color:'#333'}}>🔓 EDITANDO</span>}
           </div>
         </div>
 
@@ -622,7 +634,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
                 <input ref={cedulaRef} style={{...P.inp,flex:1,fontWeight:700,fontSize:14}}
                   value={cedula} onChange={e=>setCedula(e.target.value)}
                   onKeyDown={e=>e.key==='Enter'&&onCedulaEnter()}
-                  placeholder="Cédula o NIT…" disabled={anulada}/>
+                  placeholder="Cédula o NIT…" disabled={anulada && !desbloqueada}/>
                 <button onClick={()=>setModal('buscarCliente')}
                   style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:15,background:'#eef2ff'}}>
                   🔍
@@ -633,7 +645,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
               <div style={{display:'flex',gap:4}}>
                 <input style={{...P.inp,flex:1,fontSize:13}} value={cliTxt}
                   onChange={e=>setCliTxt(e.target.value)}
-                  placeholder="Nombre…" disabled={anulada}/>
+                  placeholder="Nombre…" disabled={anulada && !desbloqueada}/>
                 {cliente && <button onClick={()=>setModal('editarCliente')}
                   style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:15,background:'#fff3cd'}}>✎</button>}
               </div>
@@ -657,33 +669,33 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
 
           <div style={P.fila}>
             <Fld label="Fecha" w={140}>
-              <input type="date" style={P.inp} value={fecha} onChange={e=>setFecha(e.target.value)} disabled={anulada}/>
+              <input type="date" style={P.inp} value={fecha} onChange={e=>setFecha(e.target.value)} disabled={anulada && !desbloqueada}/>
             </Fld>
             <Fld label="Plazo de Pago" w={150}>
-              <select style={P.inp} value={plazo} onChange={e=>{const p=e.target.value;setPlazo(p);setFechaPago(fechaDePago(p))}} disabled={anulada}>
+              <select style={P.inp} value={plazo} onChange={e=>{const p=e.target.value;setPlazo(p);setFechaPago(fechaDePago(p))}} disabled={anulada && !desbloqueada}>
                 {PLAZOS.map(p=><option key={p}>{p}</option>)}
               </select>
             </Fld>
             <Fld label="Fecha de Pago" w={140}>
-              <input type="date" style={P.inp} value={fechaPago} onChange={e=>setFechaPago(e.target.value)} disabled={anulada}/>
+              <input type="date" style={P.inp} value={fechaPago} onChange={e=>setFechaPago(e.target.value)} disabled={anulada && !desbloqueada}/>
             </Fld>
             <Fld label="% Dcto." w={80}>
-              <input type="number" style={P.inp} value={pDesc} min={0} max={100} onChange={e=>setPDesc(Number(e.target.value))} disabled={anulada}/>
+              <input type="number" style={P.inp} value={pDesc} min={0} max={100} onChange={e=>setPDesc(Number(e.target.value))} disabled={anulada && !desbloqueada}/>
             </Fld>
             <Fld label="% IVA" w={70}>
-              <input type="number" style={P.inp} value={pIva} min={0} max={100} onChange={e=>setPIva(Number(e.target.value))} disabled={anulada}/>
+              <input type="number" style={P.inp} value={pIva} min={0} max={100} onChange={e=>setPIva(Number(e.target.value))} disabled={anulada && !desbloqueada}/>
             </Fld>
             <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
               <span style={{fontSize:12,fontWeight:800,color:'#1a3a6b',marginBottom:6}}>PRECIO:</span>
               {['Mayor','Detal','Vendedor'].map(t=>(
                 <label key={t} style={{...P.radio,marginBottom:4}}>
-                  <input type="radio" name="tipo" checked={tipoVta===t} onChange={()=>setTipoVta(t)} disabled={anulada}/>{' '}{t}
+                  <input type="radio" name="tipo" checked={tipoVta===t} onChange={()=>setTipoVta(t)} disabled={anulada && !desbloqueada}/>{' '}{t}
                 </label>
               ))}
             </div>
             <Fld label="Vendedor" w={240}>
               <select style={{...P.inp,cursor:'pointer'}}
-                value={cedVend} onChange={e=>elegirVendedor(e.target.value)} disabled={anulada}>
+                value={cedVend} onChange={e=>elegirVendedor(e.target.value)} disabled={anulada && !desbloqueada}>
                 <option value="">-- Selecciona vendedor --</option>
                 {listaVend.map(v=>(
                   <option key={v.id} value={v.cedula}>{v.cedula} - {v.nombre}</option>
@@ -715,7 +727,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
                           value={l.codartic}
                           onChange={e => onChangeCodigo(e.target.value, i)}
                           onKeyDown={e => { if(e.key==='Enter'){ e.preventDefault(); onEnterCodigo(l.codartic, i) } }}
-                          placeholder="Código" disabled={anulada}/>
+                          placeholder="Código" disabled={anulada && !desbloqueada}/>
                         {artIdx===i&&artSugg.length>0&&(
                           <ul style={{...P.drop,width:460,zIndex:99}}>
                             {artSugg.map((a,ai)=>(
@@ -731,14 +743,14 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
                     <td style={{...P.td,minWidth:160}}>
                       <input style={{...P.ci,width:'100%'}} value={l.descartic}
                         onChange={e=>buscarDesc(e.target.value,i)}
-                        placeholder="Descripción" disabled={anulada}/>
+                        placeholder="Descripción" disabled={anulada && !desbloqueada}/>
                     </td>
                     <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.marca||''}</td>
                     <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.genero||''}</td>
-                    <td style={P.td}><input style={{...P.ci,width:46,textAlign:'center'}} value={l.talla} onChange={e=>upd(i,{talla:e.target.value})} disabled={anulada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:60,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} min={1} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:96,textAlign:'right'}} value={l.valunit} min={0} onChange={e=>upd(i,{valunit:Number(e.target.value)})} disabled={anulada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porcdescue} min={0} max={100} onChange={e=>upd(i,{porcdescue:Number(e.target.value)})} disabled={anulada}/></td>
+                    <td style={P.td}><input style={{...P.ci,width:46,textAlign:'center'}} value={l.talla} onChange={e=>upd(i,{talla:e.target.value})} disabled={anulada && !desbloqueada}/></td>
+                    <td style={P.td}><input type="number" style={{...P.ci,width:60,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} min={1} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada && !desbloqueada}/></td>
+                    <td style={P.td}><input type="number" style={{...P.ci,width:96,textAlign:'right'}} value={l.valunit} min={0} onChange={e=>upd(i,{valunit:Number(e.target.value)})} disabled={anulada && !desbloqueada}/></td>
+                    <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porcdescue} min={0} max={100} onChange={e=>upd(i,{porcdescue:Number(e.target.value)})} disabled={anulada && !desbloqueada}/></td>
                     <td style={{...P.td,textAlign:'right',paddingRight:6,color:'#c0392b',fontSize:12}}>{l.valdescue?fmt(l.valdescue):''}</td>
                     <td style={{...P.td,textAlign:'right',paddingRight:6,fontWeight:700,color:'#1a3a6b',fontSize:13}}>{l.valtotal?fmt(l.valtotal):''}</td>
                     <td style={{...P.td,textAlign:'center',width:26}}>
@@ -769,8 +781,22 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
                   <option value="vendedor">Vendedor (&lt;1.000.000)</option>
                 </select>
               )}
-              <IBtn src={WZSAVE}   onClick={guardar}       title="Guardar"     disabled={busy||anulada}/>
+              <IBtn src={WZSAVE}   onClick={guardar}       title="Guardar"     disabled={busy||(anulada&&!desbloqueada)}/>
               <IBtn src={WZUNDO}   onClick={revertirNueva} title="Revertir"    disabled={!modoNueva}/>
+              {guardada && !anulada && !modoNueva && !desbloqueada && (
+                <button onClick={()=>setModal('desbloquear')}
+                  title="Desbloquear nota para edición"
+                  style={{background:'#fff3cd',border:'1px solid #ffc107',borderRadius:6,padding:'0 10px',cursor:'pointer',fontSize:13,fontWeight:700,color:'#856404',height:40}}>
+                  🔓
+                </button>
+              )}
+              {desbloqueada && (
+                <button onClick={()=>{setDesbloqueada(false);cargarDoc(nroDoc)}}
+                  title="Bloquear nota (descartar cambios)"
+                  style={{background:'#ffebee',border:'1px solid #ef9a9a',borderRadius:6,padding:'0 10px',cursor:'pointer',fontSize:13,fontWeight:700,color:'#c62828',height:40}}>
+                  🔒
+                </button>
+              )}
               <IBtn src={WZDELETE} onClick={anularNota}    title="Anular"      disabled={anulada||modoNueva}/>
               <IBtn src={WZPRINT}  onClick={()=>setModal('print')} title="Imprimir"/>
               <IBtn src={WZCLOSE}  onClick={onClose}       title="Volver al menú"/>
@@ -802,7 +828,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
             <div style={P.medios}>
               {MEDIOS.map(m=>(
                 <label key={m} style={P.radio}>
-                  <input type="radio" name="medio" checked={medio===m} onChange={()=>setMedio(m)} disabled={anulada}/>{' '}{m}
+                  <input type="radio" name="medio" checked={medio===m} onChange={()=>setMedio(m)} disabled={anulada && !desbloqueada}/>{' '}{m}
                 </label>
               ))}
             </div>
