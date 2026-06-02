@@ -14,12 +14,12 @@ const VACIA = {codartic:'',descartic:'',talla:'',cantidad:0,valunit:0,porciva:0,
 const FILAS_BASE = 12
 const FILAS = () => Array.from({length:FILAS_BASE},()=>({...VACIA}))
 const PLAZOS = ['CONTADO','15 DÍAS','30 DÍAS','60 DÍAS','90 DÍAS']
+const MEDIOS = ['Efectivo','Transferencia','Mixto','Crédito']
 const diasDePlazo = p => { const m=p.match(/(\d+)/); return m?Number(m[1]):0 }
 const fechaDePago = plazo => {
   const d = new Date(); d.setDate(d.getDate() + diasDePlazo(plazo))
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
 }
-const MEDIOS = ['Efectivo','Transferencia','Mixto','Crédito']
 
 export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   const [nroDoc,    setNroDoc]    = useState('')
@@ -30,7 +30,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   const [pIva,      setPIva]      = useState(0)
   const [tipoVta,   setTipoVta]   = useState('Mayor')
   const [medio,     setMedio]     = useState('Efectivo')
-  const [serieSel,   setSerieSel]  = useState('caja') // 'caja' | 'vendedor'
+  const [serieSel,   setSerieSel]  = useState('caja')
   const [cedula,    setCedula]    = useState('')
   const [cliTxt,    setCliTxt]    = useState('')
   const [cliente,   setCliente]   = useState(null)
@@ -62,12 +62,19 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
 
   async function init() {
     setBusy(true)
-    const {count} = await supabase.from('encnotaen')
-      .select('numnotaent', {count:'exact', head:true})
+    const rol = usuario?.rol || ''
+    // cajera ve solo notas de caja (>=1.000.000), vendedor solo las suyas (<1.000.000)
+    let qCount = supabase.from('encnotaen').select('numnotaent',{count:'exact',head:true})
+    if (rol==='cajera')   qCount = qCount.gte('numnotaent',1000000)
+    if (rol==='vendedor') qCount = qCount.lt('numnotaent',1000000)
+    const {count} = await qCount
     setTotalNotas(count||0)
     if ((count||0) > 0) {
-      const {data} = await supabase.from('encnotaen')
-        .select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
+      // SIEMPRE cargar la ÚLTIMA nota (descending)
+      let qLast = supabase.from('encnotaen').select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
+      if (rol==='cajera')   qLast = qLast.gte('numnotaent',1000000)
+      if (rol==='vendedor') qLast = qLast.lt('numnotaent',1000000)
+      const {data} = await qLast
       if (data?.length) await cargarDoc(data[0].numnotaent)
     } else {
       await prepararNueva(serieParaUsuario(serieSel))
@@ -75,24 +82,24 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     setBusy(false)
   }
 
-  function serieParaUsuario(serieSel) {
+  function serieParaUsuario(override) {
     const rol = usuario?.rol || ''
     if (rol === 'vendedor') return 'vendedor'
     if (rol === 'cajera')   return 'caja'
-    return serieSel // admin elige
+    return override || 'caja' // admin usa lo que eligió
   }
 
   async function siguienteConsecutivo(serie) {
-    const {data, error} = await supabase.rpc('siguiente_nota', { p_tipo: serie })
+    const {data,error} = await supabase.rpc('siguiente_nota', {p_tipo: serie})
     if (!error && data) return String(data)
-    // fallback de emergencia (no debería llegar aquí)
+    // fallback de emergencia
     const {data:d2} = await supabase.from('encnotaen')
       .select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
     return String(d2?.length ? Number(d2[0].numnotaent)+1 : 1)
   }
 
   async function prepararNueva(serieElegida) {
-    const serie = serieElegida || serieParaUsuario(serieSel)
+    const serie = serieParaUsuario(serieElegida)
     const nro = await siguienteConsecutivo(serie)
     setNroDoc(nro)
     setFecha(hoy()); setFechaPago(hoy())
@@ -309,6 +316,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
 
   async function guardar() {
     if (!cliente&&!cliTxt.trim()){setMsg({tipo:'err',texto:'Ingresa un cliente antes de guardar.'}); return}
+    if (!cedVend){setMsg({tipo:'err',texto:'⚠️ Debes seleccionar un vendedor antes de guardar.'}); return}
     if (!detValidas.length){setMsg({tipo:'err',texto:'Agrega al menos un artículo con cantidad.'}); return}
     setBusy(true)
     try {
@@ -567,9 +575,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
               <input type="date" style={P.inp} value={fecha} onChange={e=>setFecha(e.target.value)} disabled={anulada}/>
             </Fld>
             <Fld label="Plazo de Pago" w={150}>
-              <select style={P.inp} value={plazo} onChange={e=>{
-                const p=e.target.value; setPlazo(p); setFechaPago(fechaDePago(p))
-              }} disabled={anulada}>
+              <select style={P.inp} value={plazo} onChange={e=>{const p=e.target.value;setPlazo(p);setFechaPago(fechaDePago(p))}} disabled={anulada}>
                 {PLAZOS.map(p=><option key={p}>{p}</option>)}
               </select>
             </Fld>
@@ -670,9 +676,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
               <IBtn src={WZNEW} onClick={()=>nuevaNota(serieParaUsuario(serieSel))} title="Nueva nota" disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
               {usuario?.rol==='admin' && !modoNueva && (
                 <select value={serieSel} onChange={e=>setSerieSel(e.target.value)}
-                  style={{height:40,border:'1px solid #c8d5ea',borderRadius:6,padding:'0 6px',fontSize:12,fontWeight:700,color:'#1a3a6b',background:'#eef2ff',cursor:'pointer'}}>
-                  <option value="caja">Serie Caja (≥1.000.000)</option>
-                  <option value="vendedor">Serie Vendedor (&lt;1.000.000)</option>
+                  style={{height:40,border:'1px solid #c8d5ea',borderRadius:6,padding:'0 6px',fontSize:11,fontWeight:700,color:'#1a3a6b',background:'#eef2ff',cursor:'pointer'}}>
+                  <option value="caja">Caja (&ge;1.000.000)</option>
+                  <option value="vendedor">Vendedor (&lt;1.000.000)</option>
                 </select>
               )}
               <IBtn src={WZSAVE}   onClick={guardar}       title="Guardar"     disabled={busy||anulada}/>

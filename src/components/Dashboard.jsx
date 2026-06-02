@@ -16,34 +16,41 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
     const hoyStr = hoy()
 
     const {data:notas} = await supabase.from('encnotaen')
-      .select('valtotal,valabono,saldo,cedvended,anulada,cantotal')
+      .select('numnotaent,valtotal,valabono,saldo,cedvended,anulada,cantotal')
       .gte('fechanotae', hoyStr).lte('fechanotae', hoyStr)
 
     const notasActivas = (notas||[]).filter(n=>n.anulada!=='S')
-    const totalVentas  = notasActivas.reduce((s,n)=>s+(n.valtotal||0),0)
-    const totalAbonos  = notasActivas.reduce((s,n)=>s+(n.valabono||0),0)
-    const totalPrendas = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
+
+    // Separar por serie: caja >= 1.000.000 | vendedor < 1.000.000
+    const notasCaja   = notasActivas.filter(n=>Number(n.numnotaent)>=1000000)
+    const notasVend   = notasActivas.filter(n=>Number(n.numnotaent)<1000000)
+
+    const ventasMostrador = notasCaja.reduce((s,n)=>s+(n.valtotal||0),0)
+    const ventasVendedor  = notasVend.reduce((s,n)=>s+(n.valtotal||0),0)
+    const totalPrendas    = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
+    // Abonos solo de notas de vendedor
+    const totalAbonos     = notasVend.reduce((s,n)=>s+(n.valabono||0),0)
 
     const {data:cartera} = await supabase.from('encnotaen')
       .select('saldo').or('anulada.is.null,anulada.neq.S').gt('saldo',0)
     const totalCartera = (cartera||[]).reduce((s,n)=>s+(n.saldo||0),0)
 
-    // Traer artículos activos y filtrar en JS los que tienen existencia <= existminim
     const {data:artsBajos} = await supabase.from('articulo')
       .select('codartic,descartic,existencia,existminim')
       .eq('estado','A')
-      .lte('existencia', 10)   // pre-filtro para no traer todos
+      .lte('existencia', 10)
       .order('existencia', {ascending:true})
       .limit(50)
     const bajos = (artsBajos||[])
       .filter(a => Number(a.existencia||0) <= Number(a.existminim||0))
       .slice(0, 5)
 
+    // Top vendedoras: solo notas de caja (>= 1.000.000)
     const {data:vends} = await supabase.from('vendedores').select('cedula,nombre')
     const vendMap = {}
     ;(vends||[]).forEach(v=>{ vendMap[v.cedula]=v.nombre })
     const porVend = {}
-    notasActivas.forEach(n=>{
+    notasCaja.forEach(n=>{
       const k = n.cedvended||'SIN VENDEDOR'
       if(!porVend[k]) porVend[k]={nombre:vendMap[k]||k,total:0,notas:0}
       porVend[k].total += n.valtotal||0
@@ -52,8 +59,9 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
     const topVend = Object.values(porVend).sort((a,b)=>b.total-a.total).slice(0,5)
 
     setMetricas({
-      totalVentas, totalAbonos, totalPrendas,
+      ventasMostrador, ventasVendedor, totalAbonos, totalPrendas,
       cantNotas: notasActivas.length,
+      cantCaja: notasCaja.length, cantVend: notasVend.length,
       totalCartera, bajos:bajos||[], topVend
     })
     setCargando(false)
@@ -101,11 +109,11 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
               <div style={{textAlign:'center',padding:20,color:'#888'}}>Cargando métricas…</div>
             ) : metricas && (
               <div style={S.metricasGrid}>
-                <Metrica label="Ventas del día"    val={`$${fmt(metricas.totalVentas)}`}  color="#1a3a6b" icon="💰"/>
-                <Metrica label="Notas creadas"     val={metricas.cantNotas}               color="#2e7d32" icon="📋"/>
-                <Metrica label="Prendas vendidas"  val={metricas.totalPrendas}            color="#e65100" icon="📦"/>
-                <Metrica label="Abonos del día"    val={`$${fmt(metricas.totalAbonos)}`}  color="#00838f" icon="💵"/>
-                <Metrica label="Cartera pendiente" val={`$${fmt(metricas.totalCartera)}`} color="#c62828" icon="⚠️"/>
+                <Metrica label="Ventas Mostrador"  val={`$${fmt(metricas.ventasMostrador)}`} sub={`${metricas.cantCaja} notas`}  color="#1a3a6b" icon="🏪"/>
+                <Metrica label="Ventas Vendedor"   val={`$${fmt(metricas.ventasVendedor)}`}  sub={`${metricas.cantVend} notas`}  color="#2e7d32" icon="🤝"/>
+                <Metrica label="Prendas vendidas"  val={metricas.totalPrendas}               sub="unidades"                      color="#e65100" icon="📦"/>
+                <Metrica label="Abonos Vendedor"   val={`$${fmt(metricas.totalAbonos)}`}     sub="solo crédito"                  color="#00838f" icon="💵"/>
+                <Metrica label="Cartera pendiente" val={`$${fmt(metricas.totalCartera)}`}    sub="saldo total"                   color="#c62828" icon="⚠️"/>
               </div>
             )}
           </div>
@@ -164,13 +172,14 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
   )
 }
 
-function Metrica({label,val,color,icon}){
+function Metrica({label,val,sub,color,icon}){
   return(
     <div style={{background:'#fff',borderRadius:10,padding:'14px 18px',border:`2px solid ${color}22`,boxShadow:`0 2px 8px ${color}11`,display:'flex',alignItems:'center',gap:12}}>
       <span style={{fontSize:28}}>{icon}</span>
       <div>
         <div style={{fontSize:11,color:'#888',fontWeight:600,textTransform:'uppercase'}}>{label}</div>
         <div style={{fontSize:20,fontWeight:900,color}}>{val}</div>
+        {sub && <div style={{fontSize:10,color:'#aaa',marginTop:1}}>{sub}</div>}
       </div>
     </div>
   )
