@@ -51,7 +51,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   // cédula que no se encontró — para pasarla al modal de nuevo cliente
   const [cedulaNueva, setCedulaNueva] = useState('')
 
-  const cedulaRef = useRef()
+  const cedulaRef  = useRef()
+  const inputRefs  = useRef({})   // refs a cada input de código por fila
+  const debounceRef = useRef(null) // timer para búsqueda manual
 
   useEffect(() => {
     supabase.from('vendedores').select('id,cedula,nombre').order('nombre')
@@ -174,19 +176,120 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     return art.preciovent||0
   }
 
-  async function buscarArt(txt, idx) {
-    setLineas(prev=>{const n=[...prev];n[idx]={...n[idx],codartic:txt};return n})
-    if (txt.length<1){setArtSugg([]);setArtIdx(null);return}
-    const {data:exactos} = await supabase.from('articomp')
-      .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
-      .eq('codartic', txt).limit(10)
-    if (exactos&&exactos.length===1) { elegirArt(exactos[0], idx); return }
-    if (exactos&&exactos.length>1)   { setArtSugg(exactos); setArtIdx(idx); return }
+  // Extrae el código del artículo del código de barras (quita ceros a la izquierda)
+  const extraerCodigo = str => {
+    const num = parseInt(str, 10)
+    return isNaN(num) ? str.trim() : String(num)
+  }
+
+  // Foco en el input de código de la fila idx
+  function focoEnCodigo(idx) {
+    setTimeout(() => {
+      const ref = inputRefs.current[idx]
+      if (ref) { ref.focus(); ref.select() }
+    }, 50)
+  }
+
+  // Foco en el input de cantidad de la fila idx
+  function focoEnCantidad(idx) {
+    setTimeout(() => {
+      const row = inputRefs.current[idx]?.closest('tr')
+      if (row) {
+        const inputs = row.querySelectorAll('input')
+        inputs[3]?.focus() // índice 3 = cantidad (cod, desc, talla, cant...)
+        inputs[3]?.select()
+      }
+    }, 50)
+  }
+
+  // Procesa un código ingresado (pistola o manual con Enter)
+  async function procesarCodigo(txt, idx) {
+    if (!txt.trim()) return
+    const cod = extraerCodigo(txt)
+    // Buscar exacto en articomp
     const {data} = await supabase.from('articomp')
       .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
-      .ilike('codartic',`%${txt}%`).limit(10)
-    if (!data||!data.length){setArtSugg([]);setArtIdx(null);return}
-    setArtSugg(data); setArtIdx(idx)
+      .eq('codartic', cod).limit(10)
+
+    if (!data || !data.length) {
+      // No encontrado → mostrar error en la línea y limpiar
+      setLineas(prev => { const n=[...prev]; n[idx]={...n[idx],codartic:txt}; return n })
+      setMsg({tipo:'err', texto:`❌ Código "${cod}" no encontrado.`})
+      focoEnCodigo(idx)
+      return
+    }
+
+    if (data.length === 1) {
+      // Exacto único → agregar/sumar y bajar al siguiente código (modo pistola)
+      elegirArtPistola(data[0], idx)
+    } else {
+      // Varias tallas → mostrar dropdown para elegir
+      setLineas(prev => { const n=[...prev]; n[idx]={...n[idx],codartic:cod}; return n })
+      setArtSugg(data); setArtIdx(idx)
+    }
+  }
+
+  // onChange del campo código: actualiza texto, NO busca todavía
+  function onChangeCodigo(txt, idx) {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    setArtSugg([]); setArtIdx(null)
+    setLineas(prev => { const n=[...prev]; n[idx]={...n[idx],codartic:txt}; return n })
+  }
+
+  // Enter en campo código → procesar inmediatamente (pistola o manual)
+  async function onEnterCodigo(txt, idx) {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    setArtSugg([]); setArtIdx(null)
+    await procesarCodigo(txt, idx)
+  }
+
+  // Elegir artículo con pistola: suma si ya existe, agrega si no, baja al siguiente código
+  function elegirArtPistola(art, idx) {
+    let targetIdx = idx
+    setLineas(prev => {
+      const sig = [...prev]
+      const cod = art.codartic
+      const existeIdx = sig.findIndex((l,i) => l.codartic===cod && l.talla===art.talla)
+      if (existeIdx >= 0) {
+        // Ya existe → sumar cantidad
+        sig[existeIdx] = recalc({...sig[existeIdx], cantidad: Number(sig[existeIdx].cantidad||0)+1})
+        sig[idx] = {...VACIA} // limpiar la fila donde se escribió si era diferente
+        targetIdx = existeIdx >= idx ? idx : existeIdx
+      } else {
+        // Nueva línea
+        const precio = precioSegunTipo(art)
+        sig[idx] = recalc({...sig[idx], codartic:art.codartic, descartic:art.descartic,
+          talla:art.talla||'', marca:art.marca||'', genero:art.genero||'',
+          valunit:precio, porciva:art.porciva||0, cantidad:1})
+        if (idx===sig.length-1) sig.push({...VACIA})
+        targetIdx = idx + 1
+      }
+      return sig
+    })
+    setArtSugg([]); setArtIdx(null)
+    // Bajar al siguiente campo código
+    setTimeout(() => focoEnCodigo(targetIdx), 80)
+  }
+
+  // Elegir artículo desde dropdown (manual) → foco en cantidad
+  function elegirArt(art, idx) {
+    setLineas(prev => {
+      const sig = [...prev]
+      const existeIdx = sig.findIndex((l,i) => i!==idx && l.codartic===art.codartic && l.talla===art.talla)
+      if (existeIdx >= 0) {
+        sig[existeIdx] = recalc({...sig[existeIdx], cantidad: Number(sig[existeIdx].cantidad||0)+1})
+        sig[idx] = {...VACIA}
+      } else {
+        const precio = precioSegunTipo(art)
+        sig[idx] = recalc({...sig[idx], codartic:art.codartic, descartic:art.descartic,
+          talla:art.talla||'', marca:art.marca||'', genero:art.genero||'',
+          valunit:precio, porciva:art.porciva||0, cantidad:1})
+        if (idx===sig.length-1) sig.push({...VACIA})
+      }
+      return sig
+    })
+    setArtSugg([]); setArtIdx(null)
+    focoEnCantidad(idx) // manual → va a cantidad para editar
   }
 
   async function buscarDesc(txt, idx) {
@@ -196,24 +299,6 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
       .ilike('descartic',`%${txt}%`).limit(10)
     setArtSugg(data||[]); setArtIdx(idx)
-  }
-
-  function elegirArt(art, idx) {
-    setLineas(prev => {
-      const sig = [...prev]
-      const existeIdx = sig.findIndex((l,i) => i!==idx && l.codartic===art.codartic && l.talla===art.talla)
-      if (existeIdx >= 0) {
-        const nueva = recalc({...sig[existeIdx], cantidad: Number(sig[existeIdx].cantidad||0)+1})
-        sig[existeIdx] = nueva
-        sig[idx] = {...VACIA}
-        return sig
-      }
-      const precio = precioSegunTipo(art)
-      sig[idx] = recalc({...sig[idx], codartic:art.codartic, descartic:art.descartic, talla:art.talla||'', valunit:precio, porciva:art.porciva||0, cantidad:1})
-      if (idx===sig.length-1) sig.push({...VACIA})
-      return sig
-    })
-    setArtSugg([]); setArtIdx(null)
   }
 
   function recalc(lin) {
@@ -624,9 +709,12 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
                     <td style={{...P.td,textAlign:'center',color:'#aaa',width:26,fontSize:11}}>{l.codartic?i+1:''}</td>
                     <td style={P.td}>
                       <div style={{position:'relative'}}>
-                        <input style={{...P.ci,width:88}} value={l.codartic}
-                          onChange={e=>buscarArt(e.target.value,i)}
-                          onKeyDown={e=>{if(e.key==='Enter'){setArtSugg([]);setArtIdx(null);e.target.closest('tr')?.querySelectorAll('input')[3]?.focus()}}}
+                        <input
+                          ref={el => inputRefs.current[i] = el}
+                          style={{...P.ci,width:88}}
+                          value={l.codartic}
+                          onChange={e => onChangeCodigo(e.target.value, i)}
+                          onKeyDown={e => { if(e.key==='Enter'){ e.preventDefault(); onEnterCodigo(l.codartic, i) } }}
                           placeholder="Código" disabled={anulada}/>
                         {artIdx===i&&artSugg.length>0&&(
                           <ul style={{...P.drop,width:460,zIndex:99}}>
