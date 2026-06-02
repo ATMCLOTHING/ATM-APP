@@ -14,6 +14,11 @@ const VACIA = {codartic:'',descartic:'',talla:'',cantidad:0,valunit:0,porciva:0,
 const FILAS_BASE = 12
 const FILAS = () => Array.from({length:FILAS_BASE},()=>({...VACIA}))
 const PLAZOS = ['CONTADO','15 DÍAS','30 DÍAS','60 DÍAS','90 DÍAS']
+const diasDePlazo = p => { const m=p.match(/(\d+)/); return m?Number(m[1]):0 }
+const fechaDePago = plazo => {
+  const d = new Date(); d.setDate(d.getDate() + diasDePlazo(plazo))
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
+}
 const MEDIOS = ['Efectivo','Transferencia','Mixto','Crédito']
 
 export default function NotaDeEntrega({ supabase, usuario, onClose }) {
@@ -25,6 +30,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   const [pIva,      setPIva]      = useState(0)
   const [tipoVta,   setTipoVta]   = useState('Mayor')
   const [medio,     setMedio]     = useState('Efectivo')
+  const [serieSel,   setSerieSel]  = useState('caja') // 'caja' | 'vendedor'
   const [cedula,    setCedula]    = useState('')
   const [cliTxt,    setCliTxt]    = useState('')
   const [cliente,   setCliente]   = useState(null)
@@ -56,7 +62,6 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
 
   async function init() {
     setBusy(true)
-    // solo contar y cargar la última nota — sin traer todos los IDs
     const {count} = await supabase.from('encnotaen')
       .select('numnotaent', {count:'exact', head:true})
     setTotalNotas(count||0)
@@ -65,21 +70,30 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
         .select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
       if (data?.length) await cargarDoc(data[0].numnotaent)
     } else {
-      await prepararNueva()
+      await prepararNueva(serieParaUsuario(serieSel))
     }
     setBusy(false)
   }
 
-  async function siguienteConsecutivo() {
-    const {data,error} = await supabase.rpc('siguiente_nota')
+  function serieParaUsuario(serieSel) {
+    const rol = usuario?.rol || ''
+    if (rol === 'vendedor') return 'vendedor'
+    if (rol === 'cajera')   return 'caja'
+    return serieSel // admin elige
+  }
+
+  async function siguienteConsecutivo(serie) {
+    const {data, error} = await supabase.rpc('siguiente_nota', { p_tipo: serie })
     if (!error && data) return String(data)
+    // fallback de emergencia (no debería llegar aquí)
     const {data:d2} = await supabase.from('encnotaen')
       .select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
     return String(d2?.length ? Number(d2[0].numnotaent)+1 : 1)
   }
 
-  async function prepararNueva() {
-    const nro = await siguienteConsecutivo()
+  async function prepararNueva(serieElegida) {
+    const serie = serieElegida || serieParaUsuario(serieSel)
+    const nro = await siguienteConsecutivo(serie)
     setNroDoc(nro)
     setFecha(hoy()); setFechaPago(hoy())
     setPlazo('CONTADO'); setMedio('Efectivo')
@@ -92,11 +106,11 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     setTimeout(()=>cedulaRef.current?.focus(), 100)
   }
 
-  async function nuevaNota() {
+  async function nuevaNota(serieElegida) {
     if (modoNueva && (cliente || cliTxt || lineas.some(l=>l.codartic))) {
       if (!window.confirm('¿Descartar los cambios sin guardar?')) return
     }
-    await prepararNueva()
+    await prepararNueva(serieElegida)
   }
 
   async function revertirNueva() {
@@ -553,7 +567,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
               <input type="date" style={P.inp} value={fecha} onChange={e=>setFecha(e.target.value)} disabled={anulada}/>
             </Fld>
             <Fld label="Plazo de Pago" w={150}>
-              <select style={P.inp} value={plazo} onChange={e=>setPlazo(e.target.value)} disabled={anulada}>
+              <select style={P.inp} value={plazo} onChange={e=>{
+                const p=e.target.value; setPlazo(p); setFechaPago(fechaDePago(p))
+              }} disabled={anulada}>
                 {PLAZOS.map(p=><option key={p}>{p}</option>)}
               </select>
             </Fld>
@@ -651,7 +667,14 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
               <IBtn src={WZLOCATE} onClick={()=>setModal('buscarNota')} title="Buscar nota"/>
             </div>
             <div style={P.btnFila}>
-              <IBtn src={WZNEW}    onClick={nuevaNota}     title="Nueva nota"  disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
+              <IBtn src={WZNEW} onClick={()=>nuevaNota(serieParaUsuario(serieSel))} title="Nueva nota" disabled={modoNueva&&!(cliente||cliTxt||lineas.some(l=>l.codartic))}/>
+              {usuario?.rol==='admin' && !modoNueva && (
+                <select value={serieSel} onChange={e=>setSerieSel(e.target.value)}
+                  style={{height:40,border:'1px solid #c8d5ea',borderRadius:6,padding:'0 6px',fontSize:12,fontWeight:700,color:'#1a3a6b',background:'#eef2ff',cursor:'pointer'}}>
+                  <option value="caja">Serie Caja (≥1.000.000)</option>
+                  <option value="vendedor">Serie Vendedor (&lt;1.000.000)</option>
+                </select>
+              )}
               <IBtn src={WZSAVE}   onClick={guardar}       title="Guardar"     disabled={busy||anulada}/>
               <IBtn src={WZUNDO}   onClick={revertirNueva} title="Revertir"    disabled={!modoNueva}/>
               <IBtn src={WZDELETE} onClick={anularNota}    title="Anular"      disabled={anulada||modoNueva}/>
