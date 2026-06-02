@@ -72,7 +72,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     const {count} = await qCount
     setTotalNotas(count||0)
     if ((count||0) > 0) {
-      // SIEMPRE cargar la ÚLTIMA nota (descending)
+      // numnotaent ya es bigint → ORDER BY es numérico, trae correctamente la última
       let qLast = supabase.from('encnotaen').select('numnotaent').order('numnotaent',{ascending:false}).limit(1)
       if (rol==='cajera')   qLast = qLast.gte('numnotaent',1000000)
       if (rol==='vendedor') qLast = qLast.lt('numnotaent',1000000)
