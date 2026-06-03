@@ -11,6 +11,8 @@ import GestionUsuarios from './components/GestionUsuarios'
 import Cartera         from './components/Cartera'
 import Comisiones      from './components/Comisiones'
 import Clientes        from './components/Clientes'
+import ControlDocumentos from './components/ControlDocumentos'
+import Egresos         from './components/Egresos'
 import Manual          from './components/Manual'
 
 export default function App() {
@@ -50,7 +52,9 @@ export default function App() {
   if (modulo === 'cierre')     return <CierreCaja       supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'usuarios')   return <GestionUsuarios  supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'cartera')    return <Cartera          supabase={supabase} usuario={usuario} onClose={onClose}/>
-  if (modulo === 'comisiones') return <Comisiones       supabase={supabase} usuario={usuario} onClose={onClose}/>
+  if (modulo === 'documentos') return <ControlDocumentos supabase={supabase} usuario={usuario} onClose={onClose}/>
+  if (modulo === 'egresos')    return <Egresos           supabase={supabase} usuario={usuario} onClose={onClose}/>
+  if (modulo === 'comisiones') return <Comisiones        supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'clientes')   return <Clientes         supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'manual')     return <Manual                                                  onClose={onClose}/>
 
