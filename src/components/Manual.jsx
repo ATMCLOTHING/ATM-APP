@@ -1,6 +1,4 @@
 // src/components/Manual.jsx
-// Manual de usuario ATM-APP — accesible desde el Dashboard
-
 import { useState } from 'react'
 
 const SECCIONES = [
@@ -11,7 +9,7 @@ const SECCIONES = [
     contenido: [
       {
         subtitulo: 'Cómo ingresar al sistema',
-        texto: `Abre el navegador y ve a https://atm-app-alpha.vercel.app. Ingresa tu usuario y contraseña. La contraseña inicial es Atm2026* — el sistema te pedirá cambiarla en el primer ingreso.`
+        texto: 'Abre el navegador y ve a https://atm-app-alpha.vercel.app. Ingresa tu usuario y contraseña. La contraseña inicial es Atm2026* — el sistema te pedirá cambiarla en el primer ingreso.'
       },
       {
         subtitulo: 'Roles del sistema',
@@ -20,8 +18,9 @@ const SECCIONES = [
           filas: [
             ['admin', 'Administrador', 'Todo el sistema'],
             ['caja1 / caja2 / caja3', 'Cajera', 'Notas de entrega y abonos'],
-            ['laura', 'Vendedor', 'Sus notas y su cartera'],
+            ['laura (u otro)', 'Vendedor', 'Sus notas y su cartera'],
             ['prendas', 'Bodega', 'Artículos y proveedores'],
+            ['PIN', 'Especial', 'PIN de autorización para acciones restringidas — solo el admin lo conoce'],
           ]
         }
       },
@@ -38,20 +37,41 @@ const SECCIONES = [
     contenido: [
       {
         subtitulo: '¿Qué es?',
-        texto: 'Es el documento principal de venta. Registra qué se vendió, a quién, cuánto costó y cómo se pagó.'
+        texto: 'Es el documento principal de venta. Registra qué se vendió, a quién, cuánto costó y cómo se pagó. Hay dos series: notas de Vendedor (números menores a 1.000.000) y notas de Caja (desde 1.000.000 en adelante).'
       },
       {
         subtitulo: 'Crear una nota nueva',
         pasos: [
-          'Haz clic en el botón ➕ Nueva (o presiona el ícono de hoja nueva en la barra inferior)',
+          'Haz clic en el botón ➕ Nueva',
+          'Si eres admin, elige la serie antes de crear: Caja (≥1.000.000) o Vendedor (<1.000.000)',
           'Ingresa la cédula del cliente y presiona Enter — si existe, carga sus datos automáticamente',
           'Si el cliente no existe, el sistema abre un formulario para registrarlo',
-          'Selecciona el vendedor en el combo correspondiente',
+          'Selecciona el vendedor — es obligatorio para poder guardar',
           'Elige el tipo de precio: Mayor, Detal o Vendedor',
-          'En la tabla de artículos, ingresa el código o descripción — el sistema busca automáticamente',
+          'En la tabla de artículos, ingresa el código y presiona Enter',
           'Ajusta cantidades según sea necesario',
-          'Selecciona la forma de pago (Contado / Crédito) y el medio (Efectivo / Transferencia / Mixto)',
+          'Selecciona el plazo de pago — la fecha de vencimiento se calcula automáticamente',
+          'Selecciona el medio de pago (Efectivo / Transferencia / Mixto / Crédito)',
           'Haz clic en 💾 Guardar'
+        ]
+      },
+      {
+        subtitulo: 'Ingreso con pistola de código de barras',
+        pasos: [
+          'Apunta la pistola al código de barras del artículo y dispara',
+          'El sistema extrae automáticamente el código del artículo (elimina ceros a la izquierda)',
+          'Si el artículo ya está en la nota, suma 1 a la cantidad existente',
+          'Si es nuevo, agrega una línea y el cursor baja listo para el siguiente escaneo',
+          'Si el código tiene varias tallas, aparece un dropdown para elegir la correcta'
+        ]
+      },
+      {
+        subtitulo: 'Ingreso manual de artículos',
+        pasos: [
+          'Escribe el código en el campo correspondiente',
+          'Presiona Enter para buscar — si no existe muestra un mensaje de error',
+          'Si hay varias coincidencias, aparece un dropdown para seleccionar',
+          'Al elegir del dropdown, el cursor va al campo cantidad para que la edites'
         ]
       },
       {
@@ -68,21 +88,32 @@ const SECCIONES = [
         }
       },
       {
-        subtitulo: 'Buscar una nota',
-        pasos: [
-          'Haz clic en el ícono 🔍 de la barra de navegación',
-          'Puedes buscar por número de nota, cédula, nombre del cliente o rango de fechas',
-          'Filtra por estado: Todas, Pendientes, Pagadas o Anuladas',
-          'Haz doble clic en la nota o selecciónala y clic en "Abrir nota"'
-        ]
-      },
-      {
         subtitulo: 'Registrar abonos',
         pasos: [
           'Abre la nota a la que quieres abonar',
-          'Haz clic en el botón 💵 Abonos (esquina inferior derecha)',
-          'Ingresa el valor del abono y el medio de pago',
-          'Confirma — el saldo se actualiza automáticamente'
+          'Haz clic en el botón 💵 Abonos',
+          'Ingresa el valor del abono, la fecha y el medio de pago',
+          'Haz clic en 💾 Registrar abono — el saldo se actualiza automáticamente'
+        ]
+      },
+      {
+        subtitulo: 'Revertir un abono',
+        pasos: [
+          'Abre la nota y entra al módulo de Abonos',
+          'En el historial de abonos, haz clic en ↩ Revertir junto al abono que deseas eliminar',
+          'El sistema pedirá el PIN de administrador',
+          'Ingresa el PIN y confirma — el abono se elimina y el saldo se recalcula'
+        ]
+      },
+      {
+        subtitulo: 'Desbloquear una nota para edición',
+        pasos: [
+          'Una nota guardada está bloqueada por defecto para evitar cambios accidentales',
+          'Haz clic en el botón 🔓 (amarillo) en la barra de botones',
+          'Ingresa el PIN de administrador',
+          'La nota muestra el badge 🔓 EDITANDO — todos los campos quedan habilitados',
+          'Realiza los cambios necesarios y haz clic en 💾 Guardar',
+          'Para cancelar sin guardar, haz clic en 🔒 para volver al estado original'
         ]
       },
       {
@@ -154,7 +185,7 @@ const SECCIONES = [
       },
       {
         subtitulo: 'Inventario',
-        texto: 'El inventario se descuenta automáticamente al guardar una nota de entrega y se restaura al anularla. Nunca modifiques el inventario manualmente a menos que sea necesario.'
+        texto: 'El inventario se descuenta automáticamente al guardar una nota de entrega y se restaura al anularla. Nunca modifiques el inventario manualmente a menos que sea estrictamente necesario.'
       }
     ]
   },
@@ -165,7 +196,7 @@ const SECCIONES = [
     contenido: [
       {
         subtitulo: '¿Qué es?',
-        texto: 'Muestra todas las notas con saldo pendiente. Permite ver la cartera por vendedor, filtrar por estado y mora, y registrar abonos a múltiples notas a la vez.'
+        texto: 'Muestra todas las notas con saldo pendiente. Permite ver la cartera por vendedor, filtrar por estado y mora, y registrar abonos a múltiples notas.'
       },
       {
         subtitulo: 'Generar la cartera',
@@ -193,6 +224,102 @@ const SECCIONES = [
     ]
   },
   {
+    id: 'documentos',
+    icon: '📋',
+    titulo: 'Control de Documentos',
+    contenido: [
+      {
+        subtitulo: '¿Qué es?',
+        texto: 'Permite rastrear la ubicación física del documento de cada Nota de Entrega de vendedor. Solo el administrador puede ver y cambiar los estados. Aplica únicamente a notas de la serie vendedor (número menor a 1.000.000).'
+      },
+      {
+        subtitulo: 'Estados del documento',
+        tabla: {
+          headers: ['Estado', 'Ícono', 'Significado'],
+          filas: [
+            ['Almacén',           '🏪', 'El documento está en ATM, en proceso de despacho'],
+            ['Vendedor',          '🤝', 'El documento está en manos del vendedor'],
+            ['Cuentas por Cobrar','📂', 'El documento está en la carpeta de CxC'],
+            ['Liquidada',         '✅', 'La comisión del vendedor fue pagada sobre esta nota'],
+            ['Eliminada',         '🗑', 'El administrador decidió eliminar el documento'],
+          ]
+        }
+      },
+      {
+        subtitulo: 'Cambiar el estado de un documento',
+        pasos: [
+          'Entra al módulo Control de Documentos desde el Dashboard',
+          'Usa los filtros por vendedor o estado para encontrar la nota',
+          'En la columna "Cambiar a", haz clic en el ícono del estado al que quieres mover el documento',
+          'El cambio se guarda inmediatamente — no requiere confirmación',
+        ]
+      },
+      {
+        subtitulo: 'Filtros y resumen',
+        texto: 'La parte superior muestra 5 tarjetas con el conteo y saldo total por estado. Haz clic en cualquier tarjeta para filtrar la tabla por ese estado. También puedes filtrar por vendedor o buscar por número de nota, cliente o cédula.'
+      }
+    ]
+  },
+  {
+    id: 'egresos',
+    icon: '💸',
+    titulo: 'Egresos / Pago de Cuentas',
+    contenido: [
+      {
+        subtitulo: '¿Qué es?',
+        texto: 'Módulo para registrar todos los pagos y gastos de la empresa. Organizado en grupos y tipos de egreso. Solo el administrador puede registrar y consultar egresos.'
+      },
+      {
+        subtitulo: 'Grupos de egresos',
+        texto: 'Cada egreso pertenece a un grupo (ej: Transporte, Nómina, Impuestos) y dentro del grupo a un tipo específico (ej: Gasolina, Seguridad Social, IVA). Al seleccionar el grupo, solo aparecen los tipos de ese grupo.'
+      },
+      {
+        subtitulo: 'Registrar un egreso',
+        pasos: [
+          'Haz clic en el ícono ➕ Nueva',
+          'Selecciona el Grupo de Egreso',
+          'Selecciona el Tipo de Egreso (se filtra según el grupo)',
+          'Busca el beneficiario por cédula (Enter) o escribe el nombre para buscar en terceros',
+          'Completa el sub-detalle, período desde/hasta y documento del beneficiario',
+          'Ingresa el Subtotal — el Total se calcula automáticamente sumando recargos y restando descuentos',
+          'Selecciona el medio de pago — si es Transferencia, Consignación o Cheque aparecen los campos de Banco y Cuenta',
+          'Haz clic en 💾 Guardar'
+        ]
+      },
+      {
+        subtitulo: 'Campos del formulario',
+        tabla: {
+          headers: ['Campo', 'Descripción'],
+          filas: [
+            ['Doc Interno',    'Consecutivo automático — no se puede modificar'],
+            ['Sub-Detalle',    'Descripción adicional del gasto (ej: "Arepas", "Marzo 2026")'],
+            ['Per. Desde/Hasta','Período al que corresponde el gasto'],
+            ['Docto. Benef.',  'Número de factura o documento del beneficiario'],
+            ['$ Recargos',     'Valor adicional al subtotal'],
+            ['$ Descuento',    'Valor a descontar del subtotal'],
+            ['# Aprobación',   'Código o número de autorización del pago'],
+          ]
+        }
+      },
+      {
+        subtitulo: 'Buscar un egreso',
+        pasos: [
+          'Haz clic en el ícono 🔍 Buscar en la barra de navegación',
+          'Busca por número de documento o nombre del beneficiario',
+          'Haz clic en la fila para cargar el egreso'
+        ]
+      },
+      {
+        subtitulo: 'Anular un egreso',
+        texto: 'Haz clic en el ícono 🗑 Anular e ingresa el motivo. El egreso queda marcado como ANULADO pero nunca se borra de la base de datos.'
+      },
+      {
+        subtitulo: 'Terceros / Beneficiarios',
+        texto: 'La base de terceros incluye los proveedores y contactos de ATM. Si el beneficiario no está en la lista, puedes escribir el nombre manualmente sin necesidad de crearlo.'
+      }
+    ]
+  },
+  {
     id: 'cierre',
     icon: '💰',
     titulo: 'Cierre de Caja',
@@ -215,17 +342,26 @@ const SECCIONES = [
           headers: ['Pestaña', 'Contenido'],
           filas: [
             ['📊 Consolidado por Vendedor', 'Ventas por vendedor: efectivo, transferencia, mixto, crédito'],
-            ['🏷️ Ventas por Marca', 'Unidades y valor vendido por marca'],
-            ['👥 Ventas por Cliente', 'Detalle de ventas por cliente'],
-            ['💰 Resumen del Día', 'Totales: ventas, ingresos, por cajera, cartera'],
-            ['🏆 Top Artículos', 'Los 10 artículos más vendidos'],
-            ['📋 Cartera Pendiente', 'Notas con saldo por cobrar'],
+            ['🏷️ Ventas por Marca',         'Unidades y valor vendido por marca'],
+            ['👥 Ventas por Cliente',        'Detalle de ventas por cliente'],
+            ['💰 Resumen del Día',           'Totales: ventas mostrador, ventas vendedor, abonos, cartera'],
+            ['🏆 Top Artículos',             'Los 10 artículos más vendidos'],
+            ['📋 Cartera Pendiente',         'Notas con saldo por cobrar'],
           ]
         }
       },
       {
-        subtitulo: 'Ventas por cajera',
-        texto: 'El sistema identifica automáticamente quién hizo cada nota según el usuario registrado: Cajera 1 (caja1), Cajera 2 (caja2), Cajera 3 (caja3) o Vendedor/Admin.'
+        subtitulo: 'Dashboard — Resumen del día',
+        tabla: {
+          headers: ['Tarjeta', 'Qué muestra'],
+          filas: [
+            ['Ventas Mostrador', 'Suma de notas de caja del día (≥1.000.000)'],
+            ['Ventas Vendedor',  'Suma de notas de vendedor del día (<1.000.000)'],
+            ['Prendas vendidas', 'Total de unidades vendidas en el día'],
+            ['Abonos Vendedor',  'Abonos recibidos sobre notas de crédito del día'],
+            ['Cartera pendiente','Saldo total por cobrar (todas las fechas)'],
+          ]
+        }
       }
     ]
   },
@@ -289,16 +425,20 @@ const SECCIONES = [
         tabla: {
           headers: ['Rol', 'Descripción'],
           filas: [
-            ['admin', 'Acceso total al sistema'],
-            ['cajera', 'Solo Notas de Entrega y abonos'],
-            ['vendedor', 'Sus notas y su cartera'],
-            ['bodega', 'Artículos y proveedores'],
+            ['admin',   'Acceso total al sistema'],
+            ['cajera',  'Solo Notas de Entrega y abonos — serie caja (≥1.000.000)'],
+            ['vendedor','Sus notas (serie vendedor <1.000.000) y su cartera'],
+            ['bodega',  'Artículos y proveedores'],
           ]
         }
       },
       {
+        subtitulo: 'El usuario PIN',
+        texto: 'Existe un usuario especial llamado PIN cuya contraseña funciona como PIN de autorización. Se usa para revertir abonos y desbloquear notas para edición. El administrador puede cambiar el PIN desde este módulo igual que cualquier contraseña.'
+      },
+      {
         subtitulo: 'Cambiar contraseña',
-        texto: 'Cada usuario puede cambiar su propia contraseña en el primer ingreso. El administrador puede resetearla desde el módulo de Usuarios.'
+        texto: 'Cada usuario puede cambiar su propia contraseña en el primer ingreso. El administrador puede resetearla desde el módulo de Usuarios haciendo clic en "🔄 Reset a Atm2026*".'
       }
     ]
   },
@@ -310,14 +450,12 @@ export default function Manual({ onClose }) {
 
   return (
     <div style={S.wrap}>
-      {/* HEADER */}
       <div style={S.header}>
         <span style={S.headerTit}>❓ MANUAL DE USUARIO — ATM-APP</span>
         <button onClick={onClose} style={S.btnClose}>✕ Cerrar</button>
       </div>
 
       <div style={S.body}>
-        {/* SIDEBAR */}
         <div style={S.sidebar}>
           <div style={S.sidebarTit}>MÓDULOS</div>
           {SECCIONES.map(s => (
@@ -329,7 +467,6 @@ export default function Manual({ onClose }) {
           ))}
         </div>
 
-        {/* CONTENIDO */}
         <div style={S.contenido}>
           <div style={S.secTitulo}>
             <span style={{fontSize:28}}>{seccion.icon}</span>
@@ -339,34 +476,23 @@ export default function Manual({ onClose }) {
           {seccion.contenido.map((bloque, i) => (
             <div key={i} style={S.bloque}>
               <div style={S.subTitulo}>{bloque.subtitulo}</div>
-
-              {bloque.texto && (
-                <p style={S.texto}>{bloque.texto}</p>
-              )}
-
+              {bloque.texto && <p style={S.texto}>{bloque.texto}</p>}
               {bloque.pasos && (
                 <ol style={S.lista}>
-                  {bloque.pasos.map((p, j) => (
-                    <li key={j} style={S.item}>{p}</li>
-                  ))}
+                  {bloque.pasos.map((p, j) => <li key={j} style={S.item}>{p}</li>)}
                 </ol>
               )}
-
               {bloque.tabla && (
                 <table style={S.tabla}>
                   <thead>
                     <tr style={S.thead}>
-                      {bloque.tabla.headers.map(h => (
-                        <th key={h} style={S.th}>{h}</th>
-                      ))}
+                      {bloque.tabla.headers.map(h => <th key={h} style={S.th}>{h}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {bloque.tabla.filas.map((fila, j) => (
                       <tr key={j} style={{background: j%2===0?'#fff':'#f5f7ff'}}>
-                        {fila.map((cel, k) => (
-                          <td key={k} style={S.td}>{cel}</td>
-                        ))}
+                        {fila.map((cel, k) => <td key={k} style={S.td}>{cel}</td>)}
                       </tr>
                     ))}
                   </tbody>
@@ -381,24 +507,24 @@ export default function Manual({ onClose }) {
 }
 
 const S = {
-  wrap:         {position:'fixed',inset:0,background:'#f0f2f5',zIndex:2000,display:'flex',flexDirection:'column',fontFamily:'Arial,sans-serif'},
-  header:       {background:'linear-gradient(90deg,#1a3a6b,#2c5fa8)',padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0},
-  headerTit:    {color:'#fff',fontWeight:900,fontSize:16,letterSpacing:1},
-  btnClose:     {background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'#fff',borderRadius:6,padding:'6px 16px',cursor:'pointer',fontSize:13,fontWeight:700},
-  body:         {display:'flex',flex:1,overflow:'hidden'},
-  sidebar:      {width:220,background:'#1a3a6b',display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto'},
-  sidebarTit:   {color:'rgba(255,255,255,0.5)',fontSize:10,fontWeight:700,padding:'16px 16px 8px',textTransform:'uppercase',letterSpacing:1},
-  sideItem:     {display:'flex',alignItems:'center',gap:10,padding:'10px 16px',background:'none',border:'none',color:'rgba(255,255,255,0.8)',cursor:'pointer',fontSize:13,textAlign:'left',width:'100%',borderLeft:'3px solid transparent'},
+  wrap:          {position:'fixed',inset:0,background:'#f0f2f5',zIndex:2000,display:'flex',flexDirection:'column',fontFamily:'Arial,sans-serif'},
+  header:        {background:'linear-gradient(90deg,#1a3a6b,#2c5fa8)',padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0},
+  headerTit:     {color:'#fff',fontWeight:900,fontSize:16,letterSpacing:1},
+  btnClose:      {background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'#fff',borderRadius:6,padding:'6px 16px',cursor:'pointer',fontSize:13,fontWeight:700},
+  body:          {display:'flex',flex:1,overflow:'hidden'},
+  sidebar:       {width:220,background:'#1a3a6b',display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto'},
+  sidebarTit:    {color:'rgba(255,255,255,0.5)',fontSize:10,fontWeight:700,padding:'16px 16px 8px',textTransform:'uppercase',letterSpacing:1},
+  sideItem:      {display:'flex',alignItems:'center',gap:10,padding:'10px 16px',background:'none',border:'none',color:'rgba(255,255,255,0.8)',cursor:'pointer',fontSize:13,textAlign:'left',width:'100%',borderLeft:'3px solid transparent'},
   sideItemActivo:{background:'rgba(255,255,255,0.15)',color:'#fff',borderLeft:'3px solid #ffc107',fontWeight:700},
-  contenido:    {flex:1,overflowY:'auto',padding:28},
-  secTitulo:    {display:'flex',alignItems:'center',gap:12,fontSize:22,fontWeight:900,color:'#1a3a6b',marginBottom:20,paddingBottom:12,borderBottom:'3px solid #1a3a6b'},
-  bloque:       {background:'#fff',borderRadius:8,padding:18,marginBottom:16,boxShadow:'0 1px 4px rgba(0,0,0,0.06)'},
-  subTitulo:    {fontSize:13,fontWeight:800,color:'#1a3a6b',marginBottom:10,textTransform:'uppercase',letterSpacing:0.5},
-  texto:        {fontSize:13,color:'#444',lineHeight:1.7},
-  lista:        {paddingLeft:20,margin:0},
-  item:         {fontSize:13,color:'#444',lineHeight:1.8,marginBottom:4},
-  tabla:        {width:'100%',borderCollapse:'collapse',fontSize:13,marginTop:8},
-  thead:        {background:'#1a3a6b'},
-  th:           {padding:'8px 12px',color:'#fff',fontWeight:700,textAlign:'left'},
-  td:           {padding:'7px 12px',borderBottom:'1px solid #eee',color:'#444'},
+  contenido:     {flex:1,overflowY:'auto',padding:28},
+  secTitulo:     {display:'flex',alignItems:'center',gap:12,fontSize:22,fontWeight:900,color:'#1a3a6b',marginBottom:20,paddingBottom:12,borderBottom:'3px solid #1a3a6b'},
+  bloque:        {background:'#fff',borderRadius:8,padding:18,marginBottom:16,boxShadow:'0 1px 4px rgba(0,0,0,0.06)'},
+  subTitulo:     {fontSize:13,fontWeight:800,color:'#1a3a6b',marginBottom:10,textTransform:'uppercase',letterSpacing:0.5},
+  texto:         {fontSize:13,color:'#444',lineHeight:1.7},
+  lista:         {paddingLeft:20,margin:0},
+  item:          {fontSize:13,color:'#444',lineHeight:1.8,marginBottom:4},
+  tabla:         {width:'100%',borderCollapse:'collapse',fontSize:13,marginTop:8},
+  thead:         {background:'#1a3a6b'},
+  th:            {padding:'8px 12px',color:'#fff',fontWeight:700,textAlign:'left'},
+  td:            {padding:'7px 12px',borderBottom:'1px solid #eee',color:'#444'},
 }
