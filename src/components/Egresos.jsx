@@ -49,6 +49,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
   const [formTerc,     setFormTerc]     = useState({cedrif:'',nombre:'',ciudad:'',telefono:'',celular:''})
   const [guardandoTer, setGuardandoTer] = useState(false)
   const [editTerc,     setEditTerc]     = useState(null)
+  const [filtTerc,     setFiltTerc]     = useState('')
 
   // Filtros consulta
   const [filtDesde,    setFiltDesde]    = useState(mes1())
@@ -474,12 +475,30 @@ export default function Egresos({ supabase, usuario, onClose }) {
                 {/* 6. Beneficiario */}
                 <div style={E.campo}>
                   <label style={E.lbl}>Cédula / NIT Beneficiario</label>
-                  <select style={E.sel} value={form.cedrifben} onChange={e=>setF('cedrifben',e.target.value)}>
-                    <option value="">— Selecciona —</option>
-                    {terceros.map(t=>(
-                      <option key={t.cedrif} value={t.cedrif}>{t.nombre||t.cedrif} ({t.cedrif})</option>
-                    ))}
-                  </select>
+                  <div style={{position:'relative'}}>
+                    <input style={E.inp} value={filtTerc}
+                      onChange={e=>setFiltTerc(e.target.value)}
+                      placeholder="Buscar por nombre o cédula..."/>
+                    {filtTerc.length >= 2 && (
+                      <div style={{position:'absolute',top:34,left:0,right:0,background:'#fff',border:'1px solid #c8d5ea',borderRadius:5,boxShadow:'0 4px 12px rgba(0,0,0,0.15)',zIndex:100,maxHeight:180,overflowY:'auto'}}>
+                        {terceros
+                          .filter(t => t.nombre?.toLowerCase().includes(filtTerc.toLowerCase()) || t.cedrif?.includes(filtTerc))
+                          .map(t=>(
+                            <div key={t.cedrif}
+                              onMouseDown={()=>{ setF('cedrifben', t.cedrif); setFiltTerc(t.nombre||t.cedrif) }}
+                              style={{padding:'7px 12px',cursor:'pointer',fontSize:12,borderBottom:'1px solid #eee'}}
+                              onMouseEnter={e=>e.currentTarget.style.background='#eef2ff'}
+                              onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
+                              <strong>{t.nombre}</strong> <span style={{color:'#888',fontSize:11}}>{t.cedrif}</span>
+                            </div>
+                          ))
+                        }
+                        {terceros.filter(t => t.nombre?.toLowerCase().includes(filtTerc.toLowerCase()) || t.cedrif?.includes(filtTerc)).length === 0 && (
+                          <div style={{padding:'10px 12px',color:'#aaa',fontSize:12}}>Sin resultados</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* 7. Nombre beneficiario */}
@@ -537,7 +556,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
                 <button onClick={guardar} disabled={guardando} style={E.btnGuardar}>
                   {guardando ? '⏳ Guardando…' : '💾 Guardar Egreso'}
                 </button>
-                <button onClick={()=>{setForm({tipoegreso:'',codegreso:'',fechapag:hoy(),cedrifben:'',nomrazben:'',subdetalle:'',perdesde:'',perhasta:'',valorneto:'',valrecarg:'0',valdescue:'0',mediopago:'EFECTIVO',observacio:''});setMsg(null)}}
+                <button onClick={()=>{setForm({tipoegreso:'',codegreso:'',fechapag:hoy(),cedrifben:'',nomrazben:'',subdetalle:'',perdesde:'',perhasta:'',valorneto:'',valrecarg:'0',valdescue:'0',mediopago:'EFECTIVO',observacio:''});setFiltTerc('');setMsg(null)}}
                   style={E.btnLimpiar}>
                   🗑 Limpiar
                 </button>
