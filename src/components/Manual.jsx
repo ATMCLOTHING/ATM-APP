@@ -366,6 +366,120 @@ const SECCIONES = [
     ]
   },
   {
+    id: 'cartera',
+    icon: '📊',
+    titulo: 'Cartera',
+    contenido: [
+      {
+        subtitulo: '¿Qué es?',
+        texto: 'Módulo para consultar y gestionar las cuentas por cobrar. Permite ver el estado de las notas de crédito, registrar abonos y generar el informe de cartera vigente por vendedor.'
+      },
+      {
+        subtitulo: 'Filtros disponibles',
+        tabla: {
+          headers: ['Filtro', 'Opciones'],
+          filas: [
+            ['Vendedor', 'Filtra por vendedor asignado a las notas'],
+            ['Cliente', 'Escribe el nombre o cédula — filtra en tiempo real'],
+            ['Estado', 'Pendientes / Pagadas / Todas'],
+            ['Mora mínima', 'Todas / +30 días / +60 días / +90 días'],
+          ]
+        }
+      },
+      {
+        subtitulo: 'Vistas disponibles',
+        tabla: {
+          headers: ['Vista', 'Qué muestra'],
+          filas: [
+            ['Resumen por Cliente', 'Total notas, valor, abonado y saldo por cliente. Haz clic en un cliente para ver sus notas'],
+            ['Detalle por Nota', 'Cada nota con fecha, vencimiento y días de mora'],
+          ]
+        }
+      },
+      {
+        subtitulo: 'Colores de mora',
+        tabla: {
+          headers: ['Color', 'Significado'],
+          filas: [
+            ['🟢 Verde', 'Sin mora — pago vigente'],
+            ['🟡 Amarillo', 'Más de 30 días de mora'],
+            ['🟠 Naranja', 'Más de 60 días de mora'],
+            ['🔴 Rojo', 'Más de 90 días de mora'],
+          ]
+        }
+      },
+      {
+        subtitulo: 'Registrar un abono desde Cartera',
+        pasos: [
+          'Genera la cartera con los filtros que necesitas',
+          'Haz clic en el botón 💵 Registrar Abono',
+          'Selecciona una o varias notas marcando las casillas',
+          'Ingresa el valor total del abono y el medio de pago',
+          'Haz clic en ⚡ Distribuir — el sistema reparte el valor cronológicamente',
+          'Revisa la distribución propuesta y haz clic en 💾 Confirmar y guardar'
+        ]
+      },
+      {
+        subtitulo: 'Informe Cartera Completa',
+        texto: 'Haz clic en el botón 📄 Cartera Completa para generar un informe imprimible agrupado por vendedor y cliente, igual al reporte de cartera vigente del sistema anterior. Muestra # documento, fecha, vencimiento, mora, valor, abono y saldo de cada nota.'
+      }
+    ]
+  },
+  {
+    id: 'egresos',
+    icon: '💸',
+    titulo: 'Egresos',
+    contenido: [
+      {
+        subtitulo: '¿Qué es?',
+        texto: 'Módulo para registrar y controlar todos los gastos de la empresa: nómina, arriendos, impuestos, servicios, comisiones y más. Solo el administrador tiene acceso.'
+      },
+      {
+        subtitulo: 'Registrar un egreso',
+        pasos: [
+          'Selecciona el Tipo de Egreso (Nómina, Arriendos, Impuestos, etc.)',
+          'Escribe el Subdetalle si aplica — descripción adicional del gasto',
+          'Ingresa la fecha de inicio del Período — la fecha final se calcula automáticamente al final del mes',
+          'Selecciona la Fecha de Pago y el Medio de Pago (Efectivo o Transferencia)',
+          'Busca el Beneficiario escribiendo su nombre o cédula en el campo de búsqueda',
+          'Si el beneficiario no está en la lista, escribe el nombre directamente',
+          'Ingresa el Valor Neto y el recargo o descuento si aplican',
+          'Haz clic en 💾 Guardar Egreso'
+        ]
+      },
+      {
+        subtitulo: 'Consultar egresos',
+        pasos: [
+          'Ve a la pestaña 🔍 Consultar / Imprimir',
+          'Selecciona el rango de fechas y filtra por tipo o medio de pago si necesitas',
+          'Haz clic en 🔍 Consultar',
+          'Para imprimir el reporte haz clic en 🖨 Imprimir'
+        ]
+      },
+      {
+        subtitulo: 'Resumen por Categoría',
+        texto: 'La pestaña 📊 Resumen muestra tarjetas visuales con el total gastado en cada categoría durante el período seleccionado, con el porcentaje que representa del total.'
+      },
+      {
+        subtitulo: 'Gestionar Tipos de Egreso',
+        pasos: [
+          'Haz clic en el botón ⚙️ Gestionar Tipos de Egreso en la parte superior',
+          'Para agregar: escribe el nombre y haz clic en ➕ Agregar',
+          'Para eliminar: haz clic en la × junto al tipo que deseas borrar'
+        ]
+      },
+      {
+        subtitulo: 'Gestionar Terceros (Beneficiarios)',
+        pasos: [
+          'Haz clic en el botón 👥 Gestionar Terceros en la parte superior',
+          'Para agregar: completa cédula, nombre, ciudad y teléfono, luego haz clic en ➕ Agregar',
+          'Para editar: haz clic en ✏️ junto al tercero que deseas modificar',
+          'Para eliminar: haz clic en 🗑 junto al tercero'
+        ]
+      }
+    ]
+  },
+  {
     id: 'comisiones',
     icon: '💼',
     titulo: 'Comisiones',
