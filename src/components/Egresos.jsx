@@ -40,6 +40,15 @@ export default function Egresos({ supabase, usuario, onClose }) {
   const [cargando,     setCargando]     = useState(false)
   const [guardando,    setGuardando]    = useState(false)
   const [msg,          setMsg]          = useState(null)
+  // CRUD Tipos de egreso
+  const [showTipos,    setShowTipos]    = useState(false)
+  const [nuevoTipo,    setNuevoTipo]    = useState('')
+  const [guardandoT,   setGuardandoT]  = useState(false)
+  // CRUD Terceros
+  const [showTerc,     setShowTerc]     = useState(false)
+  const [formTerc,     setFormTerc]     = useState({cedrif:'',nombre:'',ciudad:'',telefono:'',celular:''})
+  const [guardandoTer, setGuardandoTer] = useState(false)
+  const [editTerc,     setEditTerc]     = useState(null)
 
   // Filtros consulta
   const [filtDesde,    setFiltDesde]    = useState(mes1())
@@ -65,7 +74,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
   })
 
   // Subdetalles filtrados por grupo seleccionado
-  const subsFiltrados = subdetalles.filter(s => String(s.cg) === String(form.tipoegreso))
+  const subsFiltrados = subdetalles.filter(s => String(s.tipoegreso) === String(form.tipoegreso))
 
   useEffect(() => {
     cargarMaestros()
@@ -73,8 +82,8 @@ export default function Egresos({ supabase, usuario, onClose }) {
 
   async function cargarMaestros() {
     const [{data:subs}, {data:terc}] = await Promise.all([
-      supabase.from('egr_grupos').select('*').order('cg').order('codigo'),
-      supabase.from('terceros').select('cedrif,nombre').eq('activo', 1).order('nombre'),
+      supabase.from('grupoegresos').select('*').order('tipoegreso').order('codegreso'),
+      supabase.from('terceros').select('cedrif,nomtercero').eq('activo', 1).order('nomtercero'),
     ])
     setSubdetalles(subs||[])
     setTerceros(terc||[])
@@ -84,9 +93,9 @@ export default function Egresos({ supabase, usuario, onClose }) {
     setCargando(true)
     let q = supabase.from('egresos')
       .select('*')
-      .gte('fecha_pago', filtDesde)
-      .lte('fecha_pago', filtHasta)
-      .order('fecha_pago', {ascending:false})
+      .gte('fechapag', filtDesde)
+      .lte('fechapag', filtHasta)
+      .order('fechapag', {ascending:false})
     if (filtGrupo) q = q.eq('grupo_id', Number(filtGrupo))
     if (filtMedio) q = q.eq('medio_pago', filtMedio)
     const {data, error} = await q.limit(2000)
@@ -102,13 +111,13 @@ export default function Egresos({ supabase, usuario, onClose }) {
       if (k === 'tipoegreso') nuevo.codegreso = ''
       // Al cambiar subdetalle, autocompletar descegreso
       if (k === 'codegreso') {
-        const sub = subdetalles.find(s => String(s.cg)===String(nuevo.tipoegreso) && String(s.codigo)===String(v))
-        if (sub) nuevo.descegreso = sub.nombre
+        const sub = subdetalles.find(s => String(s.tipoegreso)===String(nuevo.tipoegreso) && String(s.codegreso)===String(v))
+        if (sub) nuevo.descegreso = sub.descegreso
       }
       // Al cambiar cédula beneficiario, buscar nombre
       if (k === 'cedrifben') {
         const terc = terceros.find(t => String(t.cedrif) === String(v))
-        if (terc) nuevo.nomrazben = terc.nombre
+        if (terc) nuevo.nomrazben = terc.nomtercero
       }
       return nuevo
     })
@@ -124,17 +133,17 @@ export default function Egresos({ supabase, usuario, onClose }) {
   async function guardar() {
     setMsg(null)
     if (!form.tipoegreso)  return setMsg({ok:false, txt:'Selecciona el grupo de egreso.'})
-    if (!form.codegreso)   return setMsg({ok:false, txt:'Selecciona el tipo de egreso.'})
     if (!form.fechapag)    return setMsg({ok:false, txt:'Ingresa la fecha de pago.'})
     if (!form.nomrazben)   return setMsg({ok:false, txt:'Ingresa el beneficiario.'})
     if (!form.valorneto || Number(form.valorneto) <= 0)
                            return setMsg({ok:false, txt:'Ingresa un valor válido.'})
     setGuardando(true)
-    const sub = subdetalles.find(s => String(s.cg)===String(form.tipoegreso) && String(s.codigo)===String(form.codegreso))
+    const sub = subdetalles.find(s => String(s.tipoegreso)===String(form.tipoegreso) && String(s.codegreso)===String(form.codegreso))
     const registro = {
       grupo_id: Number(form.tipoegreso),
       tipo_id:  Number(form.codegreso),
-      descegreso: sub?.nombre || '',
+      descegreso: sub?.descegreso || '',
+      tipocod:    sub?.tipocod || null,
       fecha_pago: form.fechapag,
       cedrif_benef: form.cedrifben || null,
       nombre_benef: form.nomrazben,
@@ -231,6 +240,55 @@ export default function Egresos({ supabase, usuario, onClose }) {
     w.document.close()
   }
 
+  // ── CRUD TIPOS DE EGRESO ─────────────────────────────────────────────────
+  async function agregarTipo() {
+    if (!nuevoTipo.trim()) return
+    setGuardandoT(true)
+    await supabase.from('egr_grupos').insert({nombre: nuevoTipo.trim(), cg: 0})
+    setNuevoTipo('')
+    await cargarMaestros()
+    setGuardandoT(false)
+  }
+  async function eliminarTipo(id) {
+    if (!window.confirm('¿Eliminar este tipo de egreso?')) return
+    await supabase.from('egr_grupos').delete().eq('id', id)
+    await cargarMaestros()
+  }
+
+  // ── CRUD TERCEROS ─────────────────────────────────────────────────────────
+  async function guardarTercero() {
+    if (!formTerc.cedrif || !formTerc.nombre) return
+    setGuardandoTer(true)
+    if (editTerc) {
+      await supabase.from('terceros').update({
+        nombre: formTerc.nombre, ciudad: formTerc.ciudad,
+        telefono: formTerc.telefono, celular: formTerc.celular
+      }).eq('cedrif', editTerc)
+    } else {
+      await supabase.from('terceros').insert({
+        cedrif: formTerc.cedrif, nombre: formTerc.nombre,
+        ciudad: formTerc.ciudad, telefono: formTerc.telefono,
+        celular: formTerc.celular, activo: 1
+      })
+    }
+    setFormTerc({cedrif:'',nombre:'',ciudad:'',telefono:'',celular:''})
+    setEditTerc(null)
+    const {data} = await supabase.from('terceros').select('cedrif,nombre').eq('activo',1).order('nombre')
+    setTerceros(data||[])
+    setGuardandoTer(false)
+  }
+  async function eliminarTercero(cedrif) {
+    if (!window.confirm('¿Eliminar este tercero?')) return
+    await supabase.from('terceros').update({activo:0}).eq('cedrif', cedrif)
+    const {data} = await supabase.from('terceros').select('cedrif,nombre').eq('activo',1).order('nombre')
+    setTerceros(data||[])
+  }
+  function editarTercero(t) {
+    setFormTerc({cedrif:t.cedrif, nombre:t.nombre||'', ciudad:t.ciudad||'', telefono:t.telefono||'', celular:t.celular||''})
+    setEditTerc(t.cedrif)
+    setShowTerc(true)
+  }
+
   return (
     <div style={E.pagina}>
       <div style={E.ventana}>
@@ -244,6 +302,99 @@ export default function Egresos({ supabase, usuario, onClose }) {
           <span style={E.headerTit}>CONTROL DE EGRESOS</span>
           <button onClick={onClose} style={E.btnCerrar}>← Menú</button>
         </div>
+
+        {/* GESTIÓN MAESTROS */}
+        <div style={{display:'flex',gap:8,padding:'6px 14px',background:'#f0f4ff',borderBottom:'1px solid #c8d5ea'}}>
+          <button onClick={()=>setShowTipos(!showTipos)}
+            style={{fontSize:11,padding:'3px 12px',border:'1px solid #c8d5ea',borderRadius:4,background:showTipos?'#1a3a6b':'#fff',color:showTipos?'#fff':'#1a3a6b',cursor:'pointer',fontWeight:600}}>
+            ⚙️ Gestionar Tipos de Egreso
+          </button>
+          <button onClick={()=>setShowTerc(!showTerc)}
+            style={{fontSize:11,padding:'3px 12px',border:'1px solid #c8d5ea',borderRadius:4,background:showTerc?'#1a3a6b':'#fff',color:showTerc?'#fff':'#1a3a6b',cursor:'pointer',fontWeight:600}}>
+            👥 Gestionar Terceros
+          </button>
+        </div>
+
+        {/* PANEL TIPOS DE EGRESO */}
+        {showTipos && (
+          <div style={{background:'#fff',borderBottom:'1px solid #dde3ee',padding:'12px 16px'}}>
+            <div style={{fontWeight:700,fontSize:13,color:'#1a3a6b',marginBottom:8}}>⚙️ Tipos de Egreso</div>
+            <div style={{display:'flex',gap:8,marginBottom:10}}>
+              <input style={{...E.inp,width:280}} value={nuevoTipo} onChange={e=>setNuevoTipo(e.target.value)}
+                placeholder="Nuevo tipo de egreso..." onKeyDown={e=>e.key==='Enter'&&agregarTipo()}/>
+              <button onClick={agregarTipo} disabled={guardandoT} style={{...E.btnGenerar,height:32}}>
+                {guardandoT?'⏳':'➕'} Agregar
+              </button>
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {subdetalles.map(g=>(
+                <div key={g.id} style={{display:'flex',alignItems:'center',gap:4,background:'#eef2ff',borderRadius:16,padding:'3px 10px',fontSize:12}}>
+                  <span>{g.nombre}</span>
+                  <button onClick={()=>eliminarTipo(g.id)}
+                    style={{background:'none',border:'none',color:'#c62828',cursor:'pointer',fontSize:13,padding:'0 2px',lineHeight:1}}>×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PANEL TERCEROS */}
+        {showTerc && (
+          <div style={{background:'#fff',borderBottom:'1px solid #dde3ee',padding:'12px 16px'}}>
+            <div style={{fontWeight:700,fontSize:13,color:'#1a3a6b',marginBottom:8}}>👥 Gestionar Terceros</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 2fr 1fr 1fr 1fr auto',gap:6,marginBottom:10,alignItems:'end'}}>
+              <div><label style={E.lbl}>Cédula/NIT</label>
+                <input style={E.inp} value={formTerc.cedrif} onChange={e=>setFormTerc(p=>({...p,cedrif:e.target.value}))}
+                  placeholder="Cédula/NIT" disabled={!!editTerc}/></div>
+              <div><label style={E.lbl}>Nombre *</label>
+                <input style={E.inp} value={formTerc.nombre} onChange={e=>setFormTerc(p=>({...p,nombre:e.target.value}))}
+                  placeholder="Nombre completo"/></div>
+              <div><label style={E.lbl}>Ciudad</label>
+                <input style={E.inp} value={formTerc.ciudad} onChange={e=>setFormTerc(p=>({...p,ciudad:e.target.value}))}
+                  placeholder="Ciudad"/></div>
+              <div><label style={E.lbl}>Teléfono</label>
+                <input style={E.inp} value={formTerc.telefono} onChange={e=>setFormTerc(p=>({...p,telefono:e.target.value}))}
+                  placeholder="Teléfono"/></div>
+              <div><label style={E.lbl}>Celular</label>
+                <input style={E.inp} value={formTerc.celular} onChange={e=>setFormTerc(p=>({...p,celular:e.target.value}))}
+                  placeholder="Celular"/></div>
+              <div style={{display:'flex',gap:4}}>
+                <button onClick={guardarTercero} disabled={guardandoTer}
+                  style={{...E.btnGenerar,height:32,whiteSpace:'nowrap'}}>
+                  {guardandoTer?'⏳':editTerc?'💾 Guardar':'➕ Agregar'}
+                </button>
+                {editTerc && <button onClick={()=>{setEditTerc(null);setFormTerc({cedrif:'',nombre:'',ciudad:'',telefono:'',celular:''})}}
+                  style={{...E.btnLimpiar,height:32}}>✕</button>}
+              </div>
+            </div>
+            <div style={{maxHeight:180,overflowY:'auto'}}>
+              <table style={{...E.tabla,fontSize:11}}>
+                <thead><tr style={E.thead}>
+                  {['Cédula/NIT','Nombre','Ciudad','Teléfono','Celular',''].map(h=>(
+                    <th key={h} style={E.th}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {terceros.map((t,i)=>(
+                    <tr key={t.cedrif} style={{background:i%2===0?'#fff':'#f8faff'}}>
+                      <td style={E.td}>{t.cedrif}</td>
+                      <td style={{...E.td,fontWeight:600}}>{t.nombre}</td>
+                      <td style={E.td}>{t.ciudad||''}</td>
+                      <td style={E.td}>{t.telefono||''}</td>
+                      <td style={E.td}>{t.celular||''}</td>
+                      <td style={E.td}>
+                        <button onClick={()=>editarTercero(t)}
+                          style={{background:'#eef2ff',border:'1px solid #c8d5ea',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontSize:11,marginRight:4}}>✏️</button>
+                        <button onClick={()=>eliminarTercero(t.cedrif)}
+                          style={{background:'#fdecea',border:'1px solid #ef9a9a',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontSize:11,color:'#c62828'}}>🗑</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* TABS PRINCIPALES */}
         <div style={E.tabs}>
@@ -267,36 +418,52 @@ export default function Egresos({ supabase, usuario, onClose }) {
               <div style={E.cardTit}>📝 Nuevo Egreso</div>
 
               <div style={E.grid2}>
-                {/* Grupo de egreso */}
-                <div style={E.campo}>
-                  <label style={E.lbl}>Categoría / Grupo *</label>
-                  <select style={E.sel} value={form.tipoegreso} onChange={e=>setF('tipoegreso',e.target.value)}>
-                    <option value="">— Selecciona —</option>
-                    {Object.entries(GRUPOS).sort((a,b)=>a[1].nombre.localeCompare(b[1].nombre)).map(([k,g])=>(
-                      <option key={k} value={k}>{g.icon} {g.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Tipo específico */}
+                {/* 1. Tipo de Egreso */}
                 <div style={E.campo}>
                   <label style={E.lbl}>Tipo de Egreso *</label>
-                  <select style={E.sel} value={form.codegreso} onChange={e=>setF('codegreso',e.target.value)}
-                    disabled={!form.tipoegreso}>
+                  <select style={E.sel} value={form.tipoegreso} onChange={e=>setF('tipoegreso',e.target.value)}>
                     <option value="">— Selecciona —</option>
-                    {subsFiltrados.map(s=>(
-                      <option key={s.codigo} value={s.codigo}>{s.nombre}</option>
+                    {subdetalles.map(g=>(
+                      <option key={g.id} value={g.id}>{g.nombre}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Fecha */}
+                {/* 2. Subdetalle */}
+                <div style={E.campo}>
+                  <label style={E.lbl}>Subdetalle / Descripción</label>
+                  <input style={E.inp} value={form.subdetalle} onChange={e=>setF('subdetalle',e.target.value)}
+                    placeholder="Descripción adicional (opcional)"/>
+                </div>
+
+                {/* 3. Período - al cambiar desde, calcula hasta automáticamente */}
+                <div style={{...E.campo,gridColumn:'span 2'}}>
+                  <label style={E.lbl}>Período</label>
+                  <div style={{display:'flex',gap:6}}>
+                    <input style={{...E.inp,flex:1}} type="date" value={form.perdesde}
+                      onChange={e=>{
+                        const desde = e.target.value
+                        setF('perdesde', desde)
+                        if (desde) {
+                          const d = new Date(desde)
+                          const diasMes = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate()
+                          d.setDate(d.getDate() + diasMes - 1)
+                          const hasta = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
+                          setForm(prev=>({...prev, perdesde:desde, perhasta:hasta}))
+                        }
+                      }} title="Desde"/>
+                    <input style={{...E.inp,flex:1}} type="date" value={form.perhasta}
+                      onChange={e=>setF('perhasta',e.target.value)} title="Hasta"/>
+                  </div>
+                </div>
+
+                {/* 4. Fecha de pago */}
                 <div style={E.campo}>
                   <label style={E.lbl}>Fecha de Pago *</label>
                   <input style={E.inp} type="date" value={form.fechapag} onChange={e=>setF('fechapag',e.target.value)}/>
                 </div>
 
-                {/* Medio de pago */}
+                {/* 5. Medio de pago */}
                 <div style={E.campo}>
                   <label style={E.lbl}>Medio de Pago *</label>
                   <select style={E.sel} value={form.mediopago} onChange={e=>setF('mediopago',e.target.value)}>
@@ -304,44 +471,25 @@ export default function Egresos({ supabase, usuario, onClose }) {
                   </select>
                 </div>
 
-                {/* Cédula beneficiario */}
+                {/* 6. Beneficiario */}
                 <div style={E.campo}>
                   <label style={E.lbl}>Cédula / NIT Beneficiario</label>
-                  <select style={E.sel} value={form.cedrifben}
-                    onChange={e=>setF('cedrifben',e.target.value)}>
-                    <option value="">— Selecciona o escribe abajo —</option>
+                  <select style={E.sel} value={form.cedrifben} onChange={e=>setF('cedrifben',e.target.value)}>
+                    <option value="">— Selecciona —</option>
                     {terceros.map(t=>(
-                      <option key={t.cedrif} value={t.cedrif}>{t.nomtercero} ({t.cedrif})</option>
+                      <option key={t.cedrif} value={t.cedrif}>{t.nombre||t.cedrif} ({t.cedrif})</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Nombre beneficiario */}
+                {/* 7. Nombre beneficiario */}
                 <div style={E.campo}>
                   <label style={E.lbl}>Nombre / Razón Social *</label>
                   <input style={E.inp} value={form.nomrazben} onChange={e=>setF('nomrazben',e.target.value)}
                     placeholder="Nombre del beneficiario"/>
                 </div>
 
-                {/* Subdetalle */}
-                <div style={E.campo}>
-                  <label style={E.lbl}>Subdetalle / Descripción</label>
-                  <input style={E.inp} value={form.subdetalle} onChange={e=>setF('subdetalle',e.target.value)}
-                    placeholder="Descripción adicional (opcional)"/>
-                </div>
-
-                {/* Período */}
-                <div style={E.campo}>
-                  <label style={E.lbl}>Período</label>
-                  <div style={{display:'flex',gap:6}}>
-                    <input style={{...E.inp,flex:1}} type="date" value={form.perdesde}
-                      onChange={e=>setF('perdesde',e.target.value)} title="Desde"/>
-                    <input style={{...E.inp,flex:1}} type="date" value={form.perhasta}
-                      onChange={e=>setF('perhasta',e.target.value)} title="Hasta"/>
-                  </div>
-                </div>
-
-                {/* Valor neto */}
+                {/* 8. Valor neto */}
                 <div style={E.campo}>
                   <label style={E.lbl}>Valor Neto *</label>
                   <input style={{...E.inp,fontWeight:700,fontSize:15}} type="number" min={0}
@@ -349,14 +497,14 @@ export default function Egresos({ supabase, usuario, onClose }) {
                     placeholder="$0"/>
                 </div>
 
-                {/* Recargo y descuento */}
+                {/* 9. Recargo y descuento */}
                 <div style={E.campo}>
                   <label style={E.lbl}>Recargo / Descuento</label>
                   <div style={{display:'flex',gap:6}}>
                     <input style={{...E.inp,flex:1}} type="number" min={0} value={form.valrecarg}
-                      onChange={e=>setF('valrecarg',e.target.value)} placeholder="Recargo" title="Recargo"/>
+                      onChange={e=>setF('valrecarg',e.target.value)} placeholder="Recargo"/>
                     <input style={{...E.inp,flex:1}} type="number" min={0} value={form.valdescue}
-                      onChange={e=>setF('valdescue',e.target.value)} placeholder="Descuento" title="Descuento"/>
+                      onChange={e=>setF('valdescue',e.target.value)} placeholder="Descuento"/>
                   </div>
                 </div>
               </div>
@@ -414,8 +562,8 @@ export default function Egresos({ supabase, usuario, onClose }) {
                   <label style={E.lbl}>Categoría</label>
                   <select style={E.sel} value={filtGrupo} onChange={e=>setFiltGrupo(e.target.value)}>
                     <option value="">— Todas —</option>
-                    {Object.entries(GRUPOS).sort((a,b)=>a[1].nombre.localeCompare(b[1].nombre)).map(([k,g])=>(
-                      <option key={k} value={k}>{g.icon} {g.nombre}</option>
+                    {subdetalles.map(g=>(
+                      <option key={g.id} value={g.id}>{g.nombre}</option>
                     ))}
                   </select>
                 </div>
@@ -472,7 +620,56 @@ export default function Egresos({ supabase, usuario, onClose }) {
                     <tbody>
                       {egresos.map((e,i)=>{
                         const g = GRUPOS[e.grupo_id]
-                        return (
+                        // ── CRUD TIPOS DE EGRESO ─────────────────────────────────────────────────
+  async function agregarTipo() {
+    if (!nuevoTipo.trim()) return
+    setGuardandoT(true)
+    await supabase.from('egr_grupos').insert({nombre: nuevoTipo.trim(), cg: 0})
+    setNuevoTipo('')
+    await cargarMaestros()
+    setGuardandoT(false)
+  }
+  async function eliminarTipo(id) {
+    if (!window.confirm('¿Eliminar este tipo de egreso?')) return
+    await supabase.from('egr_grupos').delete().eq('id', id)
+    await cargarMaestros()
+  }
+
+  // ── CRUD TERCEROS ─────────────────────────────────────────────────────────
+  async function guardarTercero() {
+    if (!formTerc.cedrif || !formTerc.nombre) return
+    setGuardandoTer(true)
+    if (editTerc) {
+      await supabase.from('terceros').update({
+        nombre: formTerc.nombre, ciudad: formTerc.ciudad,
+        telefono: formTerc.telefono, celular: formTerc.celular
+      }).eq('cedrif', editTerc)
+    } else {
+      await supabase.from('terceros').insert({
+        cedrif: formTerc.cedrif, nombre: formTerc.nombre,
+        ciudad: formTerc.ciudad, telefono: formTerc.telefono,
+        celular: formTerc.celular, activo: 1
+      })
+    }
+    setFormTerc({cedrif:'',nombre:'',ciudad:'',telefono:'',celular:''})
+    setEditTerc(null)
+    const {data} = await supabase.from('terceros').select('cedrif,nombre').eq('activo',1).order('nombre')
+    setTerceros(data||[])
+    setGuardandoTer(false)
+  }
+  async function eliminarTercero(cedrif) {
+    if (!window.confirm('¿Eliminar este tercero?')) return
+    await supabase.from('terceros').update({activo:0}).eq('cedrif', cedrif)
+    const {data} = await supabase.from('terceros').select('cedrif,nombre').eq('activo',1).order('nombre')
+    setTerceros(data||[])
+  }
+  function editarTercero(t) {
+    setFormTerc({cedrif:t.cedrif, nombre:t.nombre||'', ciudad:t.ciudad||'', telefono:t.telefono||'', celular:t.celular||''})
+    setEditTerc(t.cedrif)
+    setShowTerc(true)
+  }
+
+  return (
                           <tr key={e.id||i} style={{background:i%2===0?'#fff':'#f8faff'}}>
                             <td style={E.td}>{e.fecha_pago?.slice(0,10)||''}</td>
                             <td style={E.td}>
@@ -542,10 +739,59 @@ export default function Egresos({ supabase, usuario, onClose }) {
                   {/* Tarjetas por categoría */}
                   <div style={E.gridCards}>
                     {resumenGrupos().map(g=>{
-                      const info = GRUPOS[g.grupo_id]
+                      const info = GRUPOS[g.tipoegreso]
                       const pct = totalEgresos > 0 ? (g.total/totalEgresos*100).toFixed(1) : 0
-                      return (
-                        <div key={g.grupo_id} style={{...E.cardGrupo, borderLeft:`4px solid ${info?.color||'#888'}`}}>
+                      // ── CRUD TIPOS DE EGRESO ─────────────────────────────────────────────────
+  async function agregarTipo() {
+    if (!nuevoTipo.trim()) return
+    setGuardandoT(true)
+    await supabase.from('egr_grupos').insert({nombre: nuevoTipo.trim(), cg: 0})
+    setNuevoTipo('')
+    await cargarMaestros()
+    setGuardandoT(false)
+  }
+  async function eliminarTipo(id) {
+    if (!window.confirm('¿Eliminar este tipo de egreso?')) return
+    await supabase.from('egr_grupos').delete().eq('id', id)
+    await cargarMaestros()
+  }
+
+  // ── CRUD TERCEROS ─────────────────────────────────────────────────────────
+  async function guardarTercero() {
+    if (!formTerc.cedrif || !formTerc.nombre) return
+    setGuardandoTer(true)
+    if (editTerc) {
+      await supabase.from('terceros').update({
+        nombre: formTerc.nombre, ciudad: formTerc.ciudad,
+        telefono: formTerc.telefono, celular: formTerc.celular
+      }).eq('cedrif', editTerc)
+    } else {
+      await supabase.from('terceros').insert({
+        cedrif: formTerc.cedrif, nombre: formTerc.nombre,
+        ciudad: formTerc.ciudad, telefono: formTerc.telefono,
+        celular: formTerc.celular, activo: 1
+      })
+    }
+    setFormTerc({cedrif:'',nombre:'',ciudad:'',telefono:'',celular:''})
+    setEditTerc(null)
+    const {data} = await supabase.from('terceros').select('cedrif,nombre').eq('activo',1).order('nombre')
+    setTerceros(data||[])
+    setGuardandoTer(false)
+  }
+  async function eliminarTercero(cedrif) {
+    if (!window.confirm('¿Eliminar este tercero?')) return
+    await supabase.from('terceros').update({activo:0}).eq('cedrif', cedrif)
+    const {data} = await supabase.from('terceros').select('cedrif,nombre').eq('activo',1).order('nombre')
+    setTerceros(data||[])
+  }
+  function editarTercero(t) {
+    setFormTerc({cedrif:t.cedrif, nombre:t.nombre||'', ciudad:t.ciudad||'', telefono:t.telefono||'', celular:t.celular||''})
+    setEditTerc(t.cedrif)
+    setShowTerc(true)
+  }
+
+  return (
+                        <div key={g.tipoegreso} style={{...E.cardGrupo, borderLeft:`4px solid ${info?.color||'#888'}`}}>
                           <div style={{fontSize:22}}>{info?.icon||'📌'}</div>
                           <div style={{flex:1}}>
                             <div style={{fontWeight:700,fontSize:13,color:'#1a3a6b'}}>{info?.nombre||'Grupo '+g.tipoegreso}</div>
