@@ -65,7 +65,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
   })
 
   // Subdetalles filtrados por grupo seleccionado
-  const subsFiltrados = subdetalles.filter(s => String(s.tipoegreso) === String(form.tipoegreso))
+  const subsFiltrados = subdetalles.filter(s => String(s.cg) === String(form.tipoegreso))
 
   useEffect(() => {
     cargarMaestros()
@@ -73,8 +73,8 @@ export default function Egresos({ supabase, usuario, onClose }) {
 
   async function cargarMaestros() {
     const [{data:subs}, {data:terc}] = await Promise.all([
-      supabase.from('grupoegresos').select('*').order('tipoegreso').order('codegreso'),
-      supabase.from('terceros').select('cedrif,nomtercero').eq('activo', 1).order('nomtercero'),
+      supabase.from('egr_grupos').select('*').order('cg').order('codigo'),
+      supabase.from('terceros').select('cedrif,nombre').eq('activo', 1).order('nombre'),
     ])
     setSubdetalles(subs||[])
     setTerceros(terc||[])
@@ -84,9 +84,9 @@ export default function Egresos({ supabase, usuario, onClose }) {
     setCargando(true)
     let q = supabase.from('egresos')
       .select('*')
-      .gte('fechapag', filtDesde)
-      .lte('fechapag', filtHasta)
-      .order('fechapag', {ascending:false})
+      .gte('fecha_pago', filtDesde)
+      .lte('fecha_pago', filtHasta)
+      .order('fecha_pago', {ascending:false})
     if (filtGrupo) q = q.eq('grupo_id', Number(filtGrupo))
     if (filtMedio) q = q.eq('medio_pago', filtMedio)
     const {data, error} = await q.limit(2000)
@@ -102,13 +102,13 @@ export default function Egresos({ supabase, usuario, onClose }) {
       if (k === 'tipoegreso') nuevo.codegreso = ''
       // Al cambiar subdetalle, autocompletar descegreso
       if (k === 'codegreso') {
-        const sub = subdetalles.find(s => String(s.tipoegreso)===String(nuevo.tipoegreso) && String(s.codegreso)===String(v))
-        if (sub) nuevo.descegreso = sub.descegreso
+        const sub = subdetalles.find(s => String(s.cg)===String(nuevo.tipoegreso) && String(s.codigo)===String(v))
+        if (sub) nuevo.descegreso = sub.nombre
       }
       // Al cambiar cédula beneficiario, buscar nombre
       if (k === 'cedrifben') {
         const terc = terceros.find(t => String(t.cedrif) === String(v))
-        if (terc) nuevo.nomrazben = terc.nomtercero
+        if (terc) nuevo.nomrazben = terc.nombre
       }
       return nuevo
     })
@@ -130,12 +130,11 @@ export default function Egresos({ supabase, usuario, onClose }) {
     if (!form.valorneto || Number(form.valorneto) <= 0)
                            return setMsg({ok:false, txt:'Ingresa un valor válido.'})
     setGuardando(true)
-    const sub = subdetalles.find(s => String(s.tipoegreso)===String(form.tipoegreso) && String(s.codegreso)===String(form.codegreso))
+    const sub = subdetalles.find(s => String(s.cg)===String(form.tipoegreso) && String(s.codigo)===String(form.codegreso))
     const registro = {
       grupo_id: Number(form.tipoegreso),
       tipo_id:  Number(form.codegreso),
-      descegreso: sub?.descegreso || '',
-      tipocod:    sub?.tipocod || null,
+      descegreso: sub?.nombre || '',
       fecha_pago: form.fechapag,
       cedrif_benef: form.cedrifben || null,
       nombre_benef: form.nomrazben,
@@ -286,7 +285,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
                     disabled={!form.tipoegreso}>
                     <option value="">— Selecciona —</option>
                     {subsFiltrados.map(s=>(
-                      <option key={s.codegreso} value={s.codegreso}>{s.descegreso}</option>
+                      <option key={s.codigo} value={s.codigo}>{s.nombre}</option>
                     ))}
                   </select>
                 </div>
@@ -543,10 +542,10 @@ export default function Egresos({ supabase, usuario, onClose }) {
                   {/* Tarjetas por categoría */}
                   <div style={E.gridCards}>
                     {resumenGrupos().map(g=>{
-                      const info = GRUPOS[g.tipoegreso]
+                      const info = GRUPOS[g.grupo_id]
                       const pct = totalEgresos > 0 ? (g.total/totalEgresos*100).toFixed(1) : 0
                       return (
-                        <div key={g.tipoegreso} style={{...E.cardGrupo, borderLeft:`4px solid ${info?.color||'#888'}`}}>
+                        <div key={g.grupo_id} style={{...E.cardGrupo, borderLeft:`4px solid ${info?.color||'#888'}`}}>
                           <div style={{fontSize:22}}>{info?.icon||'📌'}</div>
                           <div style={{flex:1}}>
                             <div style={{fontWeight:700,fontSize:13,color:'#1a3a6b'}}>{info?.nombre||'Grupo '+g.tipoegreso}</div>
