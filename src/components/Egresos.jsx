@@ -82,8 +82,8 @@ export default function Egresos({ supabase, usuario, onClose }) {
 
   async function cargarMaestros() {
     const [{data:subs}, {data:terc}] = await Promise.all([
-      supabase.from('grupoegresos').select('*').order('tipoegreso').order('codegreso'),
-      supabase.from('terceros').select('cedrif,nomtercero').eq('activo', 1).order('nomtercero'),
+      supabase.from('egr_grupos').select('id,nombre,cg').order('nombre'),
+      supabase.from('terceros').select('cedrif,nombre,ciudad,telefono,celular').eq('activo', true).order('nombre'),
     ])
     setSubdetalles(subs||[])
     setTerceros(terc||[])
