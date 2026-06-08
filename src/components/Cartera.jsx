@@ -29,6 +29,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
   const [tab,         setTab]         = useState('resumen')
 
   // ── abonos ──
+  const [clienteSelDrill, setClienteSelDrill] = useState(null)  // cliente seleccionado para ver sus notas
+  const [sugerencias,    setSugerencias]    = useState([])          // autocomplete clientes
+  const [showSuger,      setShowSuger]      = useState(false)
   const [notasSel,    setNotasSel]    = useState({})   // {numnotaent: true}
   const [valorAbono,  setValorAbono]  = useState('')
   const [medioAbono,  setMedioAbono]  = useState('E')
@@ -132,6 +135,142 @@ export default function Cartera({ supabase, usuario, onClose }) {
     setNotasSel({})
     setDistribucio([])
     setMsgAbono(null)
+  }
+
+  // ── AUTOCOMPLETE CLIENTE ─────────────────────────────────────────────────
+  async function buscarClientes(texto) {
+    setFiltCliente(texto)
+    setClienteSelDrill(null)
+    if (!texto || texto.length < 2) { setSugerencias([]); setShowSuger(false); return }
+    const {data} = await supabase.from('encnotaen')
+      .select('cedrifclie,nombreclie')
+      .ilike('nombreclie', `%${texto}%`)
+      .or('anulada.is.null,anulada.neq.S')
+      .gt('saldo', 0)
+      .limit(10)
+    const unicos = {}
+    ;(data||[]).forEach(n => { if(n.cedrifclie) unicos[n.cedrifclie] = n.nombreclie })
+    setSugerencias(Object.entries(unicos).map(([ced,nom])=>({cedula:ced,nombre:nom})))
+    setShowSuger(true)
+  }
+
+  function seleccionarSugerencia(s) {
+    setFiltCliente(s.nombre)
+    setSugerencias([])
+    setShowSuger(false)
+  }
+
+  // ── DRILL-DOWN CLIENTE ────────────────────────────────────────────────────
+  function verDetalleCliente(cliente) {
+    setClienteSelDrill(cliente)
+    setTab('detalle')
+  }
+
+  const notasFiltradas = clienteSelDrill
+    ? notas.filter(n => n.cedrifclie === clienteSelDrill.cedula)
+    : notas
+
+  // ── IMPRIMIR CARTERA COMPLETA POR VENDEDOR ────────────────────────────────
+  function imprimirCarteraCompleta() {
+    const vendNombre = vendedores.find(v=>String(v.cedula)===String(filtVend))?.nombre || 'Todos los vendedores'
+    const w = window.open('','_blank','width=1000,height=800')
+    // Agrupar notas por cliente
+    const porCliente = {}
+    notas.forEach(n => {
+      const k = n.cedrifclie || n.nombreclie || '?'
+      if (!porCliente[k]) porCliente[k] = { cedula:n.cedrifclie||'', nombre:n.nombreclie||'', notas:[] }
+      porCliente[k].notas.push(n)
+    })
+    const clientes = Object.values(porCliente).sort((a,b) => a.nombre.localeCompare(b.nombre))
+
+    w.document.write(`<html><head><title>Cartera Vigente</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}
+      h2{color:#1a3a6b;text-align:center;margin:4px 0;}
+      .sub{text-align:center;color:#555;margin-bottom:12px;font-size:11px;}
+      .vendedor{font-size:13px;font-weight:900;color:#1a3a6b;text-align:center;margin-bottom:16px;border-bottom:2px solid #1a3a6b;padding-bottom:4px;}
+      .cliente-header{background:#1a3a6b;color:#fff;padding:4px 8px;margin-top:14px;font-weight:700;font-size:11px;display:flex;justify-content:space-between;}
+      table{width:100%;border-collapse:collapse;margin-bottom:2px;}
+      th{background:#e8eaf6;color:#1a3a6b;padding:4px 8px;text-align:right;font-size:10px;font-weight:700;}
+      th:first-child{text-align:left;}
+      td{padding:4px 8px;border-bottom:1px solid #eee;text-align:right;font-size:11px;}
+      td:first-child{text-align:left;}
+      tr:nth-child(even){background:#f9f9f9;}
+      .tot-cli{font-weight:900;background:#e8eaf6!important;font-size:11px;}
+      .tot-gen{font-weight:900;background:#1a3a6b!important;color:#fff;font-size:12px;}
+      .tot-gen td{color:#fff!important;}
+      .mora-r{color:#c62828;font-weight:700;}
+      .mora-o{color:#e65100;font-weight:700;}
+      .mora-y{color:#f9a825;font-weight:700;}
+      .mora-g{color:#2e7d32;}
+      @media print{body{margin:10px;}button{display:none!important;}}
+    </style></head><body>
+    <h2>CARTERA VIGENTE</h2>
+    <div class="vendedor">VENDEDOR: ${vendNombre.toUpperCase()}</div>
+    <div class="sub">Fecha: ${new Date().toLocaleDateString('es-CO')} &nbsp;|&nbsp; ${clientes.length} clientes &nbsp;|&nbsp; ${notas.length} notas</div>
+    <button onclick="window.print()" style="margin-bottom:14px;padding:6px 18px;background:#1a3a6b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">🖨 Imprimir</button>`)
+
+    clientes.forEach(cli => {
+      const totVal = cli.notas.reduce((s,n)=>s+(n.valtotal||0),0)
+      const totAbo = cli.notas.reduce((s,n)=>s+(n.valabono||0),0)
+      const totSal = cli.notas.reduce((s,n)=>s+(n.saldo||0),0)
+      w.document.write(`
+        <div class="cliente-header">
+          <span>CLIENTE: ${cli.cedula} &nbsp;&nbsp; ${cli.nombre.toUpperCase()}</span>
+          <span>SALDO: $${fmt(totSal)}</span>
+        </div>
+        <table>
+          <thead><tr>
+            <th style="text-align:left"># DOCTO.</th>
+            <th style="text-align:left">FECHA</th>
+            <th style="text-align:left">VENCIM</th>
+            <th>MORA</th>
+            <th>VALOR $</th>
+            <th>$DCTO.</th>
+            <th>$ABONO</th>
+            <th>$SALDO</th>
+          </tr></thead>
+          <tbody>`)
+      cli.notas.forEach(n => {
+        const mora = n.diasVencido||0
+        const clMora = mora>=90?'mora-r':mora>=60?'mora-o':mora>=30?'mora-y':'mora-g'
+        w.document.write(`<tr>
+          <td style="text-align:left;font-weight:700">${n.numnotaent}</td>
+          <td style="text-align:left">${(n.fechanotae||'').slice(0,10)}</td>
+          <td style="text-align:left">${(n.fechavence||'').slice(0,10)}</td>
+          <td class="${clMora}">${mora}</td>
+          <td>$${fmt(n.valtotal)}</td>
+          <td>0</td>
+          <td>$${fmt(n.valabono)}</td>
+          <td style="font-weight:700;color:#c62828">$${fmt(n.saldo)}</td>
+        </tr>`)
+      })
+      w.document.write(`
+          <tr class="tot-cli">
+            <td colspan="4" style="text-align:right">$TOTAL CLIENTE</td>
+            <td>$${fmt(totVal)}</td>
+            <td>$0</td>
+            <td>$${fmt(totAbo)}</td>
+            <td style="color:#c62828">$${fmt(totSal)}</td>
+          </tr>
+          </tbody></table>`)
+    })
+
+    // Total general
+    w.document.write(`
+      <table style="margin-top:16px;">
+        <tbody>
+          <tr class="tot-gen">
+            <td colspan="4" style="text-align:right;padding:6px 8px;">TOTAL GENERAL — ${clientes.length} clientes / ${notas.length} notas</td>
+            <td style="padding:6px 8px;">$${fmt(totales.valor)}</td>
+            <td style="padding:6px 8px;">$0</td>
+            <td style="padding:6px 8px;">$${fmt(totales.abonado)}</td>
+            <td style="padding:6px 8px;">$${fmt(totales.saldo)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </body></html>`)
+    w.document.close()
   }
 
   // ── DISTRIBUIR ABONO ──────────────────────────────────────────────────────
@@ -264,9 +403,26 @@ export default function Cartera({ supabase, usuario, onClose }) {
             {vendedores.map(v=><option key={v.cedula} value={v.cedula}>{v.nombre}</option>)}
           </select>
         </Fld>
-        <Fld label="Cliente" w={200}>
-          <input style={S.inp} value={filtCliente} onChange={e=>setFiltCliente(e.target.value)}
-            placeholder="Nombre del cliente..." onKeyDown={e=>e.key==='Enter'&&generar()}/>
+        <Fld label="Cliente" w={220}>
+          <div style={{position:'relative'}}>
+            <input style={S.inp} value={filtCliente}
+              onChange={e=>buscarClientes(e.target.value)}
+              onBlur={()=>setTimeout(()=>setShowSuger(false),200)}
+              onFocus={()=>filtCliente.length>=2&&setShowSuger(true)}
+              placeholder="Escribe el nombre..." onKeyDown={e=>e.key==='Enter'&&generar()}/>
+            {showSuger && sugerencias.length>0 && (
+              <div style={{position:'absolute',top:34,left:0,right:0,background:'#fff',border:'1px solid #c8d5ea',borderRadius:5,boxShadow:'0 4px 12px rgba(0,0,0,0.15)',zIndex:100,maxHeight:200,overflowY:'auto'}}>
+                {sugerencias.map(s=>(
+                  <div key={s.cedula} onMouseDown={()=>seleccionarSugerencia(s)}
+                    style={{padding:'7px 12px',cursor:'pointer',fontSize:12,borderBottom:'1px solid #eee'}}
+                    onMouseEnter={e=>e.target.style.background='#eef2ff'}
+                    onMouseLeave={e=>e.target.style.background='#fff'}>
+                    <strong>{s.nombre}</strong> <span style={{color:'#888',fontSize:11}}>{s.cedula}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </Fld>
         <Fld label="Estado" w={140}>
           <select style={S.inp} value={filtEstado} onChange={e=>setFiltEstado(e.target.value)}>
@@ -290,6 +446,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
           {generado && <>
             <button onClick={()=>imprimir('resumen')} style={S.btnPrint}>🖨 Resumen</button>
             <button onClick={()=>imprimir('detalle')} style={S.btnPrint}>🖨 Detalle</button>
+            <button onClick={imprimirCarteraCompleta} style={{...S.btnPrint,background:'#1a3a6b'}}>📄 Cartera Completa</button>
           </>}
         </div>
       </div>
@@ -310,6 +467,17 @@ export default function Cartera({ supabase, usuario, onClose }) {
             <Tot label="$ Abonado" val={fmtM(totales.abonado)}  color="#2e7d32"/>
             <Tot label="$ Saldo"  val={fmtM(totales.saldo)}     color="#c62828" grande/>
           </div>
+
+          {/* INDICADOR CLIENTE SELECCIONADO */}
+          {clienteSelDrill && (
+            <div style={{background:'#e8f0fe',padding:'6px 16px',fontSize:12,display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid #c8d5ea'}}>
+              <span>🔍 Viendo notas de: <strong>{clienteSelDrill.nombre}</strong> ({clienteSelDrill.cedula})</span>
+              <button onClick={()=>{setClienteSelDrill(null);setTab('resumen')}}
+                style={{background:'#c62828',color:'#fff',border:'none',borderRadius:4,padding:'2px 10px',cursor:'pointer',fontSize:11}}>
+                ✕ Ver todos
+              </button>
+            </div>
+          )}
 
           {/* TABS */}
           <div style={S.tabs}>
@@ -411,9 +579,12 @@ export default function Cartera({ supabase, usuario, onClose }) {
                   {resumen.length === 0
                     ? <tr><td colSpan={7} style={{textAlign:'center',padding:30,color:'#aaa'}}>Sin resultados con esos filtros.</td></tr>
                     : resumen.map((c,i) => (
-                      <tr key={c.cedula||i} style={{background:i%2===0?'#fff':'#f5f7ff'}}>
+                      <tr key={c.cedula||i}
+                        onClick={()=>verDetalleCliente(c)}
+                        style={{background:clienteSelDrill?.cedula===c.cedula?'#e8f0fe':i%2===0?'#fff':'#f5f7ff',cursor:'pointer'}}
+                        title="Clic para ver detalle de notas">
                         <td style={S.td}>{c.cedula}</td>
-                        <td style={{...S.td,fontWeight:600}}>{c.nombre}</td>
+                        <td style={{...S.td,fontWeight:600,color:'#1a3a6b',textDecoration:'underline'}}>{c.nombre}</td>
                         <td style={{...S.td,textAlign:'right'}}>{c.notas}</td>
                         <td style={{...S.td,textAlign:'right'}}>{fmtM(c.valor)}</td>
                         <td style={{...S.td,textAlign:'right',color:'#2e7d32'}}>{fmtM(c.abonado)}</td>
@@ -452,9 +623,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {notas.length === 0
+                  {notasFiltradas.length === 0
                     ? <tr><td colSpan={modoAbono?10:9} style={{textAlign:'center',padding:30,color:'#aaa'}}>Sin resultados con esos filtros.</td></tr>
-                    : notas.map((n,i) => {
+                    : notasFiltradas.map((n,i) => {
                       const selec = !!notasSel[n.numnotaent]
                       return (
                         <tr key={n.numnotaent} style={{background:selec?'#e8f5e9':i%2===0?'#fff':'#f5f7ff',cursor:modoAbono?'pointer':'default'}}
@@ -489,10 +660,10 @@ export default function Cartera({ supabase, usuario, onClose }) {
                 <tfoot>
                   <tr style={{background:'#e8eaf6',fontWeight:700}}>
                     {modoAbono && <td style={S.td}></td>}
-                    <td style={S.td} colSpan={4}>TOTALES — {notas.length} notas</td>
-                    <td style={{...S.td,textAlign:'right'}}>{fmtM(totales.valor)}</td>
-                    <td style={{...S.td,textAlign:'right',color:'#2e7d32'}}>{fmtM(totales.abonado)}</td>
-                    <td style={{...S.td,textAlign:'right',color:'#c62828'}}>{fmtM(totales.saldo)}</td>
+                    <td style={S.td} colSpan={4}>TOTALES — {notasFiltradas.length} notas</td>
+                    <td style={{...S.td,textAlign:'right'}}>{fmtM(notasFiltradas.reduce((s,n)=>s+(n.valtotal||0),0))}</td>
+                    <td style={{...S.td,textAlign:'right',color:'#2e7d32'}}>{fmtM(notasFiltradas.reduce((s,n)=>s+(n.valabono||0),0))}</td>
+                    <td style={{...S.td,textAlign:'right',color:'#c62828'}}>{fmtM(notasFiltradas.reduce((s,n)=>s+(n.saldo||0),0))}</td>
                     <td style={S.td} colSpan={2}></td>
                   </tr>
                 </tfoot>
