@@ -369,8 +369,17 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     const {data:det} = await supabase.from('detnotaen').select('*').eq('numnotaent',id)
     const extras = Math.max(0,FILAS_BASE-(det?.length||0))
     setLineas(det?.length?[...det,...Array.from({length:extras},()=>({...VACIA}))]:FILAS())
+    // Se confía en el valabono guardado en el encabezado (es la misma fuente que usa
+    // el buscador y los informes). Antes esto se recalculaba sumando detabonos, pero
+    // notas antiguas/migradas pueden no tener el detalle completo, lo que hacía ver
+    // como "sin pagar" una nota que en realidad sí estaba pagada.
+    const abonoHeader = Number(e.valabono)||0
+    setAbonos(abonoHeader)
     const {data:ab} = await supabase.from('detabonos').select('valabono').eq('numnotaent',id)
-    setAbonos((ab||[]).reduce((s,r)=>s+(r.valabono||0),0))
+    const sumaDetalle = (ab||[]).reduce((s,r)=>s+(r.valabono||0),0)
+    if (Math.abs(sumaDetalle - abonoHeader) > 1) {
+      setMsg({tipo:'warn', texto:`⚠️ El detalle de abonos de esta nota ($${fmt(sumaDetalle)}) no coincide con el total guardado ($${fmt(abonoHeader)}). Se está mostrando el total guardado; conviene revisar esta nota en la base de datos.`})
+    }
     setGuardada(true); setAnulada(e.anulada==='S'); setModoNueva(false); setDesbloqueada(false)
     setBusy(false)
   }
