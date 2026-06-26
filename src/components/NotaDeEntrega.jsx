@@ -859,7 +859,11 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
                       <div class="vale-codigo">${r.vale.codigo}</div>
                       <div class="vale-valor">$${fmt(r.vale.valor)}</div>
                       <div class="centro" style="font-size:9px;margin-top:4px;">Válido como parte de pago en<br/>cualquier Nota de Entrega futura.</div>
-                    ` : ''}
+                    ` : `
+                      <div class="sep"></div>
+                      <div class="fila"><span>Vale generado:</span><span>Ninguno</span></div>
+                      <div class="centro" style="font-size:9px;">El valor se descontó directamente del saldo de la nota.</div>
+                    `}
                     <div class="sep"></div>
                     <div class="centro" style="font-size:9px;">Conserve este comprobante</div>
                     <br/><br/>
