@@ -28,10 +28,15 @@ export default function ModalBuscarNota({ supabase, onSelect, onClose }) {
       .limit(200)
 
     // filtros
-    if (nroNota.trim())  q = q.ilike('numnotaent', `%${nroNota.trim()}%`)
+    let buscaPorNumero = false
+    if (nroNota.trim()) {
+      const n = Number(nroNota.trim().replace(/\D/g,''))
+      if (!isNaN(n)) { q = q.eq('numnotaent', n); buscaPorNumero = true }
+    }
     if (cedula.trim())   q = q.ilike('cedrifclie',  `%${cedula.trim()}%`)
     if (nombre.trim())   q = q.ilike('nombreclie',  `%${nombre.trim()}%`)
-    if (usarFecha)       q = q.gte('fechanotae', desde).lte('fechanotae', hasta)
+    // si se busca un número de nota puntual, el rango de fechas no aplica (podría ser una nota antigua)
+    if (usarFecha && !buscaPorNumero) q = q.gte('fechanotae', desde).lte('fechanotae', hasta)
 
     // filtro estado — NO filtrar anuladas como si fueran pagadas
     if (filtEstado === 'pendiente') q = q.gt('saldo', 0).neq('anulada','S')
@@ -39,7 +44,8 @@ export default function ModalBuscarNota({ supabase, onSelect, onClose }) {
     else if (filtEstado === 'anuladas') q = q.eq('anulada','S')
     // 'todas' → sin filtro adicional
 
-    const {data} = await q
+    const {data, error} = await q
+    if (error) console.error('Error buscando notas:', error)
     setResultados(data||[])
     setBuscado(true); setBuscando(false)
   }
