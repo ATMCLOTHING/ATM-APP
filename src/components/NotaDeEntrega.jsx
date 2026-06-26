@@ -439,7 +439,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
       const {error:e2}=await supabase.from('detnotaen').insert(
         detValidas.map(l=>({
-          numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic,
+          numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
           talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
           subtotal:Number(l.cantidad)*Number(l.valunit),
           porciva:l.porciva, valiva:l.valiva,
@@ -646,7 +646,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
       const {error:e2} = await supabase.from('detnotaen').insert(
         detValidas.map(l=>({
-          numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic,
+          numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
           talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
           subtotal:Number(l.cantidad)*Number(l.valunit),
           porciva:l.porciva, valiva:l.valiva,
@@ -721,7 +721,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
         await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
         const {error:eg2} = await supabase.from('detnotaen').insert(
           detValidas.map(l=>({
-            numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic,
+            numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
             talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
             subtotal:Number(l.cantidad)*Number(l.valunit),
             porciva:l.porciva, valiva:l.valiva,
@@ -771,7 +771,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
         await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
         const {error:e2} = await supabase.from('detnotaen').insert(
           detValidas.map(l=>({
-            numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic,
+            numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
             talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
             subtotal:Number(l.cantidad)*Number(l.valunit),
             porciva:l.porciva, valiva:l.valiva,
@@ -825,21 +825,45 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
             <div style={{display:'flex',gap:8,justifyContent:'center'}}>
               <button onClick={()=>{
                   const r = resultDevolucion
-                  const w=window.open('','_blank','width=380,height=500')
-                  w.document.write(`<html><body style="font-family:Arial,sans-serif;text-align:center;padding:24px;font-size:13px;">
-                    <h2 style="color:#1a3a6b;margin-bottom:0;">ATM — COMPROBANTE DE DEVOLUCIÓN</h2>
-                    <p style="color:#666;margin-top:4px;">Nota de origen: ${r.nota} &nbsp;|&nbsp; Fecha: ${r.fecha}</p>
-                    <hr/>
-                    <p style="text-align:left;"><strong>Cliente:</strong> ${r.cliente}<br/>
-                    <strong>Artículo:</strong> ${r.descripcion} (Cód. ${r.codartic}${r.talla?', T:'+r.talla:''})<br/>
-                    <strong>Cantidad devuelta:</strong> ${r.cantidad}<br/>
-                    <strong>Valor devuelto:</strong> $${fmt(r.valorDevolucion)}<br/>
-                    <strong>Nuevo saldo de la nota:</strong> $${fmt(r.saldoNuevo)}</p>
-                    ${r.vale ? `<hr/><p style="font-size:16px;"><strong>VALE GENERADO</strong></p>
-                      <h1 style="letter-spacing:2px;margin:6px 0;">${r.vale.codigo}</h1>
-                      <p style="font-size:18px;font-weight:bold;">$${fmt(r.vale.valor)}</p>
-                      <p style="color:#666;font-size:11px;">Válido como parte de pago en cualquier Nota de Entrega futura.</p>` : ''}
-                  </body></html>`)
+                  const w=window.open('','_blank','width=320,height=600')
+                  w.document.write(`
+                    <html><head><title>Devolución ${r.nota}</title>
+                    <style>
+                      * { margin:0; padding:0; box-sizing:border-box; }
+                      body { font-family:'Courier New', monospace; font-size:11px; width:280px; padding:8px; }
+                      .centro { text-align:center; }
+                      .bold { font-weight:bold; }
+                      .grande { font-size:14px; }
+                      .sep { border-top:1px dashed #000; margin:5px 0; }
+                      .fila { display:flex; justify-content:space-between; }
+                      .vale-codigo { font-size:20px; font-weight:bold; letter-spacing:2px; text-align:center; margin:4px 0; }
+                      .vale-valor { font-size:15px; font-weight:bold; text-align:center; }
+                      @media print { body { width:80mm; } }
+                    </style></head><body>
+                    <div class="centro bold grande">A TU MEDIDA</div>
+                    <div class="centro">COMPROBANTE DE DEVOLUCIÓN</div>
+                    <div class="sep"></div>
+                    <div class="fila"><span>Nota origen:</span><span>${r.nota}</span></div>
+                    <div class="fila"><span>Fecha:</span><span>${r.fecha}</span></div>
+                    <div class="fila"><span>Cliente:</span><span>${(r.cliente||'').substring(0,20)}</span></div>
+                    <div class="sep"></div>
+                    <div class="fila bold"><span>Artículo</span><span>Cód. ${r.codartic}</span></div>
+                    <div>${r.descripcion}${r.talla?' - T:'+r.talla:''}</div>
+                    <div class="fila"><span>Cantidad devuelta:</span><span>${r.cantidad}</span></div>
+                    <div class="fila bold"><span>Valor devuelto:</span><span>$${fmt(r.valorDevolucion)}</span></div>
+                    <div class="sep"></div>
+                    <div class="fila bold"><span>NUEVO SALDO NOTA</span><span>$${fmt(r.saldoNuevo)}</span></div>
+                    ${r.vale ? `
+                      <div class="sep"></div>
+                      <div class="centro bold">🎫 VALE GENERADO</div>
+                      <div class="vale-codigo">${r.vale.codigo}</div>
+                      <div class="vale-valor">$${fmt(r.vale.valor)}</div>
+                      <div class="centro" style="font-size:9px;margin-top:4px;">Válido como parte de pago en<br/>cualquier Nota de Entrega futura.</div>
+                    ` : ''}
+                    <div class="sep"></div>
+                    <div class="centro" style="font-size:9px;">Conserve este comprobante</div>
+                    <br/><br/>
+                    </body></html>`)
                   w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},300)
                 }} style={{background:'#1a3a6b',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700,fontSize:13}}>
                 🖨 Imprimir comprobante
