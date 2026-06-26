@@ -611,6 +611,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
 
   // ── APLICAR VALE COMO PARTE DE PAGO ───────────────────────────────────
   async function abrirVale() {
+    if (busy) return
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de aplicar un vale.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de aplicar un vale.'}); return }
     if (saldo <= 0) { setMsg({tipo:'warn',texto:'Esta nota no tiene saldo pendiente.'}); return }
@@ -692,6 +693,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
 
 
   async function pagarTodo() {
+    if (busy) return
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de pagar.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de pagar.'}); return }
     if (saldo <= 0) { setMsg({tipo:'warn',texto:'Esta nota no tiene saldo pendiente.'}); return }
@@ -745,6 +747,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   }
 
   async function abrirAbonos() {
+    if (busy) return
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de registrar abonos.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de registrar abonos.'}); return }
     if (!guardada) {
@@ -1121,9 +1124,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
               ))}
             </div>
             <div style={P.acciones}>
-              <BtnAcc onClick={abrirAbonos} icon="💵">Abonos</BtnAcc>
-              <BtnAcc onClick={pagarTodo}   icon="💰">Pagar Todo</BtnAcc>
-              <BtnAcc onClick={abrirVale}   icon="🎫">Aplicar Vale</BtnAcc>
+              <BtnAcc onClick={abrirAbonos} icon="💵" disabled={busy}>Abonos</BtnAcc>
+              <BtnAcc onClick={pagarTodo}   icon="💰" disabled={busy}>Pagar Todo</BtnAcc>
+              <BtnAcc onClick={abrirVale}   icon="🎫" disabled={busy}>Aplicar Vale</BtnAcc>
             </div>
           </div>
         </div>
@@ -1148,10 +1151,10 @@ function IBtn({src,onClick,title,disabled}){
     </button>
   )
 }
-function BtnAcc({onClick,icon,children}){
+function BtnAcc({onClick,icon,children,disabled}){
   return(
-    <button onClick={onClick}
-      style={{background:'#eef2ff',border:'1px solid #c8d5ea',borderRadius:8,padding:'7px 11px',cursor:'pointer',fontSize:12,fontWeight:700,color:'#1a3a6b',display:'flex',alignItems:'center',gap:5}}>
+    <button onClick={onClick} disabled={disabled}
+      style={{background:disabled?'#f0f0f0':'#eef2ff',border:'1px solid #c8d5ea',borderRadius:8,padding:'7px 11px',cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.5:1,fontSize:12,fontWeight:700,color:'#1a3a6b',display:'flex',alignItems:'center',gap:5}}>
       <span>{icon}</span>{children}
     </button>
   )
