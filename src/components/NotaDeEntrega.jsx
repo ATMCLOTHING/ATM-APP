@@ -8,6 +8,8 @@ import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
 import ModalNuevoCliente  from './ModalNuevoCliente'
 import ModalPin           from './ModalPin'
+import ModalDevolucion    from './ModalDevolucion'
+import ModalVale          from './ModalVale'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
@@ -52,6 +54,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   const [desbloqueada, setDesbloqueada] = useState(false) // nota guardada editando con PIN
   // cédula que no se encontró — para pasarla al modal de nuevo cliente
   const [cedulaNueva, setCedulaNueva] = useState('')
+  const [devolverIdx, setDevolverIdx] = useState(null) // índice de línea seleccionada para devolver
 
   const cedulaRef  = useRef()
   const inputRefs  = useRef({})   // refs a cada input de código por fila
@@ -487,6 +490,190 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
 
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
 
+  // ── DEVOLUCIÓN DE MERCANCÍA (Caso A: sobre nota ya guardada) ──────────
+  function abrirDevolucion(idx) {
+    const l = lineas[idx]
+    if (!l?.codartic || !Number(l.cantidad)) return
+    if (!guardada || modoNueva) { setMsg({tipo:'warn',texto:'Guarda la nota antes de registrar una devolución.'}); return }
+    if (anulada) { setMsg({tipo:'warn',texto:'Esta nota está anulada.'}); return }
+    setDevolverIdx(idx)
+  }
+
+  async function procesarDevolucion(cantidadDevuelta) {
+    const idx = devolverIdx
+    const l = lineas[idx]
+    setDevolverIdx(null)
+    setBusy(true)
+    try {
+      const cant = Number(cantidadDevuelta)
+      const precioUnitEfectivo = Number(l.valtotal||0) / Number(l.cantidad||1)
+      const valorDevolucion = precioUnitEfectivo * cant
+
+      // 1) Restaurar inventario
+      await supabase.rpc('ajustar_inventario', {p_codartic:l.codartic, p_talla:l.talla, p_cantidad:-cant})
+
+      // 2) Ajustar (o eliminar) la línea en detnotaen
+      const cantRestante = Number(l.cantidad) - cant
+      if (l.id) {
+        if (cantRestante <= 0) {
+          await supabase.from('detnotaen').delete().eq('id', l.id)
+        } else {
+          const factor = cantRestante / Number(l.cantidad)
+          await supabase.from('detnotaen').update({
+            cantidad: cantRestante,
+            subtotal: Number(l.subtotal||l.cantidad*l.valunit) * factor,
+            valdescue: Number(l.valdescue||0) * factor,
+            valiva: Number(l.valiva||0) * factor,
+            valtotal: Number(l.valtotal||0) * factor,
+          }).eq('id', l.id)
+        }
+      }
+
+      // 3) Recalcular totales de la nota a partir de las líneas restantes
+      const {data:detRestante} = await supabase.from('detnotaen').select('*').eq('numnotaent', nroDoc)
+      const nuevoSubtotal = (detRestante||[]).reduce((s,d)=>s+Number(d.cantidad||0)*Number(d.valunit||0),0)
+      const nuevoDcto     = (detRestante||[]).reduce((s,d)=>s+Number(d.valdescue||0),0)
+      const nuevoIva      = (detRestante||[]).reduce((s,d)=>s+Number(d.valiva||0),0)
+      const nuevoTotal    = (detRestante||[]).reduce((s,d)=>s+Number(d.valtotal||0),0)
+      const nuevaCant     = (detRestante||[]).reduce((s,d)=>s+Number(d.cantidad||0),0)
+
+      // 4) Determinar si corresponde generar vale
+      const saldoActual = saldo // total - abonos, antes de esta devolución
+      let valeMonto = 0
+      let nuevoSaldo
+      if (saldoActual <= 0.01) {
+        // Nota ya estaba totalmente pagada → toda la devolución se convierte en vale
+        valeMonto = valorDevolucion
+        nuevoSaldo = Math.max(0, nuevoTotal - abonos)
+      } else if (valorDevolucion <= saldoActual) {
+        // Reduce lo que falta por pagar, sin generar vale
+        nuevoSaldo = saldoActual - valorDevolucion
+      } else {
+        // Cubre todo el saldo pendiente y el excedente se convierte en vale
+        valeMonto = valorDevolucion - saldoActual
+        nuevoSaldo = 0
+      }
+
+      await supabase.from('encnotaen').update({
+        subtotal:nuevoSubtotal, valdescue:nuevoDcto, valiva:nuevoIva,
+        valtotal:nuevoTotal, saldo:nuevoSaldo, cantotal:nuevaCant,
+      }).eq('numnotaent', nroDoc)
+
+      let textoVale = ''
+      if (valeMonto > 0.01) {
+        const {data:codData} = await supabase.rpc('siguiente_codigo_vale')
+        const codigo = codData || `V-${Date.now()}`
+        const {data:valeIns, error:eVale} = await supabase.from('vales').insert({
+          codigo,
+          cliente_id: cliente?.id || null,
+          cliente_ced: cedula || cliente?.cedula || '',
+          cliente_nombre: cliente?.nombre || cliTxt || 'Cliente general',
+          valor_original: valeMonto,
+          saldo: valeMonto,
+          numnotaent_origen: nroDoc,
+          motivo: `Devolución de ${l.descartic} (${cant} und.)`,
+          estado: 'ACTIVO',
+          usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+        }).select().single()
+        if (!eVale && valeIns) {
+          await supabase.from('vale_movimientos').insert({
+            vale_id: valeIns.id, tipo:'EMISION', valor:valeMonto, numnotaent:nroDoc,
+            usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+          })
+          textoVale = ` 🎫 Se generó el vale ${codigo} por $${fmt(valeMonto)}, utilizable como parte de pago en otra nota.`
+        }
+      }
+
+      setMsg({tipo:'ok', texto:`✅ Devolución de ${cant} ${l.descartic} registrada. Inventario restaurado.${textoVale}`})
+      await cargarDoc(nroDoc)
+    } catch(e) {
+      setMsg({tipo:'err', texto:`❌ Error al procesar la devolución: ${e.message}`})
+    }
+    setBusy(false)
+  }
+
+  // ── APLICAR VALE COMO PARTE DE PAGO ───────────────────────────────────
+  async function abrirVale() {
+    if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de aplicar un vale.'}); return }
+    if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de aplicar un vale.'}); return }
+    if (saldo <= 0) { setMsg({tipo:'warn',texto:'Esta nota no tiene saldo pendiente.'}); return }
+    if (!guardada) {
+      const ok = await guardarSilencioso()
+      if (!ok) return
+    }
+    setModal('vale')
+  }
+
+  // guarda encabezado+detalle sin mostrar mensaje (reutilizado por Abonos/Vale/PagarTodo)
+  async function guardarSilencioso() {
+    try {
+      const enc = {
+        numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
+        formapago:plazo, mediopago:medio,
+        codclient:cliente?.id||99,
+        nombreclie:cliente?.nombre||cliTxt,
+        cedrifclie:cedula||cliente?.cedula||'',
+        direcicion:cliente?.direccion||'',
+        celular:cliente?.celular||'',
+        ciudad:cliente?.ciudad||'',
+        departamen:cliente?.departamento||'',
+        nomempresa:cliente?.nom_empresa||'',
+        porcdescue:pDesc, porciva:pIva,
+        subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
+        valabono:abonos, saldo, cedvended:cedVend,
+        cantotal:prendas, anulada:'N',
+        usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+      }
+      const {error:e1} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
+      if (e1) throw e1
+      await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
+      const {error:e2} = await supabase.from('detnotaen').insert(
+        detValidas.map(l=>({
+          numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic,
+          talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
+          subtotal:Number(l.cantidad)*Number(l.valunit),
+          porciva:l.porciva, valiva:l.valiva,
+          porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
+        }))
+      )
+      if (e2) throw e2
+      setGuardada(true); setModoNueva(false)
+      await recargarIds()
+      return true
+    } catch(e) {
+      setMsg({tipo:'err',texto:`❌ Error al guardar: ${e.message}`})
+      return false
+    }
+  }
+
+  async function aplicarVale(vale, valorAplicado) {
+    setBusy(true)
+    try {
+      const nuevoSaldoVale = Number(vale.saldo) - valorAplicado
+      await supabase.from('vales').update({
+        saldo: nuevoSaldoVale, estado: nuevoSaldoVale<=0.01?'AGOTADO':'ACTIVO',
+      }).eq('id', vale.id)
+      await supabase.from('vale_movimientos').insert({
+        vale_id: vale.id, tipo:'CONSUMO', valor:valorAplicado, numnotaent:nroDoc,
+        usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+      })
+      await supabase.from('detabonos').insert({
+        numnotaent:nroDoc, fechaabono:hoy(), valabono:valorAplicado, mediopago:'Vale',
+        observacio:`Vale ${vale.codigo}`,
+      })
+      await supabase.from('encnotaen').update({
+        valabono: abonos+valorAplicado, saldo: Math.max(0, total-(abonos+valorAplicado)),
+      }).eq('numnotaent', nroDoc)
+      setModal(null)
+      setMsg({tipo:'ok', texto:`✅ Vale ${vale.codigo} aplicado por $${fmt(valorAplicado)}.`})
+      await cargarDoc(nroDoc)
+    } catch(e) {
+      setMsg({tipo:'err', texto:`❌ Error al aplicar el vale: ${e.message}`})
+    }
+    setBusy(false)
+  }
+
+
   async function pagarTodo() {
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de pagar.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de pagar.'}); return }
@@ -593,6 +780,8 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       {modal==='buscarCliente' && <ModalBuscarCliente supabase={supabase} onSelect={c=>{aplicarCliente(c);setModal(null)}} onClose={()=>setModal(null)}/>}
       {modal==='editarCliente' && <ModalEditarCliente supabase={supabase} cliente={cliente} onGuardar={onClienteEditado} onClose={()=>setModal(null)}/>}
       {modal==='nuevoCliente'  && <ModalNuevoCliente  supabase={supabase} cedulaInicial={cedulaNueva} onGuardado={onClienteCreado} onClose={()=>setModal(null)}/>}
+      {modal==='vale'          && <ModalVale          supabase={supabase} saldoNota={saldo} onAplicar={aplicarVale} onClose={()=>setModal(null)}/>}
+      {devolverIdx!==null      && <ModalDevolucion    linea={lineas[devolverIdx]} onConfirmar={procesarDevolucion} onClose={()=>setDevolverIdx(null)}/>}
       {modal==='desbloquear'   && (
         <ModalPin
           supabase={supabase}
@@ -748,13 +937,15 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
                     <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.marca||''}</td>
                     <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.genero||''}</td>
                     <td style={P.td}><input style={{...P.ci,width:46,textAlign:'center'}} value={l.talla} onChange={e=>upd(i,{talla:e.target.value})} disabled={anulada && !desbloqueada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:60,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} min={1} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada && !desbloqueada}/></td>
+                    <td style={P.td}><input type="number" style={{...P.ci,width:60,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada && !desbloqueada} title="Usa cantidad negativa para registrar una devolución sin localizar la nota original"/></td>
                     <td style={P.td}><input type="number" style={{...P.ci,width:96,textAlign:'right'}} value={l.valunit} min={0} onChange={e=>upd(i,{valunit:Number(e.target.value)})} disabled={anulada && !desbloqueada}/></td>
                     <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porcdescue} min={0} max={100} onChange={e=>upd(i,{porcdescue:Number(e.target.value)})} disabled={anulada && !desbloqueada}/></td>
                     <td style={{...P.td,textAlign:'right',paddingRight:6,color:'#c0392b',fontSize:12}}>{l.valdescue?fmt(l.valdescue):''}</td>
                     <td style={{...P.td,textAlign:'right',paddingRight:6,fontWeight:700,color:'#1a3a6b',fontSize:13}}>{l.valtotal?fmt(l.valtotal):''}</td>
-                    <td style={{...P.td,textAlign:'center',width:26}}>
-                      {l.codartic&&!anulada&&<button onClick={()=>quitarLinea(i)} style={P.btnX}>✕</button>}
+                    <td style={{...P.td,textAlign:'center',width:46}}>
+                      {l.codartic&&!anulada&&(!guardada||modoNueva||desbloqueada)&&<button onClick={()=>quitarLinea(i)} style={P.btnX} title="Quitar línea">✕</button>}
+                      {l.codartic&&!anulada&&l.id&&guardada&&!modoNueva&&!desbloqueada&&Number(l.cantidad)>0&&
+                        <button onClick={()=>abrirDevolucion(i)} style={P.btnDev} title="Devolver esta prenda">↩</button>}
                     </td>
                   </tr>
                 ))}
@@ -835,6 +1026,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
             <div style={P.acciones}>
               <BtnAcc onClick={abrirAbonos} icon="💵">Abonos</BtnAcc>
               <BtnAcc onClick={pagarTodo}   icon="💰">Pagar Todo</BtnAcc>
+              <BtnAcc onClick={abrirVale}   icon="🎫">Aplicar Vale</BtnAcc>
             </div>
           </div>
         </div>
@@ -892,6 +1084,7 @@ const P={
   td:        {padding:'3px 4px',borderRight:'1px solid #e8eef5',borderBottom:'1px solid #e8eef5',verticalAlign:'middle'},
   ci:        {border:'none',background:'transparent',fontSize:12,padding:'3px 4px',outline:'none',color:'#1a3a6b',height:26},
   btnX:      {background:'none',border:'none',color:'#c0392b',cursor:'pointer',fontSize:13,fontWeight:700},
+  btnDev:    {background:'#fff3cd',border:'1px solid #ffc107',borderRadius:4,color:'#856404',cursor:'pointer',fontSize:12,fontWeight:700,padding:'1px 5px'},
   footer:    {display:'flex',gap:12,flexWrap:'wrap',padding:'10px 14px',background:'#eef2ff',borderTop:'2px solid #c8d5ea',alignItems:'flex-start'},
   footCol:   {display:'flex',flexDirection:'column',gap:6},
   btnFila:   {display:'flex',gap:4},

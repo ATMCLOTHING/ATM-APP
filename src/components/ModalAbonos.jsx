@@ -15,7 +15,8 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
   const [obs,           setObs]           = useState('')
   const [cargando,      setCargando]      = useState(false)
   const [msg,           setMsg]           = useState(null)
-  const [pinAccion,     setPinAccion]     = useState(null) // {tipo:'revertir', abono:{...}}
+  const [pinAccion,     setPinAccion]     = useState(null) // {tipo:'revertir'|'revertirParcial', abono:{...}, valor?}
+  const [valoresRev,    setValoresRev]    = useState({}) // {abonoId: valorParcialADigitar}
 
   useEffect(() => { cargarAbonos() }, [])
 
@@ -50,12 +51,20 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
     setCargando(false)
   }
 
-  // Pide PIN antes de revertir
+  // Pide PIN antes de revertir el abono completo
   function pedirRevertir(abono) {
     setPinAccion({ tipo: 'revertir', abono })
   }
 
-  // Ejecuta la reversión después de confirmar PIN
+  // Pide PIN antes de revertir solo una parte del abono
+  function pedirRevertirParcial(abono) {
+    const valor = Number(valoresRev[abono.id] || 0)
+    if (!valor || valor <= 0) { setMsg({ tipo:'err', texto:'Ingresa el valor a revertir.' }); return }
+    if (valor >= abono.valabono) { pedirRevertir(abono); return } // si es el total o más, se trata como total
+    setPinAccion({ tipo: 'revertirParcial', abono, valor })
+  }
+
+  // Ejecuta la reversión total después de confirmar PIN
   async function ejecutarReversion(abono) {
     setPinAccion(null)
     const nuevaSum = sumaAbonos - abono.valabono
@@ -63,18 +72,41 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
     const { error } = await supabase.from('detabonos').delete().eq('id', abono.id)
     if (error) { setMsg({ tipo: 'err', texto: `❌ ${error.message}` }); return }
     await supabase.from('encnotaen').update({ valabono: nuevaSum, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
-    setMsg({ tipo: 'ok', texto: `✅ Abono de $${fmt(abono.valabono)} revertido.` })
+    setMsg({ tipo: 'ok', texto: `✅ Abono de $${fmt(abono.valabono)} revertido en su totalidad.` })
+    cargarAbonos()
+  }
+
+  // Ejecuta la reversión parcial después de confirmar PIN
+  async function ejecutarReversionParcial(abono, valor) {
+    setPinAccion(null)
+    const nuevoValAbono = abono.valabono - valor
+    const nuevaSum = sumaAbonos - valor
+    const nuevoSaldo = totalNota - nuevaSum
+    const { error } = await supabase.from('detabonos').update({ valabono: nuevoValAbono }).eq('id', abono.id)
+    if (error) { setMsg({ tipo: 'err', texto: `❌ ${error.message}` }); return }
+    await supabase.from('encnotaen').update({ valabono: nuevaSum, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
+    setMsg({ tipo: 'ok', texto: `✅ Se revirtieron $${fmt(valor)} del abono. Queda con $${fmt(nuevoValAbono)}.` })
+    setValoresRev(prev => ({ ...prev, [abono.id]: '' }))
     cargarAbonos()
   }
 
   return (
     <div style={S.fondo}>
-      {pinAccion && (
+      {pinAccion && pinAccion.tipo === 'revertir' && (
         <ModalPin
           supabase={supabase}
-          titulo="Revertir Abono"
+          titulo="Revertir Abono Total"
           descripcion={`¿Revertir el abono de $${fmt(pinAccion.abono.valabono)} del ${pinAccion.abono.fechaabono}? Esta acción requiere autorización.`}
           onConfirm={() => ejecutarReversion(pinAccion.abono)}
+          onClose={() => setPinAccion(null)}
+        />
+      )}
+      {pinAccion && pinAccion.tipo === 'revertirParcial' && (
+        <ModalPin
+          supabase={supabase}
+          titulo="Revertir Abono Parcial"
+          descripcion={`¿Revertir $${fmt(pinAccion.valor)} del abono de $${fmt(pinAccion.abono.valabono)} del ${pinAccion.abono.fechaabono}? Esta acción requiere autorización.`}
+          onConfirm={() => ejecutarReversionParcial(pinAccion.abono, pinAccion.valor)}
           onClose={() => setPinAccion(null)}
         />
       )}
@@ -104,7 +136,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
           <table style={S.tabla}>
             <thead>
               <tr style={S.thead}>
-                {['Fecha','Valor','Medio','Observación',''].map(h => <th key={h} style={S.th}>{h}</th>)}
+                {['Fecha','Valor','Medio','Observación','Revertir parcial',''].map(h => <th key={h} style={S.th}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -115,11 +147,20 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
                   <td style={S.td}>{a.mediopago}</td>
                   <td style={S.td}>{a.observacio}</td>
                   <td style={{...S.td,textAlign:'center'}}>
+                    <div style={{display:'flex',gap:4,justifyContent:'center'}}>
+                      <input type="number" placeholder="Valor" min={0} max={a.valabono}
+                        style={S.inpRev}
+                        value={valoresRev[a.id]||''}
+                        onChange={e=>setValoresRev(prev=>({...prev,[a.id]:e.target.value}))}/>
+                      <button onClick={()=>pedirRevertirParcial(a)} title="Revertir solo una parte" style={S.btnRevertirParcial}>↩ Parcial</button>
+                    </div>
+                  </td>
+                  <td style={{...S.td,textAlign:'center'}}>
                     <button
                       onClick={() => pedirRevertir(a)}
-                      title="Revertir este abono"
+                      title="Revertir este abono por completo"
                       style={S.btnRevertir}>
-                      ↩ Revertir
+                      ↩ Total
                     </button>
                   </td>
                 </tr>
@@ -176,7 +217,7 @@ function Dato({ label, valor, color }) {
 
 const S = {
   fondo:      { position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
-  modal:      { background:'#fff',borderRadius:8,padding:20,width:580,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 8px 32px rgba(0,0,0,0.3)' },
+  modal:      { background:'#fff',borderRadius:8,padding:20,width:700,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 8px 32px rgba(0,0,0,0.3)' },
   cabecera:   { display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,fontSize:15,fontWeight:800,color:'#1a3a6b' },
   btnX:       { background:'#e74c3c',color:'#fff',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700 },
   resumen:    { display:'flex',justifyContent:'space-around',background:'#f0f4ff',borderRadius:6,padding:'10px 0',marginBottom:14,border:'1px solid #c8d5ea' },
@@ -185,6 +226,8 @@ const S = {
   th:         { padding:'5px 8px',fontWeight:700,color:'#1a3a6b',borderBottom:'2px solid #aab8d4',textAlign:'left' },
   td:         { padding:'5px 8px',borderBottom:'1px solid #eee',fontSize:12 },
   btnRevertir:{ background:'#fff3cd',border:'1px solid #ffc107',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#856404',whiteSpace:'nowrap' },
+  btnRevertirParcial:{ background:'#e3f2fd',border:'1px solid #90caf9',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#1565c0',whiteSpace:'nowrap' },
+  inpRev:     { width:70,height:24,border:'1px solid #aab8d4',borderRadius:3,padding:'0 4px',fontSize:11,outline:'none' },
   sinAbonos:  { textAlign:'center',color:'#888',padding:'12px 0',fontSize:12 },
   formAbono:  { display:'flex',flexDirection:'column',gap:10,background:'#f8f9ff',borderRadius:6,padding:14,border:'1px solid #c8d5ea',marginTop:10 },
   filaForm:   { display:'flex',gap:10,flexWrap:'wrap' },

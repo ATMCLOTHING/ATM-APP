@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { WZNEW, WZSAVE, WZDELETE, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE } from '../lib/assets'
+import ModalNuevoTipoProveedor from './ModalNuevoTipoProveedor'
 
 const VACIO = {
   tipoprovee:'', nomproveed:'', cedrif:'', direccion:'', ciudad:'',
@@ -14,12 +15,24 @@ export default function Proveedores({ supabase, onClose }) {
   const [msg,      setMsg]      = useState(null)
   const [modoNuevo,setModoNuevo]= useState(true)
   const [guardado, setGuardado] = useState(false)
+  const [tiposProv, setTiposProv] = useState([])
+  const [modal,     setModal]     = useState(null) // 'nuevoTipo'
 
   const navPosRef = useRef(null)
   const allIdsRef = useRef([])
   const cedRef    = useRef()
 
   useEffect(()=>{ init() },[])
+  useEffect(()=>{
+    supabase.from('tipos_proveedor').select('id,nombre').order('nombre')
+      .then(({data}) => { if (data) setTiposProv(data) })
+  },[])
+
+  function onTipoCreado(t) {
+    setTiposProv(prev => [...prev, t].sort((a,b)=>a.nombre.localeCompare(b.nombre)))
+    upd('tipoprovee', t.nombre)
+    setModal(null)
+  }
 
   async function init() {
     setBusy(true)
@@ -91,6 +104,7 @@ export default function Proveedores({ supabase, onClose }) {
 
   return(
     <div style={P.pagina}>
+      {modal==='nuevoTipo' && <ModalNuevoTipoProveedor supabase={supabase} onGuardar={onTipoCreado} onClose={()=>setModal(null)}/>}
       <div style={P.ventana}>
         <div style={P.titulo}>
           <div style={P.logoTxt}>
@@ -117,8 +131,15 @@ export default function Proveedores({ supabase, onClose }) {
             <Campo label="Nombre / Razón Social" w={320}>
               <input style={P.inp} value={form.nomproveed||''} onChange={e=>upd('nomproveed',e.target.value.toUpperCase())} placeholder="Nombre del proveedor"/>
             </Campo>
-            <Campo label="Tipo" w={160}>
-              <input style={P.inp} value={form.tipoprovee||''} onChange={e=>upd('tipoprovee',e.target.value)} placeholder="Tipo de proveedor"/>
+            <Campo label="Tipo" w={220}>
+              <div style={{display:'flex',gap:3}}>
+                <select style={{...P.inp,flex:1}} value={form.tipoprovee||''} onChange={e=>upd('tipoprovee',e.target.value)}>
+                  <option value="">-- Selecciona --</option>
+                  {tiposProv.map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+                </select>
+                <button onClick={()=>setModal('nuevoTipo')} title="Nuevo tipo de proveedor"
+                  style={{...P.inp,width:28,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,background:'#e8f5e9',fontWeight:900,fontSize:14}}>+</button>
+              </div>
             </Campo>
             <Campo label="Descripción" w={200}>
               <input style={P.inp} value={form.descprov||''} onChange={e=>upd('descprov',e.target.value)} placeholder="Servicios, insumos…"/>

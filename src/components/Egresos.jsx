@@ -139,12 +139,8 @@ export default function Egresos({ supabase, usuario, onClose }) {
     if (!form.valorneto || Number(form.valorneto) <= 0)
                            return setMsg({ok:false, txt:'Ingresa un valor válido.'})
     setGuardando(true)
-    const sub = subdetalles.find(s => String(s.tipoegreso)===String(form.tipoegreso) && String(s.codegreso)===String(form.codegreso))
     const registro = {
       grupo_id: Number(form.tipoegreso),
-      tipo_id:  Number(form.codegreso),
-      descegreso: sub?.descegreso || '',
-      tipocod:    sub?.tipocod || null,
       fecha_pago: form.fechapag,
       cedrif_benef: form.cedrifben || null,
       nombre_benef: form.nomrazben,

@@ -69,7 +69,17 @@ export default function CierreCaja({ supabase, onClose }) {
         .select('saldo').or('anulada.is.null,anulada.neq.S').gt('saldo', 0)
       const totalCarteraGlobal = (carteraTotal||[]).reduce((s,n) => s+(n.saldo||0), 0)
 
-      setDatos({ notas:notas||[], detalle, vendMap, abonos:abonos||[], notasAyer:notasAyer||[], totalCarteraGlobal })
+      // Marca DIGITAL: se muestra aparte y no se suma al cierre de caja
+      const digitalPorNota = {}
+      let totalDigital = 0
+      detalle.forEach(d => {
+        if ((d.marca||'').trim().toUpperCase() === 'DIGITAL') {
+          digitalPorNota[d.numnotaent] = (digitalPorNota[d.numnotaent]||0) + Number(d.valtotal||0)
+          totalDigital += Number(d.valtotal||0)
+        }
+      })
+
+      setDatos({ notas:notas||[], detalle, vendMap, abonos:abonos||[], notasAyer:notasAyer||[], totalCarteraGlobal, digitalPorNota, totalDigital })
     } catch(e) { console.error(e) }
     setCargando(false)
   }
@@ -79,18 +89,18 @@ export default function CierreCaja({ supabase, onClose }) {
   // porCaja: agrupa por usuario (en qué caja se registró)
   function calcConsolidado() {
     if (!datos) return null
-    const { notas, vendMap } = datos
+    const { notas, vendMap, digitalPorNota } = datos
 
     const porVendedor = {}   // cedvended → totales
     const porCaja     = {}   // usuario   → totales
-    const totales     = { efectivo:0, transferencia:0, mixto:0, credito:0, noAbonado:0, total:0, notas:0 }
+    const totales     = { efectivo:0, transferencia:0, mixto:0, credito:0, noAbonado:0, total:0, notas:0, digital:0 }
 
-    const acum = (obj, key, n) => {
-      if (!obj[key]) obj[key] = { efectivo:0, transferencia:0, mixto:0, credito:0, noAbonado:0, total:0, notas:0 }
+    const acum = (obj, key, n, val) => {
+      if (!obj[key]) obj[key] = { efectivo:0, transferencia:0, mixto:0, credito:0, noAbonado:0, total:0, notas:0, digital:0 }
       const v     = obj[key]
       const medio = normMedio(n.mediopago)
       const esC   = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
-      const val   = n.valtotal||0
+      const valDig = digitalPorNota[n.numnotaent]||0
       if (esC) { v.credito += n.valabono||0; v.noAbonado += n.saldo||0 }
       else {
         if (medio==='efectivo')           v.efectivo      += val
@@ -99,6 +109,7 @@ export default function CierreCaja({ supabase, onClose }) {
         else                              v.efectivo      += val
       }
       v.total += val
+      v.digital += valDig
       v.notas++
     }
 
@@ -107,18 +118,20 @@ export default function CierreCaja({ supabase, onClose }) {
       const usu   = (n.usuario||'').trim()
       const medio = normMedio(n.mediopago)
       const esC   = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
-      const val   = n.valtotal||0
+      const valDig = digitalPorNota[n.numnotaent]||0
+      const val   = (n.valtotal||0) - valDig   // excluye lo facturado en marca DIGITAL
 
       // Por vendedor (cedvended)
       const nomVend = cedv ? (vendMap[cedv] || `Vendedor ${cedv}`) : 'Sin vendedor'
-      acum(porVendedor, nomVend, n)
+      acum(porVendedor, nomVend, n, val)
 
       // Por caja (usuario)
       const nomCaja = LABEL_CAJA[usu] || usu || 'Sin caja'
-      acum(porCaja, nomCaja, n)
+      acum(porCaja, nomCaja, n, val)
 
       // Totales generales
       totales.total += val
+      totales.digital += valDig
       totales.notas++
       if (esC) { totales.credito += n.valabono||0; totales.noAbonado += n.saldo||0 }
       else {
@@ -158,13 +171,14 @@ export default function CierreCaja({ supabase, onClose }) {
   // ── RESUMEN DEL DÍA ───────────────────────────────────────────────────────
   function calcResumen() {
     if (!datos) return null
-    const { notas, abonos, notasAyer } = datos
+    const { notas, abonos, notasAyer, digitalPorNota, totalDigital } = datos
 
     let totalVentas=0, totalCredito=0, totalContado=0
     let totalEfectivo=0, totalTransferencia=0, totalMixto=0
 
     notas.forEach(n => {
-      const val   = n.valtotal||0
+      const valDig = digitalPorNota[n.numnotaent]||0
+      const val   = (n.valtotal||0) - valDig   // excluye lo facturado en marca DIGITAL
       const medio = normMedio(n.mediopago)
       const esC   = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
       totalVentas += val
@@ -187,6 +201,7 @@ export default function CierreCaja({ supabase, onClose }) {
       totalEfectivo, totalTransferencia, totalMixto,
       totalIngresado, totalAbonosCredito, totalAyer,
       totalPendiente: datos.totalCarteraGlobal||0,
+      totalDigital: totalDigital||0,
       cantNotas: notas.length
     }
   }
@@ -294,6 +309,9 @@ export default function CierreCaja({ supabase, onClose }) {
         </tr>
       </tbody>
     </table>
+    <div style="background:#ede7f6;border:1px dashed #7e57c2;border-radius:6px;padding:10px 14px;font-weight:700;color:#4527a0;display:flex;justify-content:space-between;">
+      <span>📲 MARCA DIGITAL (no incluida en el cierre de caja)</span><span>$${fmt(cons.totales.digital)}</span>
+    </div>
     </body></html>`)
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
   }
@@ -379,6 +397,7 @@ export default function CierreCaja({ supabase, onClose }) {
     <div class="f"><span class="lbl">Abonos a créditos recibidos</span><span class="val">$${fmt(resumen.totalAbonosCredito)}</span></div>
     <div class="f tot"><span class="lbl">TOTAL DINERO INGRESADO</span><span class="val">$${fmt(resumen.totalIngresado)}</span></div>
     <div class="f"><span class="lbl" style="color:#c62828">Saldo pendiente por cobrar</span><span class="val" style="color:#c62828">$${fmt(resumen.totalPendiente)}</span></div>
+    <div class="f" style="background:#ede7f6;border:1px dashed #7e57c2;border-radius:6px;margin-top:6px;"><span class="lbl" style="color:#4527a0;font-weight:700;">📲 MARCA DIGITAL (no incluida en el cierre)</span><span class="val" style="color:#4527a0;">$${fmt(resumen.totalDigital)}</span></div>
     <div class="f"><span class="lbl">Ventas día anterior</span><span class="val">$${fmt(resumen.totalAyer)}</span></div>
     <div class="f"><span class="lbl" style="color:${resumen.totalVentas>=resumen.totalAyer?'#2e7d32':'#c62828'}">
       ${resumen.totalVentas>=resumen.totalAyer?'▲ MEJOR QUE AYER':'▼ MENOR QUE AYER'}
@@ -505,6 +524,12 @@ export default function CierreCaja({ supabase, onClose }) {
                       </tr>
                     </tbody>
                   </table>
+
+                  {/* DIGITAL — aparte, no se suma al cierre */}
+                  <div style={P.digitalBox}>
+                    <span>📲 MARCA DIGITAL (no incluida en el cierre de caja)</span>
+                    <strong>${fmt(cons.totales.digital)}</strong>
+                  </div>
                 </div>
               )}
 
@@ -565,6 +590,12 @@ export default function CierreCaja({ supabase, onClose }) {
                       <span style={{fontSize:r.grande?16:13,fontWeight:700,color:r.color||'#1a3a6b'}}>{r.val}</span>
                     </div>
                   ))}
+
+                  {/* DIGITAL — aparte, no se suma al cierre */}
+                  <div style={P.digitalBox}>
+                    <span>📲 MARCA DIGITAL (no incluida en el cierre de caja)</span>
+                    <strong>${fmt(resumen.totalDigital)}</strong>
+                  </div>
                 </div>
               )}
 
@@ -708,4 +739,5 @@ const P={
   td:         {padding:'6px 10px',borderBottom:'1px solid #eee',fontSize:12},
   totRow:     {background:'#dde3ee',fontWeight:900},
   resumenFila:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 14px',borderBottom:'1px solid #eee',borderRadius:4,marginBottom:2},
+  digitalBox: {display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',marginTop:10,background:'#ede7f6',border:'1px dashed #7e57c2',borderRadius:6,fontSize:13,fontWeight:700,color:'#4527a0'},
 }
