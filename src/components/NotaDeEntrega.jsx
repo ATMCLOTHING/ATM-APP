@@ -55,7 +55,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   // cédula que no se encontró — para pasarla al modal de nuevo cliente
   const [cedulaNueva, setCedulaNueva] = useState('')
   const [devolverIdx, setDevolverIdx] = useState(null) // índice de línea seleccionada para devolver
-  const [valeGenerado, setValeGenerado] = useState(null) // {codigo, valor} — para mostrar tras una devolución
+  const [resultDevolucion, setResultDevolucion] = useState(null) // {descripcion,cantidad,valorDevolucion,saldoNuevo,vale:{codigo,valor}|null}
 
   const cedulaRef  = useRef()
   const inputRefs  = useRef({})   // refs a cada input de código por fila
@@ -560,7 +560,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
         valtotal:nuevoTotal, saldo:nuevoSaldo, cantotal:nuevaCant,
       }).eq('numnotaent', nroDoc)
 
-      let textoVale = ''
+      let valeInfo = null
       if (valeMonto > 0.01) {
         const {data:codData} = await supabase.rpc('siguiente_codigo_vale')
         const codigo = codData || `V-${Date.now()}`
@@ -576,19 +576,30 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
           estado: 'ACTIVO',
           usuario: usuario?.usuario || usuario?.nombre || 'sistema',
         }).select().single()
-        if (!eVale && valeIns) {
-          await supabase.from('vale_movimientos').insert({
-            vale_id: valeIns.id, tipo:'EMISION', valor:valeMonto, numnotaent:nroDoc,
-            usuario: usuario?.usuario || usuario?.nombre || 'sistema',
-          })
-          textoVale = ` 🎫 Se generó el vale ${codigo} por $${fmt(valeMonto)}, utilizable como parte de pago en otra nota.`
-          setValeGenerado({codigo, valor:valeMonto})
-        }
+        if (eVale) throw eVale
+        await supabase.from('vale_movimientos').insert({
+          vale_id: valeIns.id, tipo:'EMISION', valor:valeMonto, numnotaent:nroDoc,
+          usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+        })
+        valeInfo = {codigo, valor:valeMonto}
       }
 
       setMsg(null)
       await cargarDoc(nroDoc)
-      setMsg({tipo:'ok', texto:`✅ Devolución de ${cant} ${l.descartic} registrada. Inventario restaurado.${textoVale}`})
+      // Siempre se muestra el modal de resultado, tenga o no vale, con opción de imprimir comprobante
+      setResultDevolucion({
+        nota: nroDoc,
+        descripcion: l.descartic,
+        codartic: l.codartic,
+        talla: l.talla,
+        cantidad: cant,
+        valorDevolucion,
+        saldoAntes: saldoActual,
+        saldoNuevo: nuevoSaldo,
+        cliente: cliente?.nombre || cliTxt || 'Cliente general',
+        fecha: hoy(),
+        vale: valeInfo,
+      })
     } catch(e) {
       setMsg({tipo:'err', texto:`❌ Error al procesar la devolución: ${e.message}`})
     }
@@ -785,30 +796,52 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       {modal==='nuevoCliente'  && <ModalNuevoCliente  supabase={supabase} cedulaInicial={cedulaNueva} onGuardado={onClienteCreado} onClose={()=>setModal(null)}/>}
       {modal==='vale'          && <ModalVale          supabase={supabase} saldoNota={saldo} onAplicar={aplicarVale} onClose={()=>setModal(null)}/>}
       {devolverIdx!==null      && <ModalDevolucion    linea={lineas[devolverIdx]} onConfirmar={procesarDevolucion} onClose={()=>setDevolverIdx(null)}/>}
-      {valeGenerado            && (
+      {resultDevolucion        && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:600}}>
-          <div style={{background:'#fff',borderRadius:10,padding:24,width:360,textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
-            <div style={{fontSize:30,marginBottom:6}}>🎫</div>
-            <div style={{fontWeight:800,fontSize:15,color:'#1a3a6b',marginBottom:4}}>VALE GENERADO</div>
-            <div style={{fontSize:13,color:'#666',marginBottom:14}}>Por la devolución de mercancía. Anota o imprime este código — el cliente lo necesitará para usarlo como pago.</div>
-            <div style={{background:'#fff8e1',border:'2px dashed #ffc107',borderRadius:8,padding:'14px 10px',marginBottom:14}}>
-              <div style={{fontSize:22,fontWeight:900,color:'#856404',letterSpacing:1}}>{valeGenerado.codigo}</div>
-              <div style={{fontSize:15,fontWeight:700,color:'#1a3a6b',marginTop:4}}>${fmt(valeGenerado.valor)}</div>
+          <div style={{background:'#fff',borderRadius:10,padding:24,width:400,textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
+            <div style={{fontSize:30,marginBottom:6}}>↩</div>
+            <div style={{fontWeight:800,fontSize:15,color:'#1a3a6b',marginBottom:4}}>DEVOLUCIÓN REGISTRADA</div>
+            <div style={{fontSize:13,color:'#666',marginBottom:14,textAlign:'left',background:'#f4f6fb',border:'1px solid #c8d5ea',borderRadius:6,padding:'10px 12px'}}>
+              <div><strong>{resultDevolucion.cantidad}</strong> × {resultDevolucion.descripcion} {resultDevolucion.talla?`(T:${resultDevolucion.talla})`:''}</div>
+              <div>Valor devuelto: <strong>${fmt(resultDevolucion.valorDevolucion)}</strong></div>
+              <div>Nuevo saldo de la nota: <strong style={{color:resultDevolucion.saldoNuevo>0?'#c62828':'#2e7d32'}}>${fmt(resultDevolucion.saldoNuevo)}</strong></div>
             </div>
+
+            {resultDevolucion.vale ? (
+              <div style={{background:'#fff8e1',border:'2px dashed #ffc107',borderRadius:8,padding:'14px 10px',marginBottom:14}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#856404',marginBottom:4}}>🎫 SE GENERÓ UN VALE</div>
+                <div style={{fontSize:22,fontWeight:900,color:'#856404',letterSpacing:1}}>{resultDevolucion.vale.codigo}</div>
+                <div style={{fontSize:15,fontWeight:700,color:'#1a3a6b',marginTop:4}}>${fmt(resultDevolucion.vale.valor)}</div>
+              </div>
+            ) : (
+              <div style={{background:'#e8f5e9',border:'1px solid #a5d6a7',borderRadius:8,padding:'10px 12px',marginBottom:14,fontSize:12,color:'#2e7d32'}}>
+                Esta devolución se descontó directamente del saldo pendiente de la nota. No requiere vale.
+              </div>
+            )}
+
             <div style={{display:'flex',gap:8,justifyContent:'center'}}>
               <button onClick={()=>{
-                  const w=window.open('','_blank','width=380,height=420')
-                  w.document.write(`<html><body style="font-family:Arial,sans-serif;text-align:center;padding:30px;">
-                    <h2 style="color:#1a3a6b;">ATM — VALE</h2>
-                    <p>Código:</p><h1 style="letter-spacing:2px;">${valeGenerado.codigo}</h1>
-                    <p style="font-size:20px;font-weight:bold;">$${fmt(valeGenerado.valor)}</p>
-                    <p style="color:#666;font-size:12px;">Válido como parte de pago en cualquier Nota de Entrega futura.</p>
+                  const r = resultDevolucion
+                  const w=window.open('','_blank','width=380,height=500')
+                  w.document.write(`<html><body style="font-family:Arial,sans-serif;text-align:center;padding:24px;font-size:13px;">
+                    <h2 style="color:#1a3a6b;margin-bottom:0;">ATM — COMPROBANTE DE DEVOLUCIÓN</h2>
+                    <p style="color:#666;margin-top:4px;">Nota de origen: ${r.nota} &nbsp;|&nbsp; Fecha: ${r.fecha}</p>
+                    <hr/>
+                    <p style="text-align:left;"><strong>Cliente:</strong> ${r.cliente}<br/>
+                    <strong>Artículo:</strong> ${r.descripcion} (Cód. ${r.codartic}${r.talla?', T:'+r.talla:''})<br/>
+                    <strong>Cantidad devuelta:</strong> ${r.cantidad}<br/>
+                    <strong>Valor devuelto:</strong> $${fmt(r.valorDevolucion)}<br/>
+                    <strong>Nuevo saldo de la nota:</strong> $${fmt(r.saldoNuevo)}</p>
+                    ${r.vale ? `<hr/><p style="font-size:16px;"><strong>VALE GENERADO</strong></p>
+                      <h1 style="letter-spacing:2px;margin:6px 0;">${r.vale.codigo}</h1>
+                      <p style="font-size:18px;font-weight:bold;">$${fmt(r.vale.valor)}</p>
+                      <p style="color:#666;font-size:11px;">Válido como parte de pago en cualquier Nota de Entrega futura.</p>` : ''}
                   </body></html>`)
                   w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},300)
                 }} style={{background:'#1a3a6b',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700,fontSize:13}}>
-                🖨 Imprimir
+                🖨 Imprimir comprobante
               </button>
-              <button onClick={()=>setValeGenerado(null)} style={{background:'#888',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700,fontSize:13}}>
+              <button onClick={()=>setResultDevolucion(null)} style={{background:'#888',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700,fontSize:13}}>
                 Cerrar
               </button>
             </div>
