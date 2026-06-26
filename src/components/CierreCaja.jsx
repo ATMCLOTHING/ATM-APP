@@ -325,8 +325,8 @@ export default function CierreCaja({ supabase, onClose }) {
     <table><thead><tr><th style="text-align:left">Marca</th><th>Unidades</th><th>$ Promedio</th><th>$ Total</th></tr></thead><tbody>
     ${Object.entries(marcas).sort((a,b)=>b[1].total-a[1].total).map(([m,v])=>`
       <tr><td>${m}</td><td>${v.unidades}</td><td>$${fmt(v.unidades>0?v.total/v.unidades:0)}</td><td>$${fmt(v.total)}</td></tr>`).join('')}
-    <tr class="tot"><td>TOTALES</td><td>${Object.values(marcas).reduce((s,v)=>s+v.unidades,0)}</td><td></td>
-    <td>$${fmt(Object.values(marcas).reduce((s,v)=>s+v.total,0))}</td></tr>
+    <tr class="tot"><td>TOTALES (sin DIGITAL)</td><td>${Object.entries(marcas).filter(([m])=>m.trim().toUpperCase()!=='DIGITAL').reduce((s,[,v])=>s+v.unidades,0)}</td><td></td>
+    <td>$${fmt(Object.entries(marcas).filter(([m])=>m.trim().toUpperCase()!=='DIGITAL').reduce((s,[,v])=>s+v.total,0))}</td></tr>
     </tbody></table></body></html>`)
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
   }
@@ -546,19 +546,22 @@ export default function CierreCaja({ supabase, onClose }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {Object.entries(marcas).sort((a,b)=>b[1].total-a[1].total).map(([m,v],i)=>(
-                        <tr key={m} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
-                          <td style={{...P.td,fontWeight:600}}>{m}</td>
-                          <td style={{...P.td,textAlign:'right'}}>{v.unidades}</td>
-                          <td style={{...P.td,textAlign:'right'}}>${fmt(v.unidades>0?v.total/v.unidades:0)}</td>
-                          <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#1a3a6b'}}>${fmt(v.total)}</td>
-                        </tr>
-                      ))}
+                      {Object.entries(marcas).sort((a,b)=>b[1].total-a[1].total).map(([m,v],i)=>{
+                        const esDigital = m.trim().toUpperCase()==='DIGITAL'
+                        return (
+                          <tr key={m} style={{background:esDigital?'#ede7f6':i%2===0?'#fff':'#f5f7fc'}}>
+                            <td style={{...P.td,fontWeight:600,color:esDigital?'#4527a0':'#333'}}>{m}{esDigital?' 📲':''}</td>
+                            <td style={{...P.td,textAlign:'right'}}>{v.unidades}</td>
+                            <td style={{...P.td,textAlign:'right'}}>${fmt(v.unidades>0?v.total/v.unidades:0)}</td>
+                            <td style={{...P.td,textAlign:'right',fontWeight:700,color:esDigital?'#4527a0':'#1a3a6b'}}>${fmt(v.total)}</td>
+                          </tr>
+                        )
+                      })}
                       <tr style={P.totRow}>
-                        <td style={P.td}><strong>TOTALES</strong></td>
-                        <td style={{...P.td,textAlign:'right'}}>{Object.values(marcas).reduce((s,v)=>s+v.unidades,0)}</td>
+                        <td style={P.td}><strong>TOTALES (sin DIGITAL)</strong></td>
+                        <td style={{...P.td,textAlign:'right'}}>{Object.entries(marcas).filter(([m])=>m.trim().toUpperCase()!=='DIGITAL').reduce((s,[,v])=>s+v.unidades,0)}</td>
                         <td style={P.td}></td>
-                        <td style={{...P.td,textAlign:'right',fontSize:14,color:'#1a3a6b'}}><strong>${fmt(Object.values(marcas).reduce((s,v)=>s+v.total,0))}</strong></td>
+                        <td style={{...P.td,textAlign:'right',fontSize:14,color:'#1a3a6b'}}><strong>${fmt(Object.entries(marcas).filter(([m])=>m.trim().toUpperCase()!=='DIGITAL').reduce((s,[,v])=>s+v.total,0))}</strong></td>
                       </tr>
                     </tbody>
                   </table>
