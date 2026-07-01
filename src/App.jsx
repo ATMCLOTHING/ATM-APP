@@ -14,6 +14,7 @@ import Clientes        from './components/Clientes'
 import ControlDocumentos from './components/ControlDocumentos'
 import Egresos         from './components/Egresos'
 import Vales           from './components/Vales'
+import Vendedores      from './components/Vendedores'
 import Manual          from './components/Manual'
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
   if (modulo === 'documentos') return <ControlDocumentos supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'egresos')    return <Egresos           supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'vales')      return <Vales              supabase={supabase} usuario={usuario} onClose={onClose}/>
+  if (modulo === 'vendedores') return <Vendedores          supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'comisiones') return <Comisiones        supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'clientes')   return <Clientes         supabase={supabase} usuario={usuario} onClose={onClose}/>
   if (modulo === 'manual')     return <Manual                                                  onClose={onClose}/>
