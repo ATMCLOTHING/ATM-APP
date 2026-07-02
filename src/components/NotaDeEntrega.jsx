@@ -472,9 +472,13 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
         if (diff===0) continue
         await supabase.rpc('ajustar_inventario', {p_codartic:cod, p_talla:tall, p_cantidad:diff})
         const {data:art} = await supabase.from('articomp')
-          .select('existencia').eq('codartic',cod).eq('talla',tall).limit(1)
+          .select('existencia,descartic').eq('codartic',cod).eq('talla',tall).limit(1)
         if (art&&art.length&&(art[0].existencia||0)<0)
           avisos.push(`${cod} T:${tall} (existencia: ${art[0].existencia})`)
+        // Registrar en kardex
+        const tipo_mov = diff > 0 ? 'ENTRADA' : 'SALIDA'
+        const concepto = diff > 0 ? `Ajuste en nota ${nroDoc}` : `Venta nota ${nroDoc}`
+        await registrarKardex(cod, art?.[0]?.descartic||cod, tall, tipo_mov, concepto, diff, nroDoc)
       }
       setGuardada(true); setModoNueva(false)
       const msgBase = `✅ Nota ${nroDoc} guardada.`
@@ -497,14 +501,32 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     }).eq('numnotaent',nroDoc)
     if(error){setMsg({tipo:'err',texto:`❌ ${error.message}`})}
     else {
-      const {data:det} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
+      const {data:det} = await supabase.from('detnotaen').select('codartic,talla,cantidad,descartic').eq('numnotaent',nroDoc)
       for (const l of (det||[])) {
         await supabase.rpc('ajustar_inventario', {p_codartic:l.codartic, p_talla:l.talla, p_cantidad:-Number(l.cantidad)})
+        await registrarKardex(l.codartic, l.descartic, l.talla, 'DEVOLUCION', `Anulación nota ${nroDoc}`, l.cantidad, nroDoc)
       }
       setAnulada(true)
       setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada. Inventario restaurado.`})
     }
     setBusy(false)
+  }
+
+  // ── REGISTRO EN KARDEX ────────────────────────────────────────────────
+  async function registrarKardex(codartic, descartic, talla, tipo_mov, concepto, cantidad, numnotaent) {
+    try {
+      // Leer existencia actual después del movimiento
+      const {data:art} = await supabase.from('articomp')
+        .select('existencia').eq('codartic',codartic).eq('talla',talla||'U').limit(1)
+      const existDespues = art&&art.length ? Number(art[0].existencia) : null
+      await supabase.from('artikardex').insert({
+        codartic, descartic: descartic||codartic, talla: talla||'U',
+        tipo_mov, concepto, cantidad: Math.abs(cantidad),
+        existencia_despues: existDespues,
+        numnotaent: numnotaent || null,
+        usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+      })
+    } catch(e) { console.error('Error registrando kardex:', e) }
   }
 
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
@@ -528,8 +550,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       const precioUnitEfectivo = Number(l.valtotal||0) / Number(l.cantidad||1)
       const valorDevolucion = precioUnitEfectivo * cant
 
-      // 1) Restaurar inventario
+      // 1) Restaurar inventario y registrar en kardex
       await supabase.rpc('ajustar_inventario', {p_codartic:l.codartic, p_talla:l.talla, p_cantidad:-cant})
+      await registrarKardex(l.codartic, l.descartic, l.talla, 'DEVOLUCION', `Devolución nota ${nroDoc}`, cant, nroDoc)
 
       // 2) Ajustar (o eliminar) la línea en detnotaen
       const cantRestante = Number(l.cantidad) - cant

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { WZNEW, WZSAVE, WZDELETE, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO, WZDUPLICAR } from '../lib/assets'
-import ModalNuevaMarca       from './ModalNuevaMarca'
-import ModalNuevoProveedor   from './ModalNuevoProveedor'
-import ModalListadoArticulos from './ModalListadoArticulos'
+import ModalNuevaMarca        from './ModalNuevaMarca'
+import ModalNuevoProveedor    from './ModalNuevoProveedor'
+import ModalListadoArticulos  from './ModalListadoArticulos'
+import ModalEntradaMercancia  from './ModalEntradaMercancia'
 
 const VACIO = {
   codartic:'', tipo:'', tipotalla:'U', descartic:'', genero:'', marca:'',
@@ -14,7 +15,7 @@ const VACIO = {
 const TIPOS   = ['JEAN','SHORT','BLUSA','CAMISA','PANTALON','VESTIDO','FALDA','BERMUDA','LEGGIN','OTRO']
 const GENEROS = ['DAMA','CABALLERO','NIÑO','NIÑA','UNISEX']
 
-export default function Articulos({ supabase, onClose }) {
+export default function Articulos({ supabase, usuario, onClose }) {
   const [form,       setForm]       = useState({...VACIO})
   const [allIds,     setAllIds]     = useState([])
   const [busy,       setBusy]       = useState(false)
@@ -165,9 +166,16 @@ export default function Articulos({ supabase, onClose }) {
 
   return(
     <div style={P.pagina}>
-      {modal==='marca'    && <ModalNuevaMarca       supabase={supabase} onGuardar={onMarcaGuardada}  onClose={()=>setModal(null)}/>}
-      {modal==='prov'     && <ModalNuevoProveedor   supabase={supabase} onGuardar={onProvGuardado}   onClose={()=>setModal(null)}/>}
-      {modal==='listado'  && <ModalListadoArticulos supabase={supabase} onSelect={cod=>cargarDoc(cod)} onClose={()=>setModal(null)}/>}
+      {modal==='marca'    && <ModalNuevaMarca        supabase={supabase} onGuardar={onMarcaGuardada}  onClose={()=>setModal(null)}/>}
+      {modal==='prov'     && <ModalNuevoProveedor    supabase={supabase} onGuardar={onProvGuardado}   onClose={()=>setModal(null)}/>}
+      {modal==='listado'  && <ModalListadoArticulos  supabase={supabase} onSelect={cod=>cargarDoc(cod)} onClose={()=>setModal(null)}/>}
+      {modal==='entrada'  && <ModalEntradaMercancia  supabase={supabase} articulo={form} usuario={usuario}
+        onGuardado={nuevaExist => {
+          upd('existencia', nuevaExist)
+          setMsg({tipo:'ok', texto:`✅ Entrada registrada. Nueva existencia: ${nuevaExist} unidades.`})
+          setModal(null)
+        }}
+        onClose={()=>setModal(null)}/>}
 
       <div style={P.ventana}>
         {/* TÍTULO */}
@@ -315,6 +323,12 @@ export default function Articulos({ supabase, onClose }) {
               <IBtn src={WZDUPLICAR} onClick={duplicar}             title="Duplicar datos"/>
               <IBtn src={WZUNDO}     onClick={()=>{if(modoNueva&&!guardado){setForm({...VACIO});setMsg(null);setTimeout(()=>codRef.current?.focus(),100)}}} title="Revertir" disabled={!modoNueva||guardado}/>
               <IBtn src={WZDELETE}   onClick={eliminar}             title="Eliminar" disabled={modoNueva&&!guardado}/>
+              <button
+                onClick={()=>{ if(!guardado||modoNueva){setMsg({tipo:'err',texto:'Guarda el artículo antes de registrar una entrada.'}); return} setModal('entrada') }}
+                title="Registrar entrada de mercancía"
+                style={{background:'#e8f5e9',border:'1px solid #a5d6a7',borderRadius:5,padding:'4px 10px',cursor:'pointer',fontSize:11,fontWeight:800,color:'#2e7d32',height:38,display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap'}}>
+                📦 Entrada
+              </button>
               <IBtn src={WZCLOSE}    onClick={onClose}              title="Volver al menú"/>
             </div>
           </div>
