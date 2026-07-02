@@ -7,25 +7,32 @@ import { useState } from 'react'
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 
 export default function ModalVale({ supabase, saldoNota, onAplicar, onClose }) {
-  const [codigo,  setCodigo]  = useState('')
-  const [vale,    setVale]    = useState(null)
-  const [valor,   setValor]   = useState('')
-  const [buscando,setBuscando]= useState(false)
-  const [busy,    setBusy]    = useState(false)
-  const [err,     setErr]     = useState('')
+  const [codigo,    setCodigo]    = useState('')
+  const [vale,      setVale]      = useState(null)
+  const [resultados,setResultados]= useState([])
+  const [valor,     setValor]     = useState('')
+  const [buscando,  setBuscando]  = useState(false)
+  const [busy,      setBusy]      = useState(false)
+  const [err,       setErr]       = useState('')
 
   async function buscar() {
-    const cod = codigo.trim().toUpperCase()
-    if (!cod) { setErr('Ingresa el código del vale.'); return }
+    const txt = codigo.trim().toUpperCase()
+    if (!txt) { setErr('Ingresa el código, nombre o cédula del cliente.'); return }
     setBuscando(true); setErr(''); setVale(null)
-    const { data, error } = await supabase.from('vales').select('*').eq('codigo', cod).limit(1)
+    const { data, error } = await supabase.from('vales').select('*')
+      .or(`codigo.ilike.%${txt}%,cliente_nombre.ilike.%${txt}%,cliente_ced.ilike.%${txt}%`)
+      .eq('estado', 'ACTIVO')
+      .gt('saldo', 0)
+      .order('fecregistr', { ascending: false })
+      .limit(20)
     setBuscando(false)
-    if (error || !data || !data.length) { setErr('Vale no encontrado.'); return }
-    const v = data[0]
-    if (v.estado !== 'ACTIVO') { setErr(`Este vale está ${v.estado.toLowerCase()} y no tiene saldo disponible.`); return }
-    if ((v.saldo||0) <= 0) { setErr('Este vale no tiene saldo disponible.'); return }
-    setVale(v)
-    setValor(String(Math.min(v.saldo, saldoNota)))
+    if (error || !data || !data.length) { setErr('No se encontraron vales activos con ese criterio.'); return }
+    if (data.length === 1) {
+      setVale(data[0])
+      setValor(String(Math.min(data[0].saldo, saldoNota)))
+    } else {
+      setResultados(data)
+    }
   }
 
   async function aplicar() {
@@ -50,17 +57,28 @@ export default function ModalVale({ supabase, saldoNota, onAplicar, onClose }) {
 
         {!vale && (
           <>
-            <label style={S.lbl}>Código del vale
+            <label style={S.lbl}>Código, nombre o cédula del cliente
               <div style={{display:'flex',gap:6}}>
                 <input autoFocus style={{...S.inp,flex:1}} value={codigo}
                   onChange={e=>setCodigo(e.target.value)}
                   onKeyDown={e=>e.key==='Enter'&&buscar()}
-                  placeholder="Ej: V-000123"/>
+                  placeholder="Ej: V-000012 o nombre del cliente"/>
                 <button onClick={buscar} disabled={buscando} style={S.btnBuscar}>
                   {buscando ? '…' : '🔍 Buscar'}
                 </button>
               </div>
             </label>
+            {resultados.length > 1 && (
+              <div style={{marginTop:8}}>
+                <div style={{fontSize:11,color:'#666',marginBottom:6}}>Se encontraron {resultados.length} vales — selecciona uno:</div>
+                {resultados.map(r=>(
+                  <div key={r.id} onClick={()=>{setVale(r);setValor(String(Math.min(r.saldo,saldoNota)));setResultados([])}}
+                    style={{padding:'7px 10px',marginBottom:4,background:'#f4f6fb',border:'1px solid #c8d5ea',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                    <strong style={{color:'#1a3a6b'}}>{r.codigo}</strong> · {r.cliente_nombre} · Saldo: <strong style={{color:'#2e7d32'}}>${Number(r.saldo).toLocaleString('es-CO')}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
