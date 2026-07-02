@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { LOGO, WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO } from '../lib/assets'
 import ModalAbonos        from './ModalAbonos'
 import ModalBuscarNota    from './ModalBuscarNota'
@@ -316,33 +316,39 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     return {...lin,valdescue:dcto,valiva:iva,valtotal:base+iva}
   }
 
-  function upd(idx, cambios) {
+  const upd = useCallback((idx, cambios) => {
     setLineas(prev=>{
       const sig=[...prev]
       sig[idx]=recalc({...sig[idx],...cambios})
       if (idx===sig.length-1&&(cambios.codartic||cambios.descartic)) sig.push({...VACIA})
       return sig
     })
-  }
+  }, [])
 
-  function quitarLinea(idx) {
+  const quitarLinea = useCallback((idx) => {
     setLineas(prev=>{
       const nuevo=prev.filter((_,i)=>i!==idx)
       while(nuevo.length<FILAS_BASE) nuevo.push({...VACIA})
       return nuevo
     })
-  }
+  }, [])
 
-  const detValidas   = lineas.filter(l=>l.codartic&&Number(l.cantidad)>0)
-  const subtotal     = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
-  const totDctoLinea = detValidas.reduce((s,l)=>s+(l.valdescue||0),0)
-  const dctoGlobal   = subtotal * ((Number(pDesc)||0)/100)
-  const totDcto      = totDctoLinea + dctoGlobal
-  const baseIva      = subtotal - totDcto
-  const totIva       = baseIva * ((Number(pIva)||0)/100)
-  const total        = baseIva + totIva
-  const saldo        = total - abonos
-  const prendas      = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
+  const detValidas = useMemo(()=>
+    lineas.filter(l=>l.codartic&&Number(l.cantidad)>0),
+  [lineas])
+
+  const { subtotal, totDcto, totIva, total, saldo, prendas } = useMemo(()=>{
+    const subtotal     = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
+    const totDctoLinea = detValidas.reduce((s,l)=>s+(l.valdescue||0),0)
+    const dctoGlobal   = subtotal * ((Number(pDesc)||0)/100)
+    const totDcto      = totDctoLinea + dctoGlobal
+    const baseIva      = subtotal - totDcto
+    const totIva       = baseIva * ((Number(pIva)||0)/100)
+    const total        = baseIva + totIva
+    const saldo        = total - abonos
+    const prendas      = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
+    return { subtotal, totDcto, totIva, total, saldo, prendas }
+  }, [detValidas, pDesc, pIva, abonos])
 
   async function cargarDoc(id) {
     setBusy(true); setMsg(null)
@@ -1015,48 +1021,16 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
               </thead>
               <tbody>
                 {lineas.map((l,i)=>(
-                  <tr key={i} style={{background:i%2===0?'#fff':'#f8faff'}}>
-                    <td style={{...P.td,textAlign:'center',color:'#aaa',width:26,fontSize:11}}>{l.codartic?i+1:''}</td>
-                    <td style={P.td}>
-                      <div style={{position:'relative'}}>
-                        <input
-                          ref={el => inputRefs.current[i] = el}
-                          style={{...P.ci,width:88}}
-                          value={l.codartic}
-                          onChange={e => onChangeCodigo(e.target.value, i)}
-                          onKeyDown={e => { if(e.key==='Enter'){ e.preventDefault(); onEnterCodigo(l.codartic, i) } }}
-                          placeholder="Código" disabled={anulada && !desbloqueada}/>
-                        {artIdx===i&&artSugg.length>0&&(
-                          <ul style={{...P.drop,width:460,zIndex:99}}>
-                            {artSugg.map((a,ai)=>(
-                              <li key={ai} style={P.dropItem} onClick={()=>elegirArt(a,i)}>
-                                <strong>{a.codartic}</strong> · {a.descartic}
-                                <span style={{color:'#999',fontSize:11}}> T:{a.talla} | ${fmt(precioSegunTipo(a))}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{...P.td,minWidth:160}}>
-                      <input style={{...P.ci,width:'100%'}} value={l.descartic}
-                        onChange={e=>buscarDesc(e.target.value,i)}
-                        placeholder="Descripción" disabled={anulada && !desbloqueada}/>
-                    </td>
-                    <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.marca||''}</td>
-                    <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.genero||''}</td>
-                    <td style={P.td}><input style={{...P.ci,width:46,textAlign:'center'}} value={l.talla} onChange={e=>upd(i,{talla:e.target.value})} disabled={anulada && !desbloqueada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:60,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada && !desbloqueada} title="Usa cantidad negativa para registrar una devolución sin localizar la nota original"/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:96,textAlign:'right'}} value={l.valunit} min={0} onChange={e=>upd(i,{valunit:Number(e.target.value)})} disabled={anulada && !desbloqueada}/></td>
-                    <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porcdescue} min={0} max={100} onChange={e=>upd(i,{porcdescue:Number(e.target.value)})} disabled={anulada && !desbloqueada}/></td>
-                    <td style={{...P.td,textAlign:'right',paddingRight:6,color:'#c0392b',fontSize:12}}>{l.valdescue?fmt(l.valdescue):''}</td>
-                    <td style={{...P.td,textAlign:'right',paddingRight:6,fontWeight:700,color:'#1a3a6b',fontSize:13}}>{l.valtotal?fmt(l.valtotal):''}</td>
-                    <td style={{...P.td,textAlign:'center',width:46}}>
-                      {l.codartic&&!anulada&&(!guardada||modoNueva||desbloqueada)&&<button onClick={()=>quitarLinea(i)} style={P.btnX} title="Quitar línea">✕</button>}
-                      {l.codartic&&!anulada&&l.id&&guardada&&!modoNueva&&!desbloqueada&&Number(l.cantidad)>0&&
-                        <button onClick={()=>abrirDevolucion(i)} style={P.btnDev} title="Devolver esta prenda">↩</button>}
-                    </td>
-                  </tr>
+                  <FilaGrilla key={i} l={l} i={i}
+                    anulada={anulada} guardada={guardada} modoNueva={modoNueva} desbloqueada={desbloqueada}
+                    artIdx={artIdx} artSugg={artSugg}
+                    upd={upd} quitarLinea={quitarLinea}
+                    onChangeCodigo={onChangeCodigo} onEnterCodigo={onEnterCodigo}
+                    buscarDesc={buscarDesc} elegirArt={elegirArt}
+                    abrirDevolucion={abrirDevolucion}
+                    precioSegunTipo={precioSegunTipo}
+                    inputRef={el => inputRefs.current[i] = el}
+                  />
                 ))}
               </tbody>
             </table>
@@ -1204,3 +1178,54 @@ const P={
   tV:        {fontSize:12,textAlign:'right',fontVariantNumeric:'tabular-nums',fontWeight:600,color:'#333'},
   totGrid:   {display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'2px 8px',background:'#fff',border:'1px solid #c8d5ea',borderRadius:6,padding:'6px 10px'},
 }
+
+// ── Fila memoizada de la grilla — solo se re-renderiza si cambian sus props ──
+import { memo } from 'react'
+const FilaGrilla = memo(function FilaGrilla({
+  l, i, anulada, guardada, modoNueva, desbloqueada,
+  artIdx, artSugg, upd, quitarLinea,
+  onChangeCodigo, onEnterCodigo, buscarDesc, elegirArt,
+  abrirDevolucion, precioSegunTipo, inputRef
+}) {
+  return (
+    <tr style={{background:i%2===0?'#fff':'#f8faff'}}>
+      <td style={{...P.td,textAlign:'center',color:'#aaa',width:26,fontSize:11}}>{l.codartic?i+1:''}</td>
+      <td style={P.td}>
+        <div style={{position:'relative'}}>
+          <input ref={inputRef} style={{...P.ci,width:88}} value={l.codartic}
+            onChange={e=>onChangeCodigo(e.target.value,i)}
+            onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();onEnterCodigo(l.codartic,i)}}}
+            placeholder="Código" disabled={anulada&&!desbloqueada}/>
+          {artIdx===i&&artSugg.length>0&&(
+            <ul style={{...P.drop,width:460,zIndex:99}}>
+              {artSugg.map((a,ai)=>(
+                <li key={ai} style={P.dropItem} onClick={()=>elegirArt(a,i)}>
+                  <strong>{a.codartic}</strong> · {a.descartic}
+                  <span style={{color:'#999',fontSize:11}}> T:{a.talla} | ${fmt(precioSegunTipo(a))}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </td>
+      <td style={{...P.td,minWidth:160}}>
+        <input style={{...P.ci,width:'100%'}} value={l.descartic}
+          onChange={e=>buscarDesc(e.target.value,i)}
+          placeholder="Descripción" disabled={anulada&&!desbloqueada}/>
+      </td>
+      <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.marca||''}</td>
+      <td style={{...P.td,paddingLeft:4,fontSize:11,color:'#555'}}>{l.genero||''}</td>
+      <td style={P.td}><input style={{...P.ci,width:46,textAlign:'center'}} value={l.talla} onChange={e=>upd(i,{talla:e.target.value})} disabled={anulada&&!desbloqueada}/></td>
+      <td style={P.td}><input type="number" style={{...P.ci,width:60,textAlign:'right',fontSize:13,fontWeight:600}} value={l.cantidad} onChange={e=>upd(i,{cantidad:e.target.value})} disabled={anulada&&!desbloqueada} title="Usa cantidad negativa para registrar una devolución sin localizar la nota original"/></td>
+      <td style={P.td}><input type="number" style={{...P.ci,width:96,textAlign:'right'}} value={l.valunit} min={0} onChange={e=>upd(i,{valunit:Number(e.target.value)})} disabled={anulada&&!desbloqueada}/></td>
+      <td style={P.td}><input type="number" style={{...P.ci,width:46,textAlign:'right'}} value={l.porcdescue} min={0} max={100} onChange={e=>upd(i,{porcdescue:Number(e.target.value)})} disabled={anulada&&!desbloqueada}/></td>
+      <td style={{...P.td,textAlign:'right',paddingRight:6,color:'#c0392b',fontSize:12}}>{l.valdescue?fmt(l.valdescue):''}</td>
+      <td style={{...P.td,textAlign:'right',paddingRight:6,fontWeight:700,color:'#1a3a6b',fontSize:13}}>{l.valtotal?fmt(l.valtotal):''}</td>
+      <td style={{...P.td,textAlign:'center',width:46}}>
+        {l.codartic&&!anulada&&(!guardada||modoNueva||desbloqueada)&&<button onClick={()=>quitarLinea(i)} style={P.btnX} title="Quitar línea">✕</button>}
+        {l.codartic&&!anulada&&l.id&&guardada&&!modoNueva&&!desbloqueada&&Number(l.cantidad)>0&&
+          <button onClick={()=>abrirDevolucion(i)} style={P.btnDev} title="Devolver esta prenda">↩</button>}
+      </td>
+    </tr>
+  )
+})

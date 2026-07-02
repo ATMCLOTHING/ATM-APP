@@ -1,84 +1,157 @@
 // src/components/Vendedores.jsx
-import { useState, useEffect } from 'react'
+// Gestión de vendedores — mismo diseño que Clientes.jsx
 
-const VACIO = { cedvended:'', nomvended:'', celular1:'', celular2:'', empresa:'', usuario:'' }
+import { useState, useEffect, useRef } from 'react'
+import { LOGO } from '../lib/assets'
 
-export default function Vendedores({ supabase, usuario, onClose }) {
-  const [lista,    setLista]    = useState([])
-  const [busq,     setBusq]     = useState('')
-  const [form,     setForm]     = useState(VACIO)
-  const [esNuevo,  setEsNuevo]  = useState(true)
-  const [busy,     setBusy]     = useState(false)
-  const [msg,      setMsg]      = useState(null)
+const S = {
+  wrap:    { position:'fixed',inset:0,background:'#f0f2f5',zIndex:1000,display:'flex',flexDirection:'column',fontFamily:'Arial,sans-serif' },
+  header:  { background:'#1a1a2e',color:'#fff',padding:'8px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0 },
+  hTitle:  { fontSize:16,fontWeight:'bold',flex:1 },
+  hBtn:    { background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'5px 14px',cursor:'pointer',fontSize:12,fontWeight:'bold' },
+  body:    { display:'flex',flex:1,overflow:'hidden',gap:0 },
+  lista:   { width:360,background:'#fff',borderRight:'1px solid #ddd',display:'flex',flexDirection:'column',flexShrink:0 },
+  lHead:   { padding:'10px 12px',borderBottom:'1px solid #eee',display:'flex',gap:8,alignItems:'center' },
+  lBusq:   { flex:1,border:'1px solid #ccc',borderRadius:5,padding:'6px 10px',fontSize:13 },
+  lTotal:  { fontSize:11,color:'#666',whiteSpace:'nowrap' },
+  lTabla:  { flex:1,overflowY:'auto' },
+  lFila:   { padding:'8px 12px',borderBottom:'1px solid #f0f0f0',cursor:'pointer',display:'flex',flexDirection:'column',gap:2 },
+  lFilaSel:{ padding:'8px 12px',borderBottom:'1px solid #f0f0f0',cursor:'pointer',display:'flex',flexDirection:'column',gap:2,background:'#e8eaf6' },
+  lNom:    { fontSize:13,fontWeight:'bold',color:'#1a1a2e' },
+  lSub:    { fontSize:11,color:'#666' },
+  lEmpty:  { padding:40,textAlign:'center',color:'#999',fontSize:13 },
+  form:    { flex:1,padding:20,overflowY:'auto',display:'flex',flexDirection:'column',gap:14 },
+  fTitulo: { fontSize:15,fontWeight:'bold',color:'#1a1a2e',borderBottom:'2px solid #1a1a2e',paddingBottom:8,marginBottom:4 },
+  fila:    { display:'flex',gap:14 },
+  grp:     { display:'flex',flexDirection:'column',gap:4,flex:1 },
+  lbl:     { fontSize:11,fontWeight:'bold',color:'#555',textTransform:'uppercase' },
+  inp:     { border:'1px solid #ccc',borderRadius:5,padding:'8px 10px',fontSize:13,width:'100%',boxSizing:'border-box' },
+  req:     { color:'#e53935' },
+  btnBar:  { display:'flex',gap:8,paddingTop:8,borderTop:'1px solid #eee',marginTop:8 },
+  btn:     { display:'flex',alignItems:'center',gap:6,padding:'7px 16px',border:'none',borderRadius:6,cursor:'pointer',fontSize:12,fontWeight:'bold' },
+  btnSave: { background:'#1a1a2e',color:'#fff' },
+  btnDel:  { background:'#e53935',color:'#fff' },
+  btnNew:  { background:'#2e7d32',color:'#fff' },
+  btnCx:   { background:'#eee',color:'#333' },
+  msg:     { borderRadius:6,padding:'8px 14px',fontSize:12,fontWeight:'bold' },
+  msgOk:   { background:'#e8f5e9',color:'#2e7d32',border:'1px solid #a5d6a7' },
+  msgErr:  { background:'#fdecea',color:'#c62828',border:'1px solid #ef9a9a' },
+  badge:   { fontSize:10,padding:'2px 7px',borderRadius:10,fontWeight:'bold',marginLeft:6 },
+  badgeNo: { background:'#fdecea',color:'#c62828' },
+  vacio:   { flex:1,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:12,color:'#bbb' },
+}
 
-  useEffect(() => { cargar() }, [])
+const FORM_VACIO = { cedula:'', nombre:'', celular1:'', celular2:'', empresa:'', porcentaje_comision:0, activo:true }
 
-  async function cargar() {
-    const { data } = await supabase.from('vendedores').select('*').order('nomvended')
+const Fld = ({ label, children, requerido, w }) => (
+  <div style={{ ...S.grp, flex: w ? `0 0 ${w}px` : 1 }}>
+    <label style={S.lbl}>{label}{requerido && <span style={S.req}> *</span>}</label>
+    {children}
+  </div>
+)
+
+export default function Vendedores({ supabase, onClose }) {
+  const [lista,      setLista]      = useState([])
+  const [total,      setTotal]      = useState(0)
+  const [busqueda,   setBusqueda]   = useState('')
+  const [seleccion,  setSeleccion]  = useState(null)
+  const [form,       setForm]       = useState(null)
+  const [esNuevo,    setEsNuevo]    = useState(false)
+  const [guardando,  setGuardando]  = useState(false)
+  const [msg,        setMsg]        = useState(null)
+  const [confirmDel, setConfirmDel] = useState(false)
+  const busqTimer = useRef(null)
+
+  useEffect(() => { cargar('') }, [])
+
+  async function cargar(q) {
+    const query = supabase.from('vendedores')
+      .select('id,cedula,nombre,celular1,celular2,empresa,porcentaje_comision,activo', { count:'exact' })
+      .order('nombre', { ascending:true })
+      .limit(200)
+    const { data, count } = q.trim()
+      ? await query.or(`nombre.ilike.%${q}%,cedula.ilike.%${q}%`)
+      : await query
     setLista(data || [])
+    setTotal(count || 0)
+  }
+
+  function onBusqueda(v) {
+    setBusqueda(v)
+    clearTimeout(busqTimer.current)
+    busqTimer.current = setTimeout(() => cargar(v), 350)
+  }
+
+  async function seleccionar(v) {
+    setSeleccion(v); setConfirmDel(false); setMsg(null)
+    const { data } = await supabase.from('vendedores').select('*').eq('id', v.id).single()
+    setForm({ ...FORM_VACIO, ...data })
+    setEsNuevo(false)
   }
 
   function nuevo() {
-    setForm(VACIO); setEsNuevo(true); setMsg(null)
+    setSeleccion(null); setConfirmDel(false); setMsg(null)
+    setForm({ ...FORM_VACIO }); setEsNuevo(true)
   }
 
-  function seleccionar(v) {
-    setForm({ ...VACIO, ...v }); setEsNuevo(false); setMsg(null)
+  function cancelar() {
+    setForm(null); setSeleccion(null); setEsNuevo(false); setMsg(null); setConfirmDel(false)
   }
 
-  function upd(k, v) { setForm(p => ({ ...p, [k]: v })) }
+  const set = (campo, val) => setForm(f => ({ ...f, [campo]: val }))
 
   async function guardar() {
     setMsg(null)
-    if (!form.cedvended.trim()) return setMsg({ ok:false, txt:'La cédula/código es obligatorio.' })
-    if (!form.nomvended.trim()) return setMsg({ ok:false, txt:'El nombre es obligatorio.' })
-    setBusy(true)
-    const reg = {
-      cedvended:  form.cedvended.trim(),
-      nomvended:  form.nomvended.trim(),
-      celular1:   form.celular1||'',
-      celular2:   form.celular2||'',
-      empresa:    form.empresa||'',
-      usuario:    usuario?.usuario || usuario?.nombre || 'admin',
-      fecregistr: new Date().toISOString(),
-    }
-    const { error } = esNuevo
-      ? await supabase.from('vendedores').insert(reg)
-      : await supabase.from('vendedores').update(reg).eq('cedvended', form.cedvended)
-    setBusy(false)
-    if (error) { setMsg({ ok:false, txt: error.message }); return }
-    setMsg({ ok:true, txt: esNuevo ? '✅ Vendedor creado.' : '✅ Vendedor actualizado.' })
-    await cargar()
-    if (esNuevo) setEsNuevo(false)
+    if (!form.nombre.trim()) { setMsg({ ok:false, txt:'El nombre es obligatorio.' }); return }
+    setGuardando(true)
+    try {
+      const payload = {
+        cedula:               form.cedula.trim()  || null,
+        nombre:               form.nombre.trim().toUpperCase(),
+        celular1:             form.celular1.trim() || null,
+        celular2:             form.celular2.trim() || null,
+        empresa:              form.empresa.trim()  || null,
+        porcentaje_comision:  Number(form.porcentaje_comision) || 0,
+        activo:               form.activo,
+      }
+      if (esNuevo) {
+        if (form.cedula.trim()) {
+          const { data:existe } = await supabase.from('vendedores').select('id').eq('cedula', form.cedula.trim()).limit(1)
+          if (existe && existe.length > 0) { setMsg({ ok:false, txt:'Ya existe un vendedor con esa cédula.' }); setGuardando(false); return }
+        }
+        const { data, error } = await supabase.from('vendedores').insert(payload).select().single()
+        if (error) throw error
+        setMsg({ ok:true, txt:'Vendedor creado correctamente.' })
+        setEsNuevo(false); setSeleccion(data); setForm({ ...FORM_VACIO, ...data })
+      } else {
+        const { error } = await supabase.from('vendedores').update(payload).eq('id', form.id)
+        if (error) throw error
+        setMsg({ ok:true, txt:'Vendedor actualizado correctamente.' })
+      }
+      cargar(busqueda)
+    } catch(e) { setMsg({ ok:false, txt:'Error: ' + (e.message || e) }) }
+    setGuardando(false)
   }
 
-  async function eliminar() {
-    if (!window.confirm(`¿Eliminar a ${form.nomvended}? Esta acción no se puede deshacer.`)) return
-    setBusy(true)
-    const { error } = await supabase.from('vendedores').delete().eq('cedvended', form.cedvended)
-    setBusy(false)
-    if (error) { setMsg({ ok:false, txt: error.message }); return }
-    setMsg({ ok:true, txt:'Vendedor eliminado.' })
-    setForm(VACIO); setEsNuevo(true)
-    await cargar()
+  async function retirar() {
+    if (!confirmDel) { setConfirmDel(true); return }
+    setGuardando(true)
+    try {
+      const { error } = await supabase.from('vendedores').update({ activo:false }).eq('id', form.id)
+      if (error) throw error
+      setMsg({ ok:true, txt:'Vendedor retirado (quedó inactivo y no aparecerá en el combo de notas).' })
+      setConfirmDel(false); cargar(busqueda); cancelar()
+    } catch(e) { setMsg({ ok:false, txt:'Error: ' + (e.message || e) }) }
+    setGuardando(false)
   }
-
-  const filtrados = lista.filter(v =>
-    v.nomvended?.toLowerCase().includes(busq.toLowerCase()) ||
-    v.cedvended?.toString().includes(busq)
-  )
 
   return (
     <div style={S.wrap}>
-      {/* Header */}
       <div style={S.header}>
-        <div style={S.logoTxt}>
-          <span style={{fontFamily:'Arial Black',fontWeight:900,fontSize:18,color:'#fff',letterSpacing:3}}>ATM</span>
-          <span style={{fontSize:9,color:'rgba(255,255,255,0.8)',letterSpacing:2}}>A TU MEDIDA</span>
-        </div>
-        <span style={S.hTitle}>👤 VENDEDORES</span>
-        <button onClick={nuevo}    style={S.hBtn}>➕ Nuevo</button>
-        <button onClick={onClose}  style={S.hBtn}>← Menú</button>
+        <img src={LOGO} alt="ATM" style={{ height:32 }} />
+        <span style={S.hTitle}>GESTIÓN DE VENDEDORES</span>
+        <button style={S.hBtn} onClick={nuevo}>+ Nuevo</button>
+        <button style={S.hBtn} onClick={onClose}>✕ Cerrar</button>
       </div>
 
       <div style={S.body}>
@@ -86,18 +159,23 @@ export default function Vendedores({ supabase, usuario, onClose }) {
         <div style={S.lista}>
           <div style={S.lHead}>
             <input style={S.lBusq} placeholder="Buscar por nombre o cédula…"
-              value={busq} onChange={e => setBusq(e.target.value)}/>
-            <span style={S.lTotal}>{filtrados.length} vendedor{filtrados.length!==1?'es':''}</span>
+              value={busqueda} onChange={e => onBusqueda(e.target.value)} autoFocus />
+            <span style={S.lTotal}>{total} vendedor{total !== 1 ? 'es' : ''}</span>
           </div>
           <div style={S.lTabla}>
-            {filtrados.length === 0
-              ? <div style={S.lEmpty}>No hay vendedores{busq?' con ese criterio':' registrados'}.</div>
-              : filtrados.map(v => (
-                <div key={v.cedvended}
-                  onClick={() => seleccionar(v)}
-                  style={form.cedvended===String(v.cedvended) ? S.lFilaSel : S.lFila}>
-                  <span style={S.lNom}>{v.nomvended}</span>
-                  <span style={S.lSub}>Cód: {v.cedvended}{v.celular1 ? ` · ${v.celular1}` : ''}{v.empresa ? ` · ${v.empresa}` : ''}</span>
+            {lista.length === 0
+              ? <div style={S.lEmpty}>No hay resultados</div>
+              : lista.map(v => (
+                <div key={v.id} style={seleccion?.id === v.id ? S.lFilaSel : S.lFila} onClick={() => seleccionar(v)}>
+                  <div style={S.lNom}>
+                    {v.nombre}
+                    {v.activo === false && <span style={{ ...S.badge, ...S.badgeNo }}>Retirado</span>}
+                  </div>
+                  <div style={S.lSub}>
+                    {v.cedula && <span>Céd: {v.cedula} · </span>}
+                    {v.celular1 || ''}
+                    {v.empresa ? ` · ${v.empresa}` : ''}
+                  </div>
                 </div>
               ))
             }
@@ -105,99 +183,77 @@ export default function Vendedores({ supabase, usuario, onClose }) {
         </div>
 
         {/* Formulario */}
-        <div style={S.form}>
-          <div style={S.fTitulo}>{esNuevo ? '➕ Nuevo Vendedor' : `✏️ Editar — ${form.nomvended}`}</div>
+        {form ? (
+          <div style={S.form}>
+            <div style={S.fTitulo}>
+              {esNuevo ? '➕ Nuevo Vendedor' : `✏️ Editar Vendedor — ${form.nombre}`}
+            </div>
 
-          {msg && <div style={msg.ok ? {...S.msg,...S.msgOk} : {...S.msg,...S.msgErr}}>{msg.txt}</div>}
+            {msg && <div style={{ ...S.msg, ...(msg.ok ? S.msgOk : S.msgErr) }}>{msg.txt}</div>}
 
-          <div style={S.fila}>
-            <Fld label="Cédula / Código" requerido w={160}>
-              <input style={{...S.inp, background: esNuevo?'#fff':'#f5f5f5'}}
-                value={form.cedvended} readOnly={!esNuevo}
-                onChange={e => upd('cedvended', e.target.value)}
-                placeholder="Ej: 13"/>
-            </Fld>
+            <div style={S.fila}>
+              <Fld label="Cédula" w={160}>
+                <input style={S.inp} value={form.cedula || ''}
+                  onChange={e => set('cedula', e.target.value)} placeholder="Cédula o código" />
+              </Fld>
+              <Fld label="Estado" w={130}>
+                <select style={S.inp} value={form.activo ? 'true' : 'false'}
+                  onChange={e => set('activo', e.target.value === 'true')}>
+                  <option value="true">Activo</option>
+                  <option value="false">Retirado</option>
+                </select>
+              </Fld>
+              <Fld label="% Comisión" w={120}>
+                <input style={S.inp} type="number" min={0} max={100} value={form.porcentaje_comision || 0}
+                  onChange={e => set('porcentaje_comision', e.target.value)} placeholder="0" />
+              </Fld>
+            </div>
+
             <Fld label="Nombre completo" requerido>
-              <input style={S.inp} value={form.nomvended}
-                onChange={e => upd('nomvended', e.target.value)}
-                placeholder="Nombre del vendedor"/>
+              <input style={S.inp} value={form.nombre || ''}
+                onChange={e => set('nombre', e.target.value)} placeholder="Nombre del vendedor" />
             </Fld>
-          </div>
 
-          <div style={S.fila}>
-            <Fld label="Celular 1" w={180}>
-              <input style={S.inp} value={form.celular1}
-                onChange={e => upd('celular1', e.target.value)}
-                placeholder="3XX XXX XXXX"/>
-            </Fld>
-            <Fld label="Celular 2" w={180}>
-              <input style={S.inp} value={form.celular2}
-                onChange={e => upd('celular2', e.target.value)}
-                placeholder="Opcional"/>
-            </Fld>
+            <div style={S.fila}>
+              <Fld label="Celular 1">
+                <input style={S.inp} value={form.celular1 || ''}
+                  onChange={e => set('celular1', e.target.value)} placeholder="3XX XXX XXXX" />
+              </Fld>
+              <Fld label="Celular 2">
+                <input style={S.inp} value={form.celular2 || ''}
+                  onChange={e => set('celular2', e.target.value)} placeholder="Opcional" />
+              </Fld>
+            </div>
+
             <Fld label="Empresa / Punto de venta">
-              <input style={S.inp} value={form.empresa}
-                onChange={e => upd('empresa', e.target.value)}
-                placeholder="Ej: PUNTO DE VENTA ATM"/>
+              <input style={S.inp} value={form.empresa || ''}
+                onChange={e => set('empresa', e.target.value)} placeholder="Ej: PUNTO DE VENTA ATM" />
             </Fld>
-          </div>
 
-          <div style={S.btnBar}>
-            <button onClick={guardar} disabled={busy} style={{...S.btn,...S.btnSave}}>
-              💾 {busy ? 'Guardando…' : 'Guardar'}
-            </button>
-            {!esNuevo && (
-              <button onClick={eliminar} disabled={busy} style={{...S.btn,...S.btnDel}}>
-                🗑 Eliminar
+            <div style={S.btnBar}>
+              <button style={{ ...S.btn, ...S.btnSave }} onClick={guardar} disabled={guardando}>
+                💾 {guardando ? 'Guardando…' : 'Guardar'}
               </button>
-            )}
-            <button onClick={nuevo} style={{...S.btn,...S.btnNew}}>➕ Nuevo</button>
-            <button onClick={onClose} style={{...S.btn,...S.btnCx}}>← Menú</button>
+              {!esNuevo && (
+                <button style={{ ...S.btn, ...S.btnDel, background: confirmDel ? '#b71c1c' : '#e53935' }}
+                  onClick={retirar} disabled={guardando}>
+                  🚪 {confirmDel ? '¿Confirmar retiro?' : 'Retirar'}
+                </button>
+              )}
+              <button style={{ ...S.btn, ...S.btnNew }} onClick={nuevo} disabled={guardando}>➕ Nuevo</button>
+              <button style={{ ...S.btn, ...S.btnCx }} onClick={cancelar} disabled={guardando}>Cancelar</button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={S.vacio}>
+            <span style={{ fontSize:48 }}>🙋</span>
+            <span>Selecciona un vendedor de la lista o crea uno nuevo</span>
+            <button style={{ ...S.btn, ...S.btnNew, fontSize:14, padding:'10px 24px' }} onClick={nuevo}>
+              ➕ Nuevo Vendedor
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
-}
-
-function Fld({ label, children, requerido, w }) {
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:4, flex: w ? `0 0 ${w}px` : 1 }}>
-      <label style={S.lbl}>{label}{requerido && <span style={{color:'#e53935'}}> *</span>}</label>
-      {children}
-    </div>
-  )
-}
-
-const S = {
-  wrap:    { position:'fixed',inset:0,background:'#f0f2f5',zIndex:1000,display:'flex',flexDirection:'column',fontFamily:'Arial,sans-serif' },
-  header:  { background:'linear-gradient(90deg,#1a3a6b,#2c5fa8)',color:'#fff',padding:'8px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0 },
-  logoTxt: { display:'flex',flexDirection:'column',marginRight:8,lineHeight:1.1 },
-  hTitle:  { fontSize:15,fontWeight:900,flex:1,letterSpacing:2 },
-  hBtn:    { background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:6,padding:'5px 14px',cursor:'pointer',fontSize:12,fontWeight:'bold' },
-  body:    { display:'flex',flex:1,overflow:'hidden' },
-  lista:   { width:320,background:'#fff',borderRight:'1px solid #ddd',display:'flex',flexDirection:'column',flexShrink:0 },
-  lHead:   { padding:'10px 12px',borderBottom:'1px solid #eee',display:'flex',gap:8,alignItems:'center' },
-  lBusq:   { flex:1,border:'1px solid #ccc',borderRadius:5,padding:'6px 10px',fontSize:13 },
-  lTotal:  { fontSize:11,color:'#666',whiteSpace:'nowrap' },
-  lTabla:  { flex:1,overflowY:'auto' },
-  lFila:   { padding:'10px 12px',borderBottom:'1px solid #f0f0f0',cursor:'pointer' },
-  lFilaSel:{ padding:'10px 12px',borderBottom:'1px solid #f0f0f0',cursor:'pointer',background:'#e3f2fd' },
-  lNom:    { fontSize:13,fontWeight:'bold',color:'#1a3a6b' },
-  lSub:    { fontSize:11,color:'#888',marginTop:2 },
-  lEmpty:  { padding:40,textAlign:'center',color:'#999',fontSize:13 },
-  form:    { flex:1,padding:24,overflowY:'auto',display:'flex',flexDirection:'column',gap:16 },
-  fTitulo: { fontSize:15,fontWeight:'bold',color:'#1a3a6b',borderBottom:'2px solid #1a3a6b',paddingBottom:8 },
-  fila:    { display:'flex',gap:14,flexWrap:'wrap' },
-  lbl:     { fontSize:11,fontWeight:'bold',color:'#555',textTransform:'uppercase' },
-  inp:     { border:'1px solid #ccc',borderRadius:5,padding:'8px 10px',fontSize:13,width:'100%',boxSizing:'border-box',outline:'none' },
-  btnBar:  { display:'flex',gap:8,paddingTop:12,borderTop:'1px solid #eee',marginTop:4 },
-  btn:     { display:'flex',alignItems:'center',gap:6,padding:'8px 18px',border:'none',borderRadius:6,cursor:'pointer',fontSize:13,fontWeight:'bold' },
-  btnSave: { background:'#1a3a6b',color:'#fff' },
-  btnDel:  { background:'#e53935',color:'#fff' },
-  btnNew:  { background:'#2e7d32',color:'#fff' },
-  btnCx:   { background:'#eee',color:'#333' },
-  msg:     { borderRadius:6,padding:'8px 14px',fontSize:13,fontWeight:'bold' },
-  msgOk:   { background:'#e8f5e9',color:'#2e7d32',border:'1px solid #a5d6a7' },
-  msgErr:  { background:'#fdecea',color:'#c62828',border:'1px solid #ef9a9a' },
 }
