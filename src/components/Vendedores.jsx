@@ -1,6 +1,4 @@
 // src/components/Vendedores.jsx
-// Gestión de vendedores — mismo diseño que Clientes.jsx
-
 import { useState, useEffect, useRef } from 'react'
 import { LOGO } from '../lib/assets'
 
@@ -9,7 +7,7 @@ const S = {
   header:  { background:'#1a1a2e',color:'#fff',padding:'8px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0 },
   hTitle:  { fontSize:16,fontWeight:'bold',flex:1 },
   hBtn:    { background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'5px 14px',cursor:'pointer',fontSize:12,fontWeight:'bold' },
-  body:    { display:'flex',flex:1,overflow:'hidden',gap:0 },
+  body:    { display:'flex',flex:1,overflow:'hidden' },
   lista:   { width:360,background:'#fff',borderRight:'1px solid #ddd',display:'flex',flexDirection:'column',flexShrink:0 },
   lHead:   { padding:'10px 12px',borderBottom:'1px solid #eee',display:'flex',gap:8,alignItems:'center' },
   lBusq:   { flex:1,border:'1px solid #ccc',borderRadius:5,padding:'6px 10px',fontSize:13 },
@@ -41,7 +39,7 @@ const S = {
   vacio:   { flex:1,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:12,color:'#bbb' },
 }
 
-const FORM_VACIO = { cedula:'', nombre:'', celular1:'', celular2:'', empresa:'', porcentaje_comision:0, activo:true }
+const FORM_VACIO = { cedula:'', nombre:'', celular:'', porcentaje_comision:0, activo:true }
 
 const Fld = ({ label, children, requerido, w }) => (
   <div style={{ ...S.grp, flex: w ? `0 0 ${w}px` : 1 }}>
@@ -66,12 +64,13 @@ export default function Vendedores({ supabase, onClose }) {
 
   async function cargar(q) {
     const query = supabase.from('vendedores')
-      .select('id,cedula,nombre,celular1,celular2,empresa,porcentaje_comision,activo', { count:'exact' })
+      .select('id,cedula,nombre,celular,porcentaje_comision,activo', { count:'exact' })
       .order('nombre', { ascending:true })
       .limit(200)
-    const { data, count } = q.trim()
+    const { data, count, error } = q.trim()
       ? await query.or(`nombre.ilike.%${q}%,cedula.ilike.%${q}%`)
       : await query
+    if (error) console.error('Error cargando vendedores:', error)
     setLista(data || [])
     setTotal(count || 0)
   }
@@ -106,20 +105,20 @@ export default function Vendedores({ supabase, onClose }) {
     setGuardando(true)
     try {
       const payload = {
-        cedula:               form.cedula.trim()  || null,
-        nombre:               form.nombre.trim().toUpperCase(),
-        celular1:             form.celular1.trim() || null,
-        celular2:             form.celular2.trim() || null,
-        empresa:              form.empresa.trim()  || null,
-        porcentaje_comision:  Number(form.porcentaje_comision) || 0,
-        activo:               form.activo,
+        cedula:              form.cedula.trim()  || null,
+        nombre:              form.nombre.trim().toUpperCase(),
+        celular:             form.celular.trim() || null,
+        porcentaje_comision: Number(form.porcentaje_comision) || 0,
+        activo:              form.activo,
       }
       if (esNuevo) {
         if (form.cedula.trim()) {
           const { data:existe } = await supabase.from('vendedores').select('id').eq('cedula', form.cedula.trim()).limit(1)
-          if (existe && existe.length > 0) { setMsg({ ok:false, txt:'Ya existe un vendedor con esa cédula.' }); setGuardando(false); return }
+          if (existe?.length > 0) { setMsg({ ok:false, txt:'Ya existe un vendedor con esa cédula.' }); setGuardando(false); return }
         }
-        const { data, error } = await supabase.from('vendedores').insert(payload).select().single()
+        const { data, error } = await supabase.from('vendedores')
+          .insert({ ...payload, fecha_registro: new Date().toISOString() })
+          .select().single()
         if (error) throw error
         setMsg({ ok:true, txt:'Vendedor creado correctamente.' })
         setEsNuevo(false); setSeleccion(data); setForm({ ...FORM_VACIO, ...data })
@@ -139,7 +138,7 @@ export default function Vendedores({ supabase, onClose }) {
     try {
       const { error } = await supabase.from('vendedores').update({ activo:false }).eq('id', form.id)
       if (error) throw error
-      setMsg({ ok:true, txt:'Vendedor retirado (quedó inactivo y no aparecerá en el combo de notas).' })
+      setMsg({ ok:true, txt:'Vendedor retirado. Ya no aparecerá en el combo de notas.' })
       setConfirmDel(false); cargar(busqueda); cancelar()
     } catch(e) { setMsg({ ok:false, txt:'Error: ' + (e.message || e) }) }
     setGuardando(false)
@@ -155,7 +154,6 @@ export default function Vendedores({ supabase, onClose }) {
       </div>
 
       <div style={S.body}>
-        {/* Lista */}
         <div style={S.lista}>
           <div style={S.lHead}>
             <input style={S.lBusq} placeholder="Buscar por nombre o cédula…"
@@ -164,17 +162,18 @@ export default function Vendedores({ supabase, onClose }) {
           </div>
           <div style={S.lTabla}>
             {lista.length === 0
-              ? <div style={S.lEmpty}>No hay resultados</div>
+              ? <div style={S.lEmpty}>No hay vendedores registrados.</div>
               : lista.map(v => (
-                <div key={v.id} style={seleccion?.id === v.id ? S.lFilaSel : S.lFila} onClick={() => seleccionar(v)}>
+                <div key={v.id} style={seleccion?.id === v.id ? S.lFilaSel : S.lFila}
+                  onClick={() => seleccionar(v)}>
                   <div style={S.lNom}>
                     {v.nombre}
                     {v.activo === false && <span style={{ ...S.badge, ...S.badgeNo }}>Retirado</span>}
                   </div>
                   <div style={S.lSub}>
-                    {v.cedula && <span>Céd: {v.cedula} · </span>}
-                    {v.celular1 || ''}
-                    {v.empresa ? ` · ${v.empresa}` : ''}
+                    {v.cedula ? `Céd: ${v.cedula}` : ''}
+                    {v.celular ? ` · ${v.celular}` : ''}
+                    {v.porcentaje_comision > 0 ? ` · Comisión: ${v.porcentaje_comision}%` : ''}
                   </div>
                 </div>
               ))
@@ -182,21 +181,20 @@ export default function Vendedores({ supabase, onClose }) {
           </div>
         </div>
 
-        {/* Formulario */}
         {form ? (
           <div style={S.form}>
             <div style={S.fTitulo}>
-              {esNuevo ? '➕ Nuevo Vendedor' : `✏️ Editar Vendedor — ${form.nombre}`}
+              {esNuevo ? '➕ Nuevo Vendedor' : `✏️ Editar — ${form.nombre}`}
             </div>
 
             {msg && <div style={{ ...S.msg, ...(msg.ok ? S.msgOk : S.msgErr) }}>{msg.txt}</div>}
 
             <div style={S.fila}>
-              <Fld label="Cédula" w={160}>
+              <Fld label="Cédula" w={180}>
                 <input style={S.inp} value={form.cedula || ''}
                   onChange={e => set('cedula', e.target.value)} placeholder="Cédula o código" />
               </Fld>
-              <Fld label="Estado" w={130}>
+              <Fld label="Estado" w={140}>
                 <select style={S.inp} value={form.activo ? 'true' : 'false'}
                   onChange={e => set('activo', e.target.value === 'true')}>
                   <option value="true">Activo</option>
@@ -204,30 +202,22 @@ export default function Vendedores({ supabase, onClose }) {
                 </select>
               </Fld>
               <Fld label="% Comisión" w={120}>
-                <input style={S.inp} type="number" min={0} max={100} value={form.porcentaje_comision || 0}
-                  onChange={e => set('porcentaje_comision', e.target.value)} placeholder="0" />
+                <input style={S.inp} type="number" min={0} max={100}
+                  value={form.porcentaje_comision || 0}
+                  onChange={e => set('porcentaje_comision', e.target.value)} />
               </Fld>
             </div>
 
             <Fld label="Nombre completo" requerido>
               <input style={S.inp} value={form.nombre || ''}
-                onChange={e => set('nombre', e.target.value)} placeholder="Nombre del vendedor" />
+                onChange={e => set('nombre', e.target.value)}
+                placeholder="Nombre del vendedor" />
             </Fld>
 
-            <div style={S.fila}>
-              <Fld label="Celular 1">
-                <input style={S.inp} value={form.celular1 || ''}
-                  onChange={e => set('celular1', e.target.value)} placeholder="3XX XXX XXXX" />
-              </Fld>
-              <Fld label="Celular 2">
-                <input style={S.inp} value={form.celular2 || ''}
-                  onChange={e => set('celular2', e.target.value)} placeholder="Opcional" />
-              </Fld>
-            </div>
-
-            <Fld label="Empresa / Punto de venta">
-              <input style={S.inp} value={form.empresa || ''}
-                onChange={e => set('empresa', e.target.value)} placeholder="Ej: PUNTO DE VENTA ATM" />
+            <Fld label="Celular" w={220}>
+              <input style={S.inp} value={form.celular || ''}
+                onChange={e => set('celular', e.target.value)}
+                placeholder="3XX XXX XXXX" />
             </Fld>
 
             <div style={S.btnBar}>
@@ -240,8 +230,12 @@ export default function Vendedores({ supabase, onClose }) {
                   🚪 {confirmDel ? '¿Confirmar retiro?' : 'Retirar'}
                 </button>
               )}
-              <button style={{ ...S.btn, ...S.btnNew }} onClick={nuevo} disabled={guardando}>➕ Nuevo</button>
-              <button style={{ ...S.btn, ...S.btnCx }} onClick={cancelar} disabled={guardando}>Cancelar</button>
+              <button style={{ ...S.btn, ...S.btnNew }} onClick={nuevo} disabled={guardando}>
+                ➕ Nuevo
+              </button>
+              <button style={{ ...S.btn, ...S.btnCx }} onClick={cancelar} disabled={guardando}>
+                Cancelar
+              </button>
             </div>
           </div>
         ) : (
