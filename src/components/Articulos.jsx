@@ -143,7 +143,7 @@ export default function Articulos({ supabase, onClose }) {
     <div style={P.pagina}>
       {modal==='marca'    && <ModalNuevaMarca       supabase={supabase} onGuardar={onMarcaGuardada}  onClose={()=>setModal(null)}/>}
       {modal==='prov'     && <ModalNuevoProveedor   supabase={supabase} onGuardar={onProvGuardado}   onClose={()=>setModal(null)}/>}
-      {modal==='listado'  && <ModalListadoArticulos supabase={supabase}                              onClose={()=>setModal(null)}/>}
+      {modal==='listado'  && <ModalListadoArticulos supabase={supabase} onSelect={cod=>cargarDoc(cod)} onClose={()=>setModal(null)}/>}
 
       <div style={P.ventana}>
         {/* TÍTULO */}

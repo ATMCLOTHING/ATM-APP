@@ -998,13 +998,10 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
               ))}
             </div>
             <Fld label="Vendedor" w={240}>
-              <select style={{...P.inp,cursor:'pointer'}}
-                value={cedVend} onChange={e=>elegirVendedor(e.target.value)} disabled={anulada && !desbloqueada}>
-                <option value="">-- Selecciona vendedor --</option>
-                {listaVend.map(v=>(
-                  <option key={v.id} value={v.cedula}>{v.cedula} - {v.nombre}</option>
-                ))}
-              </select>
+              <VendedorInput
+                listaVend={listaVend} cedVend={cedVend}
+                onChange={elegirVendedor} disabled={anulada && !desbloqueada}
+              />
             </Fld>
           </div>
         </div>
@@ -1140,6 +1137,90 @@ function BtnAcc({onClick,icon,children,disabled}){
       style={{background:disabled?'#f0f0f0':'#eef2ff',border:'1px solid #c8d5ea',borderRadius:8,padding:'7px 11px',cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.5:1,fontSize:12,fontWeight:700,color:'#1a3a6b',display:'flex',alignItems:'center',gap:5}}>
       <span>{icon}</span>{children}
     </button>
+  )
+}
+
+// ── Selector de vendedor con búsqueda por nombre o cédula ──────────────
+function VendedorInput({ listaVend, cedVend, onChange, disabled }) {
+  const [txt,      setTxt]      = useState('')
+  const [abierto,  setAbierto]  = useState(false)
+  const [filtrado, setFiltrado] = useState([])
+  const wrapRef = useRef(null)
+
+  // texto a mostrar cuando hay uno seleccionado
+  const seleccionado = listaVend.find(v => v.cedula === cedVend)
+  const etiqueta     = seleccionado ? `${seleccionado.cedula} - ${seleccionado.nombre}` : ''
+
+  // cerrar si se hace clic fuera
+  useEffect(() => {
+    function handleClick(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setAbierto(false) }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function abrir() {
+    if (disabled) return
+    setTxt(''); setFiltrado(listaVend); setAbierto(true)
+  }
+
+  function onInput(v) {
+    setTxt(v)
+    const q = v.toLowerCase()
+    setFiltrado(listaVend.filter(x =>
+      x.nombre.toLowerCase().includes(q) || (x.cedula||'').includes(q)
+    ))
+  }
+
+  function elegir(v) {
+    onChange(v.cedula); setAbierto(false); setTxt('')
+  }
+
+  function limpiar(e) {
+    e.stopPropagation(); onChange(''); setAbierto(false); setTxt('')
+  }
+
+  return (
+    <div ref={wrapRef} style={{position:'relative'}}>
+      <div style={{display:'flex',gap:3}}>
+        <div onClick={abrir} style={{...P.inp, flex:1, cursor:disabled?'not-allowed':'pointer',
+          background:disabled?'#f0f4ff':'#fff', display:'flex', alignItems:'center',
+          color: cedVend ? '#1a3a6b' : '#999', userSelect:'none', overflow:'hidden',
+          whiteSpace:'nowrap', textOverflow:'ellipsis', paddingRight:4}}>
+          {cedVend ? etiqueta : '-- Selecciona vendedor --'}
+        </div>
+        {cedVend && !disabled && (
+          <button onClick={limpiar} title="Quitar vendedor"
+            style={{...P.inp, width:24, padding:0, cursor:'pointer', textAlign:'center',
+              background:'#fdecea', color:'#c62828', fontWeight:900, fontSize:13, flexShrink:0}}>
+            ✕
+          </button>
+        )}
+      </div>
+
+      {abierto && (
+        <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:200,
+          background:'#fff',border:'1px solid #c8d5ea',borderRadius:5,
+          boxShadow:'0 6px 20px rgba(0,0,0,0.15)',maxHeight:260,display:'flex',flexDirection:'column'}}>
+          <input autoFocus value={txt} onChange={e=>onInput(e.target.value)}
+            placeholder="Escribe nombre o cédula…"
+            style={{border:'none',borderBottom:'1px solid #e0e7f0',padding:'6px 10px',
+              fontSize:12,outline:'none',flexShrink:0}}/>
+          <div style={{overflowY:'auto',flex:1}}>
+            {filtrado.length === 0
+              ? <div style={{padding:'10px',textAlign:'center',color:'#aaa',fontSize:12}}>Sin resultados</div>
+              : filtrado.map(v=>(
+                <div key={v.id} onClick={()=>elegir(v)}
+                  style={{padding:'7px 10px',cursor:'pointer',fontSize:12,
+                    borderBottom:'1px solid #f0f0f0',
+                    background: v.cedula===cedVend ? '#e3f2fd' : 'transparent'}}>
+                  <strong style={{color:'#1a3a6b'}}>{v.cedula}</strong> — {v.nombre}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

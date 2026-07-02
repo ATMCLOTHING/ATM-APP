@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 
-export default function ModalListadoArticulos({ supabase, onClose }) {
+export default function ModalListadoArticulos({ supabase, onSelect, onClose }) {
   const [articulos, setArticulos] = useState([])
   const [marcas,    setMarcas]    = useState([])
   const [filtMarca, setFiltMarca] = useState('')
@@ -137,7 +137,10 @@ export default function ModalListadoArticulos({ supabase, onClose }) {
                 <tr><td colSpan={10} style={{textAlign:'center',padding:20,color:'#888'}}>No hay artículos con esos filtros.</td></tr>
               )}
               {articulos.map((a,i)=>(
-                <tr key={a.codartic} style={{background:i%2===0?'#fff':'#f5f7fc',fontSize:12}}>
+                <tr key={a.codartic}
+                  onClick={()=>{ if(onSelect){ onSelect(a.codartic); onClose() } }}
+                  style={{background:i%2===0?'#fff':'#f5f7fc',fontSize:12,cursor:onSelect?'pointer':'default'}}
+                  title={onSelect?`Abrir artículo ${a.codartic}`:undefined}>
                   <td style={{...S.td,fontWeight:700,color:'#1a3a6b'}}>{a.codartic}</td>
                   <td style={S.td}>{a.descartic}</td>
                   <td style={S.td}>{a.tipo||''}</td>
