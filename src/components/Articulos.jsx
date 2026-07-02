@@ -89,6 +89,7 @@ export default function Articulos({ supabase, onClose }) {
     try {
       const {error}=await supabase.from('articulo').upsert({...form},{onConflict:'codartic'})
       if(error)throw error
+
       // sincronizar precios y datos en articomp
       await supabase.from('articomp').update({
         preciocomp:form.preciocomp, preciovent:form.preciovent,
@@ -96,6 +97,32 @@ export default function Articulos({ supabase, onClose }) {
         descartic:form.descartic, marca:form.marca,
         genero:form.genero, tipo:form.tipo,
       }).eq('codartic',form.codartic)
+
+      // si es artículo nuevo (tipotalla='U'), crear fila en articomp si no existe
+      const {data:existe} = await supabase.from('articomp')
+        .select('codartic').eq('codartic',form.codartic).limit(1)
+      if (!existe || existe.length === 0) {
+        await supabase.from('articomp').insert({
+          codartic:   form.codartic,
+          descartic:  form.descartic,
+          talla:      form.tipotalla || 'U',
+          marca:      form.marca     || '',
+          genero:     form.genero    || '',
+          tipo:       form.tipo      || '',
+          tipotalla:  form.tipotalla || 'U',
+          preciocomp: form.preciocomp || 0,
+          preciovent: form.preciovent || 0,
+          preciovend: form.preciovend || 0,
+          preciovenv: form.preciovenv || 0,
+          porciva:    0,
+          cantactual: form.cantactual || 0,
+          existencia: form.existencia || 0,
+          existminim: form.existminim || 0,
+          estado:     form.estado    || 'A',
+          codproveed: form.codproveed|| '',
+          nomproveed: form.nomproveed|| '',
+        })
+      }
       setGuardado(true); setModoNueva(false)
       setMsg({tipo:'ok',texto:`✅ Artículo ${form.codartic} guardado.`})
       const ids=await recargarIds()
