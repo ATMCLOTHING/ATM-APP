@@ -98,7 +98,7 @@ export default function Articulos({ supabase, onClose }) {
         genero:form.genero, tipo:form.tipo,
       }).eq('codartic',form.codartic)
 
-      // si es artículo nuevo (tipotalla='U'), crear fila en articomp si no existe
+      // si es artículo nuevo, crear fila en articomp si no existe
       const {data:existe} = await supabase.from('articomp')
         .select('codartic').eq('codartic',form.codartic).limit(1)
       if (!existe || existe.length === 0) {
@@ -115,12 +115,9 @@ export default function Articulos({ supabase, onClose }) {
           preciovend: form.preciovend || 0,
           preciovenv: form.preciovenv || 0,
           porciva:    0,
-          cantactual: form.cantactual || 0,
           existencia: form.existencia || 0,
           existminim: form.existminim || 0,
           estado:     form.estado    || 'A',
-          codproveed: form.codproveed|| '',
-          nomproveed: form.nomproveed|| '',
         })
       }
       setGuardado(true); setModoNueva(false)
