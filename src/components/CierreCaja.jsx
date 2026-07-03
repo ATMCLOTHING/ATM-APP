@@ -393,6 +393,110 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
   }
 
+
+  function calcPorUsuario() {
+    if (!datos) return null
+    const { notas, detalle, abonos, vendMap, digitalPorNota } = datos
+    const usuarios = {}
+    const get = (usu) => {
+      if (!usuarios[usu]) usuarios[usu] = {
+        efectivo:0, transferencia:0, mixto:0, totalIngresado:0,
+        ventaContado:0, ventaCredito:0, prendas:0, notas:0, cobroCartera:0,
+        porMarca:{}, porVendedor:{},
+      }
+      return usuarios[usu]
+    }
+    const notasHoy = new Set(notas.map(n=>n.numnotaent))
+    notas.forEach(n => {
+      const usu  = (n.usuario||'Sin usuario').trim()
+      const u    = get(usu)
+      const medio= normMedio(n.mediopago)
+      const esC  = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
+      const valD = digitalPorNota[n.numnotaent]||0
+      const val  = (n.valtotal||0) - valD
+      u.notas++; u.prendas += n.cantotal||0
+      if (esC) {
+        u.ventaCredito += val
+      } else {
+        u.ventaContado += val
+        if (medio==='efectivo')           { u.efectivo      += val; u.totalIngresado += val }
+        else if (medio==='transferencia') { u.transferencia += val; u.totalIngresado += val }
+        else                              { u.mixto         += val; u.totalIngresado += val }
+      }
+      const cedv = String(n.cedvended||'')
+      const nomV = cedv ? (vendMap[cedv]||`Vendedor ${cedv}`) : 'Sin vendedor'
+      if (!u.porVendedor[cedv]) u.porVendedor[cedv] = {nombre:nomV, contado:0, credito:0}
+      if (esC) u.porVendedor[cedv].credito += val
+      else     u.porVendedor[cedv].contado += val
+    })
+    abonos.forEach(a => {
+      if (notasHoy.has(a.numnotaent)) return
+      if ((a.mediopago||'').toLowerCase()==='vale') return
+      const usu = (a.usuario||'Sin usuario').trim()
+      const u   = get(usu)
+      u.cobroCartera   += a.valabono||0
+      u.totalIngresado += a.valabono||0
+      const m = normMedio(a.mediopago)
+      if (m==='efectivo')           u.efectivo      += a.valabono||0
+      else if (m==='transferencia') u.transferencia += a.valabono||0
+      else                          u.mixto         += a.valabono||0
+    })
+    detalle.forEach(d => {
+      const usu  = (d.usuario||'Sin usuario').trim()
+      const u    = get(usu)
+      const marc = (d.marca||'SIN MARCA').trim().toUpperCase()
+      if (marc==='DIGITAL') return
+      if (!u.porMarca[marc]) u.porMarca[marc] = {unidades:0, total:0}
+      u.porMarca[marc].unidades += Number(d.cantidad||0)
+      u.porMarca[marc].total    += Number(d.valtotal||0)
+    })
+    return usuarios
+  }
+
+  function imprimirPorUsuario() {
+    const pu = calcPorUsuario()
+    if (!pu) return
+    const w = window.open('','_blank','width=1000,height=700')
+    w.document.write(`<html><head><title>Por Usuario</title>
+    <style>body{font-family:Arial,sans-serif;font-size:11px;margin:16px;}
+    h2{color:#1a3a6b;text-align:center;margin-bottom:4px;}
+    .sub{text-align:center;color:#555;margin-bottom:14px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+    th{background:#1a3a6b;color:#fff;padding:5px 8px;font-size:10px;text-align:right;}
+    th:first-child{text-align:left;}
+    td{padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;text-align:right;}
+    td:first-child{text-align:left;}
+    .tot{background:#dde3ee;font-weight:900;}
+    .usu{background:#1a3a6b;color:#fff;font-size:13px;font-weight:900;padding:8px 10px;margin:16px 0 6px;}
+    @media print{body{margin:6px;}}</style></head><body>
+    <h2>ATM — CONSOLIDADO POR USUARIO</h2>
+    <div class="sub">DESDE ${desde} | HASTA ${hasta}</div>
+    ${Object.entries(pu).sort((a,b)=>a[0].localeCompare(b[0])).map(([usu,u])=>`
+      <div class="usu">👤 ${usu}</div>
+      <table><thead><tr>
+        <th>Concepto</th><th>Efectivo</th><th>Transferencia</th><th>Mixto</th><th>TOTAL</th>
+      </tr></thead><tbody>
+        <tr><td>Ventas contado</td><td></td><td></td><td></td><td>$${fmt(u.ventaContado)}</td></tr>
+        <tr><td>Ventas crédito</td><td>—</td><td>—</td><td>—</td><td>$${fmt(u.ventaCredito)}</td></tr>
+        <tr><td>Cobros de cartera</td><td colspan="3" style="text-align:center;color:#888">abonos a notas anteriores</td><td>$${fmt(u.cobroCartera)}</td></tr>
+        <tr class="tot"><td>DINERO QUE INGRESÓ</td><td>$${fmt(u.efectivo)}</td><td>$${fmt(u.transferencia)}</td><td>$${fmt(u.mixto)}</td><td>$${fmt(u.totalIngresado)}</td></tr>
+      </tbody></table>
+      <p style="font-size:11px;font-weight:700;margin:4px 0">Prendas vendidas: ${fmt(u.prendas)} | Notas: ${u.notas}</p>
+      <table><thead><tr><th style="text-align:left">Marca</th><th>Unidades</th><th>$ Total</th></tr></thead><tbody>
+        ${Object.entries(u.porMarca).sort((a,b)=>b[1].total-a[1].total).map(([m,v])=>`
+          <tr><td>${m}</td><td>${fmt(v.unidades)}</td><td>$${fmt(v.total)}</td></tr>`).join('')}
+      </tbody></table>
+      <table style="margin-top:6px"><thead><tr>
+        <th style="text-align:left">Vendedor</th><th>Contado</th><th>Crédito</th><th>Total</th>
+      </tr></thead><tbody>
+        ${Object.entries(u.porVendedor).sort((a,b)=>(b[1].contado+b[1].credito)-(a[1].contado+a[1].credito)).map(([,v])=>`
+          <tr><td>${v.nombre}</td><td>$${fmt(v.contado)}</td><td>$${fmt(v.credito)}</td><td><b>$${fmt(v.contado+v.credito)}</b></td></tr>`).join('')}
+      </tbody></table>
+    `).join('<hr style="margin:10px 0;border-color:#c8d5ea">')}
+    </body></html>`)
+    w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
+  }
+
   function imprimirVentasCliente() {
     const w = window.open('','_blank','width=900,height=600')
     w.document.write(`<html><head><title>Clientes</title><style>${estilosImp}</style></head><body>
@@ -452,6 +556,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     {id:'top',         label:'🏆 Top Artículos'},
     {id:'cartera',     label:'📋 Cartera Pendiente'},
     {id:'anuladas',    label:'🗑 Notas Anuladas'},
+    {id:'porusuario',  label:'👤 Por Usuario'},
   ]
 
   const TablaConsolidado = ({ titulo, datos: filas, icono }) => (
@@ -514,6 +619,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {tab==='top'         && <button onClick={imprimirTop}         style={P.btnPrint}>🖨 Imprimir</button>}
               {tab==='cartera'     && <button onClick={imprimirCartera}     style={P.btnPrint}>🖨 Imprimir</button>}
               {tab==='anuladas'    && <button onClick={imprimirAnuladas}    style={P.btnPrint}>🖨 Imprimir</button>}
+              {tab==='porusuario'  && <button onClick={imprimirPorUsuario}  style={P.btnPrint}>🖨 Imprimir</button>}
             </div>
           )}
         </div>
@@ -751,6 +857,83 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                 </div>
               )}
 
+              {/* ── POR USUARIO ── */}
+              {tab==='porusuario' && (() => {
+                const pu = calcPorUsuario()
+                if (!pu) return <div style={{textAlign:'center',padding:30,color:'#aaa'}}>Sin datos.</div>
+                return (
+                  <div>
+                    <div style={P.secTit}>👤 Consolidado por Usuario — {desde} al {hasta}</div>
+                    {Object.entries(pu).sort((a,b)=>a[0].localeCompare(b[0])).map(([usu,u])=>(
+                      <div key={usu} style={{marginBottom:24,border:'1px solid #e0e7f0',borderRadius:8,overflow:'hidden'}}>
+                        {/* Header usuario */}
+                        <div style={{background:'#1a3a6b',color:'#fff',padding:'10px 14px',fontWeight:900,fontSize:14,display:'flex',gap:16,alignItems:'center'}}>
+                          <span>👤 {usu}</span>
+                          <span style={{fontSize:12,fontWeight:400,opacity:0.8}}>{u.notas} notas · {fmt(u.prendas)} prendas</span>
+                        </div>
+
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:0}}>
+                          {/* Bloque dinero */}
+                          <div style={{padding:'12px 14px',borderRight:'1px solid #eee'}}>
+                            <div style={{fontSize:11,fontWeight:800,color:'#1a3a6b',marginBottom:8,textTransform:'uppercase'}}>Dinero que ingresó</div>
+                            <FilaVal label="Efectivo"       val={u.efectivo}       color="#2e7d32"/>
+                            <FilaVal label="Transferencia"  val={u.transferencia}  color="#1565c0"/>
+                            <FilaVal label="Mixto"          val={u.mixto}          color="#6a1b9a"/>
+                            <FilaVal label="Cobro cartera"  val={u.cobroCartera}   color="#e65100"/>
+                            <FilaVal label="TOTAL"          val={u.totalIngresado} color="#1a3a6b" bold/>
+                            <div style={{marginTop:8,borderTop:'1px solid #eee',paddingTop:6}}>
+                              <FilaVal label="Ventas crédito" val={u.ventaCredito} color="#c62828"/>
+                            </div>
+                          </div>
+
+                          {/* Por marca */}
+                          <div style={{padding:'12px 14px',borderRight:'1px solid #eee'}}>
+                            <div style={{fontSize:11,fontWeight:800,color:'#1a3a6b',marginBottom:8,textTransform:'uppercase'}}>Por marca</div>
+                            <table style={{width:'100%',fontSize:12,borderCollapse:'collapse'}}>
+                              <thead><tr>
+                                <th style={{textAlign:'left',color:'#888',fontSize:10,fontWeight:700,paddingBottom:4}}>Marca</th>
+                                <th style={{textAlign:'right',color:'#888',fontSize:10,fontWeight:700,paddingBottom:4}}>Uds</th>
+                                <th style={{textAlign:'right',color:'#888',fontSize:10,fontWeight:700,paddingBottom:4}}>Total</th>
+                              </tr></thead>
+                              <tbody>
+                                {Object.entries(u.porMarca).sort((a,b)=>b[1].total-a[1].total).map(([m,v])=>(
+                                  <tr key={m}>
+                                    <td style={{padding:'2px 0',color:'#333'}}>{m}</td>
+                                    <td style={{textAlign:'right',color:'#666'}}>{fmt(v.unidades)}</td>
+                                    <td style={{textAlign:'right',fontWeight:600,color:'#1a3a6b'}}>${fmt(v.total)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Por vendedor */}
+                          <div style={{padding:'12px 14px'}}>
+                            <div style={{fontSize:11,fontWeight:800,color:'#1a3a6b',marginBottom:8,textTransform:'uppercase'}}>Por vendedor</div>
+                            <table style={{width:'100%',fontSize:12,borderCollapse:'collapse'}}>
+                              <thead><tr>
+                                <th style={{textAlign:'left',color:'#888',fontSize:10,fontWeight:700,paddingBottom:4}}>Vendedor</th>
+                                <th style={{textAlign:'right',color:'#888',fontSize:10,fontWeight:700,paddingBottom:4}}>Contado</th>
+                                <th style={{textAlign:'right',color:'#888',fontSize:10,fontWeight:700,paddingBottom:4}}>Crédito</th>
+                              </tr></thead>
+                              <tbody>
+                                {Object.entries(u.porVendedor).sort((a,b)=>(b[1].contado+b[1].credito)-(a[1].contado+a[1].credito)).map(([k,v])=>(
+                                  <tr key={k}>
+                                    <td style={{padding:'2px 0',color:'#333',maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v.nombre}</td>
+                                    <td style={{textAlign:'right',color:'#2e7d32',fontWeight:600}}>${fmt(v.contado)}</td>
+                                    <td style={{textAlign:'right',color:'#c62828'}}>${fmt(v.credito)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+
               {/* ── NOTAS ANULADAS ── */}
               {tab==='anuladas' && (
                 <div>
@@ -822,4 +1005,14 @@ const P={
   totRow:     {background:'#dde3ee',fontWeight:900},
   resumenFila:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 14px',borderBottom:'1px solid #eee',borderRadius:4,marginBottom:2},
   digitalBox: {display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',marginTop:10,background:'#ede7f6',border:'1px dashed #7e57c2',borderRadius:6,fontSize:13,fontWeight:700,color:'#4527a0'},
+}
+
+function FilaVal({label, val, color='#333', bold=false}) {
+  const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
+  return (
+    <div style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0',borderBottom:'1px solid #f5f5f5'}}>
+      <span style={{color:'#666'}}>{label}</span>
+      <span style={{color, fontWeight:bold?900:600}}>${fmt(val)}</span>
+    </div>
+  )
 }
