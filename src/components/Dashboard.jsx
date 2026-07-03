@@ -5,39 +5,43 @@ import { LOGO } from '../lib/assets'
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 
-export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
-  const [metricas, setMetricas] = useState(null)
-  const [cargando, setCargando] = useState(true)
+export default function Dashboard({ supabase, usuario, permisosExtra=[], onModulo, onLogout }) {
+  const [metricas,  setMetricas]  = useState(null)
+  const [cargando,  setCargando]  = useState(true)
+  const [desde,     setDesde]     = useState(hoy())
+  const [hasta,     setHasta]     = useState(hoy())
+  const [buscando,  setBuscando]  = useState(false)
 
-  useEffect(() => { cargarMetricas() }, [])
+  useEffect(() => { cargarMetricas(hoy(), hoy()) }, [])
 
-  async function cargarMetricas() {
+  async function cargarMetricas(d, h) {
     setCargando(true)
-    const hoyStr = hoy()
 
     const {data:notas} = await supabase.from('encnotaen')
       .select('valtotal,valabono,saldo,cedvended,anulada,cantotal')
-      .gte('fechanotae', hoyStr).lte('fechanotae', hoyStr)
+      .gte('fechanotae', d).lte('fechanotae', h)
 
     const notasActivas = (notas||[]).filter(n=>n.anulada!=='S')
+    const notasAnuladas = (notas||[]).filter(n=>n.anulada==='S')
     const totalVentas  = notasActivas.reduce((s,n)=>s+(n.valtotal||0),0)
     const totalAbonos  = notasActivas.reduce((s,n)=>s+(n.valabono||0),0)
     const totalPrendas = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
+
+    // Vales emitidos en el período
+    const {data:valesEmitidos} = await supabase.from('vales')
+      .select('valor_original').gte('fecregistr', d).lte('fecregistr', h+'T23:59:59')
+    const totalVales = (valesEmitidos||[]).reduce((s,v)=>s+(v.valor_original||0),0)
 
     const {data:cartera} = await supabase.from('encnotaen')
       .select('saldo').or('anulada.is.null,anulada.neq.S').gt('saldo',0)
     const totalCartera = (cartera||[]).reduce((s,n)=>s+(n.saldo||0),0)
 
-    // Traer artículos activos y filtrar en JS los que tienen existencia <= existminim
     const {data:artsBajos} = await supabase.from('articulo')
       .select('codartic,descartic,existencia,existminim')
-      .eq('estado','A')
-      .lte('existencia', 10)   // pre-filtro para no traer todos
-      .order('existencia', {ascending:true})
-      .limit(50)
+      .eq('estado','A').lte('existencia', 10)
+      .order('existencia', {ascending:true}).limit(50)
     const bajos = (artsBajos||[])
-      .filter(a => Number(a.existencia||0) <= Number(a.existminim||0))
-      .slice(0, 5)
+      .filter(a => Number(a.existencia||0) <= Number(a.existminim||0)).slice(0, 5)
 
     const {data:vends} = await supabase.from('vendedores').select('cedula,nombre')
     const vendMap = {}
@@ -52,11 +56,20 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
     const topVend = Object.values(porVend).sort((a,b)=>b.total-a.total).slice(0,5)
 
     setMetricas({
-      totalVentas, totalAbonos, totalPrendas,
+      totalVentas, totalAbonos, totalPrendas, totalVales,
       cantNotas: notasActivas.length,
-      totalCartera, bajos:bajos||[], topVend
+      cantAnuladas: notasAnuladas.length,
+      totalCartera, bajos:bajos||[], topVend,
+      esHoy: d===hoy() && h===hoy(),
     })
     setCargando(false)
+    setBuscando(false)
+  }
+
+  function buscarRango() {
+    if (!desde||!hasta) return
+    setBuscando(true)
+    cargarMetricas(desde, hasta)
   }
 
   const MODULOS = [
@@ -76,7 +89,10 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
 
   const modulosVisibles = MODULOS.filter(m => {
     if (usuario.rol === 'admin') return true
-    return m.roles.includes(usuario.rol)
+    if (m.roles.includes(usuario.rol)) return true
+    // módulos extra asignados desde GestionUsuarios → usuario_permisos
+    if (permisosExtra.includes(m.id)) return true
+    return false
   })
 
   return (
@@ -100,17 +116,44 @@ export default function Dashboard({ supabase, usuario, onModulo, onLogout }) {
       <div style={S.contenido}>
         {usuario.rol === 'admin' && (
           <div style={S.seccion}>
-            <div style={S.secTit}>📈 Resumen del día</div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:10}}>
+              <div style={S.secTit} className="no-mb">📈 {metricas?.esHoy ? 'Resumen del día' : `Resumen ${desde} → ${hasta}`}</div>
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                <label style={{fontSize:11,fontWeight:700,color:'#888'}}>Desde
+                  <input type="date" value={desde} onChange={e=>setDesde(e.target.value)}
+                    style={{marginLeft:6,border:'1px solid #ccc',borderRadius:4,padding:'4px 8px',fontSize:12}}/>
+                </label>
+                <label style={{fontSize:11,fontWeight:700,color:'#888'}}>Hasta
+                  <input type="date" value={hasta} onChange={e=>setHasta(e.target.value)}
+                    style={{marginLeft:6,border:'1px solid #ccc',borderRadius:4,padding:'4px 8px',fontSize:12}}/>
+                </label>
+                <button onClick={buscarRango} disabled={buscando} style={{background:'#1a3a6b',color:'#fff',border:'none',borderRadius:5,padding:'5px 14px',cursor:'pointer',fontWeight:700,fontSize:12}}>
+                  {buscando?'⏳':'🔍'} Consultar
+                </button>
+                {!metricas?.esHoy && (
+                  <button onClick={()=>{setDesde(hoy());setHasta(hoy());cargarMetricas(hoy(),hoy())}}
+                    style={{background:'#eee',color:'#333',border:'none',borderRadius:5,padding:'5px 10px',cursor:'pointer',fontSize:12}}>
+                    Hoy
+                  </button>
+                )}
+              </div>
+            </div>
             {cargando ? (
               <div style={{textAlign:'center',padding:20,color:'#888'}}>Cargando métricas…</div>
             ) : metricas && (
-              <div style={S.metricasGrid}>
-                <Metrica label="Ventas del día"    val={`$${fmt(metricas.totalVentas)}`}  color="#1a3a6b" icon="💰"/>
-                <Metrica label="Notas creadas"     val={metricas.cantNotas}               color="#2e7d32" icon="📋"/>
-                <Metrica label="Prendas vendidas"  val={metricas.totalPrendas}            color="#e65100" icon="📦"/>
-                <Metrica label="Abonos del día"    val={`$${fmt(metricas.totalAbonos)}`}  color="#00838f" icon="💵"/>
-                <Metrica label="Cartera pendiente" val={`$${fmt(metricas.totalCartera)}`} color="#c62828" icon="⚠️"/>
-              </div>
+              <>
+                <div style={S.metricasGrid}>
+                  <Metrica label="Ventas del período"    val={`$${fmt(metricas.totalVentas)}`}  color="#1a3a6b" icon="💰"/>
+                  <Metrica label="Notas creadas"         val={metricas.cantNotas}               color="#2e7d32" icon="📋"/>
+                  <Metrica label="Prendas vendidas"      val={metricas.totalPrendas}            color="#e65100" icon="📦"/>
+                  <Metrica label="Abonos recibidos"      val={`$${fmt(metricas.totalAbonos)}`}  color="#00838f" icon="💵"/>
+                  <Metrica label="Cartera pendiente"     val={`$${fmt(metricas.totalCartera)}`} color="#c62828" icon="⚠️"/>
+                  <Metrica label="Vales emitidos"        val={`$${fmt(metricas.totalVales)}`}   color="#7b1fa2" icon="🎫"/>
+                  {metricas.cantAnuladas > 0 && (
+                    <Metrica label="Notas anuladas"      val={metricas.cantAnuladas}            color="#888"    icon="🗑"/>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}

@@ -29,7 +29,7 @@ const LABEL_CAJA = {
 const hoy  = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 const ayer = () => { const d=new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 
-export default function CierreCaja({ supabase, onClose }) {
+export default function CierreCaja({ supabase, onClose, onAyuda }) {
   const [desde,    setDesde]    = useState(hoy())
   const [hasta,    setHasta]    = useState(hoy())
   const [datos,    setDatos]    = useState(null)
@@ -69,6 +69,13 @@ export default function CierreCaja({ supabase, onClose }) {
         .select('saldo').or('anulada.is.null,anulada.neq.S').gt('saldo', 0)
       const totalCarteraGlobal = (carteraTotal||[]).reduce((s,n) => s+(n.saldo||0), 0)
 
+      // Notas anuladas en el período
+      const {data:notasAnuladas} = await supabase.from('encnotaen')
+        .select('numnotaent,fechanotae,nombreclie,cedrifclie,valtotal,motivoanula,fechaanula,cedvended,usuario')
+        .gte('fechanotae', desde).lte('fechanotae', hasta)
+        .eq('anulada','S')
+        .order('numnotaent', {ascending:false})
+
       // Marca DIGITAL: se muestra aparte y no se suma al cierre de caja
       const digitalPorNota = {}
       let totalDigital = 0
@@ -79,7 +86,7 @@ export default function CierreCaja({ supabase, onClose }) {
         }
       })
 
-      setDatos({ notas:notas||[], detalle, vendMap, abonos:abonos||[], notasAyer:notasAyer||[], totalCarteraGlobal, digitalPorNota, totalDigital })
+      setDatos({ notas:notas||[], detalle, vendMap, abonos:abonos||[], notasAyer:notasAyer||[], totalCarteraGlobal, digitalPorNota, totalDigital, notasAnuladas:notasAnuladas||[] })
     } catch(e) { console.error(e) }
     setCargando(false)
   }
@@ -192,7 +199,11 @@ export default function CierreCaja({ supabase, onClose }) {
       }
     })
 
-    const totalAbonosCredito = abonos.reduce((s,a) => s+(a.valabono||0), 0)
+    // Excluir abonos con mediopago='Vale' — no es dinero real que ingresó
+    const abonosReales = abonos.filter(a => (a.mediopago||'').trim().toLowerCase() !== 'vale')
+    const totalAbonosCredito = abonosReales.reduce((s,a) => s+(a.valabono||0), 0)
+    const totalValesAplicados = abonos.filter(a => (a.mediopago||'').trim().toLowerCase() === 'vale')
+                                      .reduce((s,a) => s+(a.valabono||0), 0)
     const totalAyer          = notasAyer.reduce((s,n) => s+(n.valtotal||0), 0)
     const totalIngresado     = totalEfectivo + totalTransferencia + totalMixto + totalAbonosCredito
 
@@ -202,6 +213,7 @@ export default function CierreCaja({ supabase, onClose }) {
       totalIngresado, totalAbonosCredito, totalAyer,
       totalPendiente: datos.totalCarteraGlobal||0,
       totalDigital: totalDigital||0,
+      totalValesAplicados,
       cantNotas: notas.length
     }
   }
@@ -357,6 +369,30 @@ export default function CierreCaja({ supabase, onClose }) {
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
   }
 
+  function imprimirAnuladas() {
+    const an = datos?.notasAnuladas||[]
+    const w = window.open('','_blank','width=900,height=600')
+    w.document.write(`<html><head><title>Anuladas</title><style>${estilosImp}</style></head><body>
+    <h2>ATM — NOTAS ANULADAS</h2>
+    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta} &nbsp;&nbsp; Total: ${an.length} notas</div>
+    <table><thead><tr>
+      <th style="text-align:left">Nota</th><th style="text-align:left">Fecha</th>
+      <th style="text-align:left">Cliente</th><th>Total</th>
+      <th style="text-align:left">Motivo</th><th style="text-align:left">Anulada el</th>
+    </tr></thead><tbody>
+    ${an.map((n,i)=>`<tr style="background:${i%2===0?'#fff':'#fdecea'}">
+      <td style="color:#c62828;font-weight:700">${n.numnotaent}</td>
+      <td>${n.fechanotae}</td><td>${n.nombreclie}</td>
+      <td style="text-align:right">$${fmt(n.valtotal)}</td>
+      <td>${n.motivoanula||'—'}</td><td>${n.fechaanula||'—'}</td>
+    </tr>`).join('')}
+    <tr class="tot"><td colspan="3">TOTAL ANULADO</td>
+    <td style="text-align:right;color:#c62828">$${fmt(an.reduce((s,n)=>s+(n.valtotal||0),0))}</td>
+    <td colspan="2"></td></tr>
+    </tbody></table></body></html>`)
+    w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
+  }
+
   function imprimirVentasCliente() {
     const w = window.open('','_blank','width=900,height=600')
     w.document.write(`<html><head><title>Clientes</title><style>${estilosImp}</style></head><body>
@@ -415,6 +451,7 @@ export default function CierreCaja({ supabase, onClose }) {
     {id:'resumen',     label:'💰 Resumen del Día'},
     {id:'top',         label:'🏆 Top Artículos'},
     {id:'cartera',     label:'📋 Cartera Pendiente'},
+    {id:'anuladas',    label:'🗑 Notas Anuladas'},
   ]
 
   const TablaConsolidado = ({ titulo, datos: filas, icono }) => (
@@ -458,6 +495,7 @@ export default function CierreCaja({ supabase, onClose }) {
             <span style={{fontSize:9,color:'rgba(255,255,255,0.8)',letterSpacing:2}}>A TU MEDIDA</span>
           </div>
           <span style={P.titTxt}>CIERRE DE CAJA / INFORMES</span>
+          {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14}}>❓</button>}
           <button onClick={onClose} style={P.btnCerrar}>← Menú</button>
         </div>
 
@@ -475,6 +513,7 @@ export default function CierreCaja({ supabase, onClose }) {
               {tab==='resumen'     && <button onClick={imprimirResumen}     style={P.btnPrint}>🖨 Imprimir</button>}
               {tab==='top'         && <button onClick={imprimirTop}         style={P.btnPrint}>🖨 Imprimir</button>}
               {tab==='cartera'     && <button onClick={imprimirCartera}     style={P.btnPrint}>🖨 Imprimir</button>}
+              {tab==='anuladas'    && <button onClick={imprimirAnuladas}    style={P.btnPrint}>🖨 Imprimir</button>}
             </div>
           )}
         </div>
@@ -581,6 +620,7 @@ export default function CierreCaja({ supabase, onClose }) {
                     {lbl:'Ingresos en transferencia',                 val:`$${fmt(resumen.totalTransferencia)}`},
                     {lbl:'Ingresos en mixto',                         val:`$${fmt(resumen.totalMixto)}`},
                     {lbl:'Abonos a créditos recibidos hoy',           val:`$${fmt(resumen.totalAbonosCredito)}`},
+                    {lbl:'Vales aplicados (no es dinero)',              val:`$${fmt(resumen.totalValesAplicados)}`, color:'#7b1fa2'},
                     {lbl:'TOTAL DINERO INGRESADO',                    val:`$${fmt(resumen.totalIngresado)}`,     grande:true, color:'#1a3a6b'},
                     {lbl:'Saldo pendiente por cobrar',                val:`$${fmt(resumen.totalPendiente)}`,    color:'#c62828'},
                     {lbl:'Ventas día anterior',                       val:`$${fmt(resumen.totalAyer)}`},
@@ -708,6 +748,45 @@ export default function CierreCaja({ supabase, onClose }) {
                       {cartera.length===0 && <tr><td colSpan={7} style={{textAlign:'center',padding:20,color:'#2e7d32',fontWeight:700}}>✅ Sin cartera pendiente en este período.</td></tr>}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* ── NOTAS ANULADAS ── */}
+              {tab==='anuladas' && (
+                <div>
+                  <div style={P.secTit}>🗑 Notas Anuladas — {desde} al {hasta}</div>
+                  {(datos.notasAnuladas||[]).length === 0
+                    ? <div style={{textAlign:'center',padding:30,color:'#2e7d32',fontWeight:700}}>✅ No hay notas anuladas en este período.</div>
+                    : (
+                      <table style={P.tabla}>
+                        <thead>
+                          <tr style={P.thead}>
+                            {['Nota','Fecha','Cliente','Total','Motivo','Anulada el','Usuario'].map(h=>(
+                              <th key={h} style={{...P.th,textAlign:h==='Total'?'right':'left'}}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(datos.notasAnuladas||[]).map((n,i)=>(
+                            <tr key={n.numnotaent} style={{background:i%2===0?'#fff':'#fdecea'}}>
+                              <td style={{...P.td,fontWeight:700,color:'#c62828'}}>{n.numnotaent}</td>
+                              <td style={P.td}>{n.fechanotae}</td>
+                              <td style={P.td}>{n.nombreclie}</td>
+                              <td style={{...P.td,textAlign:'right'}}>${fmt(n.valtotal)}</td>
+                              <td style={P.td}>{n.motivoanula||'—'}</td>
+                              <td style={P.td}>{n.fechaanula||'—'}</td>
+                              <td style={P.td}>{n.usuario||'—'}</td>
+                            </tr>
+                          ))}
+                          <tr style={P.totRow}>
+                            <td colSpan={3} style={P.td}><strong>TOTAL ANULADO</strong></td>
+                            <td style={{...P.td,textAlign:'right',color:'#c62828'}}>${fmt((datos.notasAnuladas||[]).reduce((s,n)=>s+(n.valtotal||0),0))}</td>
+                            <td colSpan={3} style={P.td}>{(datos.notasAnuladas||[]).length} notas</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )
+                  }
                 </div>
               )}
 

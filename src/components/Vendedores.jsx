@@ -48,7 +48,7 @@ const Fld = ({ label, children, requerido, w }) => (
   </div>
 )
 
-export default function Vendedores({ supabase, onClose }) {
+export default function Vendedores({ supabase, onClose, onAyuda }) {
   const [lista,      setLista]      = useState([])
   const [total,      setTotal]      = useState(0)
   const [busqueda,   setBusqueda]   = useState('')
@@ -105,27 +105,29 @@ export default function Vendedores({ supabase, onClose }) {
     setGuardando(true)
     try {
       const payload = {
-        cedula:              form.cedula.trim()  || null,
-        nombre:              form.nombre.trim().toUpperCase(),
-        celular:             form.celular.trim() || null,
+        cedula:              form.cedula?.trim()  || null,
+        nombre:              form.nombre?.trim().toUpperCase() || '',
+        celular:             form.celular?.trim() || null,
         porcentaje_comision: Number(form.porcentaje_comision) || 0,
-        activo:              form.activo,
+        activo:              form.activo ?? true,
       }
+      console.log('Guardando vendedor payload:', payload, 'id:', form.id)
       if (esNuevo) {
-        if (form.cedula.trim()) {
+        if (form.cedula?.trim()) {
           const { data:existe } = await supabase.from('vendedores').select('id').eq('cedula', form.cedula.trim()).limit(1)
           if (existe?.length > 0) { setMsg({ ok:false, txt:'Ya existe un vendedor con esa cédula.' }); setGuardando(false); return }
         }
         const { data, error } = await supabase.from('vendedores')
           .insert({ ...payload, fecha_registro: new Date().toISOString() })
           .select().single()
-        if (error) throw error
+        if (error) { console.error('Error insert vendedor:', error); throw error }
         setMsg({ ok:true, txt:'Vendedor creado correctamente.' })
         setEsNuevo(false); setSeleccion(data); setForm({ ...FORM_VACIO, ...data })
       } else {
         const { error } = await supabase.from('vendedores').update(payload).eq('id', form.id)
-        if (error) throw error
+        if (error) { console.error('Error update vendedor:', error); throw error }
         setMsg({ ok:true, txt:'Vendedor actualizado correctamente.' })
+        setSeleccion(prev => ({...prev, ...payload}))
       }
       cargar(busqueda)
     } catch(e) { setMsg({ ok:false, txt:'Error: ' + (e.message || e) }) }
@@ -150,6 +152,7 @@ export default function Vendedores({ supabase, onClose }) {
         <img src={LOGO} alt="ATM" style={{ height:32 }} />
         <span style={S.hTitle}>GESTIÓN DE VENDEDORES</span>
         <button style={S.hBtn} onClick={nuevo}>+ Nuevo</button>
+        {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14}}>❓</button>}
         <button style={S.hBtn} onClick={onClose}>✕ Cerrar</button>
       </div>
 

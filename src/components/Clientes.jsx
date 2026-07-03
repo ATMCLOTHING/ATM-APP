@@ -62,7 +62,7 @@ const Fld = ({ label, children, requerido, w }) => (
   </div>
 )
 
-export default function Clientes({ supabase, onClose }) {
+export default function Clientes({ supabase, onClose, onAyuda }) {
   const [clientes,   setClientes]   = useState([])
   const [total,      setTotal]      = useState(0)
   const [busqueda,   setBusqueda]   = useState('')
@@ -201,6 +201,7 @@ export default function Clientes({ supabase, onClose }) {
         <img src={LOGO} alt="ATM" style={{ height: 32 }} />
         <span style={S.hTitle}>GESTIÓN DE CLIENTES</span>
         <button style={S.hBtn} onClick={nuevo}>+ Nuevo</button>
+        {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14}}>❓</button>}
         <button style={S.hBtn} onClick={onClose}>✕ Cerrar</button>
       </div>
 

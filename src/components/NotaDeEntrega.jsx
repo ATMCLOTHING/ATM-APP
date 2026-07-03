@@ -24,7 +24,7 @@ const fechaDePago = plazo => {
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
 }
 
-export default function NotaDeEntrega({ supabase, usuario, onClose }) {
+export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   const [nroDoc,    setNroDoc]    = useState('')
   const [fecha,     setFecha]     = useState(hoy())
   const [fechaPago, setFechaPago] = useState(hoy())
@@ -54,8 +54,10 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   const [desbloqueada, setDesbloqueada] = useState(false) // nota guardada editando con PIN
   // cédula que no se encontró — para pasarla al modal de nuevo cliente
   const [cedulaNueva, setCedulaNueva] = useState('')
-  const [devolverIdx, setDevolverIdx] = useState(null) // índice de línea seleccionada para devolver
-  const [resultDevolucion, setResultDevolucion] = useState(null) // {descripcion,cantidad,valorDevolucion,saldoNuevo,vale:{codigo,valor}|null}
+  const [devolverIdx, setDevolverIdx] = useState(null)
+  const [resultDevolucion, setResultDevolucion] = useState(null)
+  const [artNoEncontrado, setArtNoEncontrado] = useState(null) // {cod, idx} para modal de crear artículo
+  const [modalAnular, setModalAnular] = useState(false) // modal de motivo de anulación
 
   const cedulaRef  = useRef()
   const inputRefs  = useRef({})   // refs a cada input de código por fila
@@ -218,10 +220,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       .eq('codartic', cod).limit(10)
 
     if (!data || !data.length) {
-      // No encontrado → mostrar error en la línea y limpiar
+      // No encontrado → ofrecer crear el artículo
       setLineas(prev => { const n=[...prev]; n[idx]={...n[idx],codartic:txt}; return n })
-      setMsg({tipo:'err', texto:`❌ Código "${cod}" no encontrado.`})
-      focoEnCodigo(idx)
+      setArtNoEncontrado({cod, idx})
       return
     }
 
@@ -429,6 +430,15 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     if (!detValidas.length){setMsg({tipo:'err',texto:'Agrega al menos un artículo con cantidad.'}); return}
     setBusy(true)
     try {
+      // Al editar una nota ya guardada, leer el abono real de la BD para no pisarlo
+      let abonoReal = abonos
+      if (!modoNueva && guardada) {
+        const {data:encActual} = await supabase.from('encnotaen')
+          .select('valabono').eq('numnotaent',nroDoc).single()
+        if (encActual) abonoReal = Number(encActual.valabono)||0
+      }
+      const saldoReal = Math.max(0, total - abonoReal)
+
       const enc = {
         numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
         formapago:plazo, mediopago:medio,
@@ -442,7 +452,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
         nomempresa:cliente?.nom_empresa||'',
         porcdescue:pDesc, porciva:pIva,
         subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
-        valabono:abonos, saldo, cedvended:cedVend,
+        valabono:abonoReal, saldo:saldoReal, cedvended:cedVend,
         cantotal:prendas, anulada:'N',
         usuario: usuario?.usuario || usuario?.nombre || 'sistema',
       }
@@ -481,6 +491,41 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
         await registrarKardex(cod, art?.[0]?.descartic||cod, tall, tipo_mov, concepto, diff, nroDoc)
       }
       setGuardada(true); setModoNueva(false)
+
+      // Punto 7: Si el saldo real quedó negativo (devolvió más de lo que compró),
+      // generar un vale por el excedente
+      if (saldoReal < -0.01) {
+        const montoVale = Math.abs(saldoReal)
+        const {data:codData} = await supabase.rpc('siguiente_codigo_vale')
+        const codigoVale = codData || `V-${Date.now()}`
+        const {data:valeIns} = await supabase.from('vales').insert({
+          codigo: codigoVale,
+          cliente_id: cliente?.id || null,
+          cliente_ced: cedula || cliente?.cedula || '',
+          cliente_nombre: cliente?.nombre || cliTxt || 'Cliente general',
+          valor_original: montoVale, saldo: montoVale,
+          numnotaent_origen: nroDoc,
+          motivo: `Devolución con saldo a favor en nota ${nroDoc}`,
+          estado: 'ACTIVO',
+          usuario: usuario?.usuario || 'sistema',
+        }).select().single()
+        if (valeIns) {
+          await supabase.from('vale_movimientos').insert({
+            vale_id: valeIns.id, tipo:'EMISION', valor:montoVale, numnotaent:nroDoc,
+            usuario: usuario?.usuario || 'sistema',
+          })
+          // Dejar la nota con saldo en 0 (el vale cubre el excedente)
+          await supabase.from('encnotaen').update({saldo:0}).eq('numnotaent',nroDoc)
+          setResultDevolucion({
+            nota: nroDoc, descripcion: 'Devolución con saldo a favor',
+            codartic:'', talla:'', cantidad:'', valorDevolucion: montoVale,
+            saldoAntes: 0, saldoNuevo: 0,
+            cliente: cliente?.nombre||cliTxt||'Cliente general',
+            fecha: hoy(), vale: {codigo:codigoVale, valor:montoVale},
+          })
+        }
+      }
+
       const msgBase = `✅ Nota ${nroDoc} guardada.`
       setMsg({tipo:avisos.length?'warn':'ok', texto:avisos.length?`${msgBase} ⚠️ Inventario negativo en: ${avisos.join(', ')}`:msgBase})
       await recargarIds()
@@ -493,8 +538,11 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
   async function anularNota() {
     if (!guardada){setMsg({tipo:'warn',texto:'Esta nota no está guardada aún.'}); return}
     if (anulada){setMsg({tipo:'warn',texto:'Esta nota ya está anulada.'}); return}
-    const motivo=window.prompt(`Motivo de anulación (opcional):`)
-    if (motivo===null) return
+    setModalAnular(true)
+  }
+
+  async function ejecutarAnulacion(motivo) {
+    setModalAnular(false)
     setBusy(true)
     const {error}=await supabase.from('encnotaen').update({
       anulada:'S',fechaanula:hoy(),motivoanula:motivo||'Anulada'
@@ -504,7 +552,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       const {data:det} = await supabase.from('detnotaen').select('codartic,talla,cantidad,descartic').eq('numnotaent',nroDoc)
       for (const l of (det||[])) {
         await supabase.rpc('ajustar_inventario', {p_codartic:l.codartic, p_talla:l.talla, p_cantidad:-Number(l.cantidad)})
-        await registrarKardex(l.codartic, l.descartic, l.talla, 'DEVOLUCION', `Anulación nota ${nroDoc}`, l.cantidad, nroDoc)
+        await registrarKardex(l.codartic, l.descartic, l.talla, 'DEVOLUCION', `Anulación nota ${nroDoc}: ${motivo}`, l.cantidad, nroDoc)
       }
       setAnulada(true)
       setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada. Inventario restaurado.`})
@@ -512,7 +560,54 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
     setBusy(false)
   }
 
-  // ── REGISTRO EN KARDEX ────────────────────────────────────────────────
+  // ── CREAR ARTÍCULO DESDE LA NOTA ─────────────────────────────────────
+  async function crearArticuloDesdeNota(datos) {
+    // datos = {codartic, descartic, cantidad, valunit}
+    setBusy(true)
+    try {
+      const idx = artNoEncontrado.idx
+      // Crear en articulo
+      await supabase.from('articulo').upsert({
+        codartic: datos.codartic, descartic: datos.descartic,
+        tipo:'', tipotalla:'U', genero:'', marca:'',
+        preciovent: datos.valunit, preciovend: datos.valunit, preciovenv: datos.valunit,
+        preciocomp: 0, existencia: datos.cantidad, existminim: 0, estado:'A',
+        usuario: usuario?.usuario || 'sistema',
+      }, {onConflict:'codartic'})
+      // Crear en articomp
+      const {data:existeComp} = await supabase.from('articomp')
+        .select('codartic').eq('codartic', datos.codartic).limit(1)
+      if (!existeComp || !existeComp.length) {
+        await supabase.from('articomp').insert({
+          codartic: datos.codartic, descartic: datos.descartic,
+          talla:'U', tipotalla:'U', tipo:'', marca:'', genero:'',
+          preciovent: datos.valunit, preciovend: datos.valunit, preciovenv: datos.valunit,
+          preciocomp: 0, existencia: datos.cantidad, existminim: 0, porciva: 0,
+        })
+      }
+      // Kardex de salida
+      await registrarKardex(datos.codartic, datos.descartic, 'U', 'SALIDA',
+        `Venta nota ${nroDoc} (artículo creado desde nota)`, datos.cantidad, nroDoc)
+      // Poner en la línea de la nota
+      setLineas(prev => {
+        const sig = [...prev]
+        sig[idx] = recalc({...sig[idx],
+          codartic: datos.codartic, descartic: datos.descartic,
+          talla:'U', marca:'', genero:'',
+          valunit: datos.valunit, cantidad: datos.cantidad, porciva:0
+        })
+        if (idx===sig.length-1) sig.push({...VACIA})
+        return sig
+      })
+      setArtNoEncontrado(null)
+      setMsg({tipo:'ok', texto:`✅ Artículo ${datos.codartic} creado y agregado a la nota.`})
+    } catch(e) {
+      setMsg({tipo:'err', texto:`❌ Error al crear artículo: ${e.message}`})
+    }
+    setBusy(false)
+  }
+
+
   async function registrarKardex(codartic, descartic, talla, tipo_mov, concepto, cantidad, numnotaent) {
     try {
       // Leer existencia actual después del movimiento
@@ -840,6 +935,21 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
       {modal==='nuevoCliente'  && <ModalNuevoCliente  supabase={supabase} cedulaInicial={cedulaNueva} onGuardado={onClienteCreado} onClose={()=>setModal(null)}/>}
       {modal==='vale'          && <ModalVale          supabase={supabase} saldoNota={saldo} onAplicar={aplicarVale} onClose={()=>setModal(null)}/>}
       {devolverIdx!==null      && <ModalDevolucion    linea={lineas[devolverIdx]} onConfirmar={procesarDevolucion} onClose={()=>setDevolverIdx(null)}/>}
+
+      {/* Modal artículo no encontrado — Punto 1 */}
+      {artNoEncontrado && <ModalArticuloRapido
+        cod={artNoEncontrado.cod}
+        onConfirmar={crearArticuloDesdeNota}
+        onCancelar={()=>{ setArtNoEncontrado(null); setMsg({tipo:'err',texto:`❌ Código "${artNoEncontrado.cod}" no encontrado.`}) }}
+      />}
+
+      {/* Modal motivo de anulación — Punto 2 */}
+      {modalAnular && <ModalMotivoAnulacion
+        onConfirmar={ejecutarAnulacion}
+        onCancelar={()=>setModalAnular(false)}
+        clienteGeneral={!cliente || String(cliente?.id||'99')==='99'}
+        clienteNombre={cliente?.nombre||cliTxt||''}
+      />}
       {resultDevolucion        && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:600}}>
           <div style={{background:'#fff',borderRadius:10,padding:24,width:400,textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
@@ -939,10 +1049,12 @@ export default function NotaDeEntrega({ supabase, usuario, onClose }) {
           <span style={P.titTxt}>NOTA DE ENTREGA</span>
           <div style={P.titNro}>
             N° <strong style={{fontSize:22}}>{nroDoc}</strong>
-            {modoNueva    && <span style={P.badgeNueva}>NUEVA</span>}
+            {modoNueva    && !guardada && <span style={{...P.badgeNueva,background:'#2e7d32'}}>➕ ADICIÓN</span>}
+            {guardada     && !desbloqueada && !anulada && <span style={{...P.badgeNueva,background:'#1a3a6b'}}>✅ GUARDADA</span>}
+            {desbloqueada && <span style={{...P.badgeNueva,background:'#ffc107',color:'#333'}}>🔓 EDICIÓN</span>}
             {anulada      && <span style={P.badgeAnul}>ANULADA</span>}
-            {desbloqueada && <span style={{...P.badgeNueva,background:'#ffc107',color:'#333'}}>🔓 EDITANDO</span>}
           </div>
+          {onAyuda && <button onClick={onAyuda} title="Ayuda" style={P.btnAyuda}>❓</button>}
         </div>
 
         {msg && (
@@ -1255,6 +1367,7 @@ const P={
   titNro:    {background:'rgba(255,255,255,0.2)',borderRadius:6,padding:'5px 16px',fontSize:14,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:8},
   badgeNueva:{fontSize:10,background:'rgba(255,255,255,0.25)',borderRadius:4,padding:'2px 7px'},
   badgeAnul: {fontSize:10,background:'#e74c3c',borderRadius:4,padding:'2px 7px'},
+  btnAyuda:  {background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14,flexShrink:0},
   alerta:    {margin:'6px 12px',padding:'8px 14px',borderRadius:6,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center'},
   alertaX:   {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:16},
   bloque:    {margin:'8px 12px',background:'#fff',borderRadius:8,border:'1px solid #e0e7f0',padding:'12px 14px',display:'flex',flexDirection:'column',gap:8},
@@ -1333,3 +1446,93 @@ const FilaGrilla = memo(function FilaGrilla({
     </tr>
   )
 })
+
+// ── Modal artículo rápido (Punto 1) ─────────────────────────────────────
+function ModalArticuloRapido({ cod, onConfirmar, onCancelar }) {
+  const [form, setForm] = useState({ codartic:cod, descartic:'', cantidad:1, valunit:'' })
+  const set = (k,v) => setForm(p=>({...p,[k]:v}))
+  return (
+    <div style={MS.fondo}>
+      <div style={MS.modal}>
+        <div style={MS.tit}>⚠️ Artículo no encontrado</div>
+        <p style={{fontSize:13,color:'#555',margin:'0 0 12px'}}>
+          El código <strong>{cod}</strong> no está registrado. ¿Deseas crearlo y agregarlo a la nota?
+        </p>
+        <label style={MS.lbl}>Código
+          <input style={MS.inp} value={form.codartic}
+            onChange={e=>set('codartic',e.target.value)} placeholder="Código del artículo"/>
+        </label>
+        <label style={MS.lbl}>Descripción *
+          <input autoFocus style={MS.inp} value={form.descartic}
+            onChange={e=>set('descartic',e.target.value)} placeholder="Nombre del artículo"/>
+        </label>
+        <div style={{display:'flex',gap:10}}>
+          <label style={{...MS.lbl,flex:1}}>Cantidad
+            <input type="number" min={1} style={MS.inp} value={form.cantidad}
+              onChange={e=>set('cantidad',e.target.value)}/>
+          </label>
+          <label style={{...MS.lbl,flex:1}}>Precio de venta *
+            <input type="number" min={0} style={MS.inp} value={form.valunit}
+              onChange={e=>set('valunit',e.target.value)} placeholder="0"/>
+          </label>
+        </div>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+          <button onClick={onCancelar} style={MS.btnCan}>Cancelar</button>
+          <button onClick={()=>{
+            if (!form.descartic.trim()) return
+            if (!form.valunit || Number(form.valunit)<=0) return
+            onConfirmar({...form, cantidad:Number(form.cantidad)||1, valunit:Number(form.valunit)})
+          }} style={MS.btnOk}>✅ Crear y agregar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal motivo de anulación (Punto 2) ──────────────────────────────────
+const MOTIVOS_ANULACION = [
+  'Error en factura — Datos del cliente',
+  'Error en factura — Productos',
+  'Pedido cancelado',
+  'Factura duplicada',
+  'Otra',
+]
+function ModalMotivoAnulacion({ onConfirmar, onCancelar }) {
+  const [motivo, setMotivo] = useState(MOTIVOS_ANULACION[0])
+  const [otro,   setOtro]   = useState('')
+  const motivoFinal = motivo === 'Otra' ? (otro.trim()||'Otra') : motivo
+  return (
+    <div style={MS.fondo}>
+      <div style={MS.modal}>
+        <div style={MS.tit}>🗑 Motivo de Anulación</div>
+        <label style={MS.lbl}>Selecciona el motivo
+          <select style={MS.inp} value={motivo} onChange={e=>setMotivo(e.target.value)}>
+            {MOTIVOS_ANULACION.map(m=><option key={m} value={m}>{m}</option>)}
+          </select>
+        </label>
+        {motivo==='Otra' && (
+          <label style={MS.lbl}>Describe el motivo
+            <input autoFocus style={MS.inp} value={otro}
+              onChange={e=>setOtro(e.target.value)} placeholder="Escribe el motivo de anulación…"/>
+          </label>
+        )}
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+          <button onClick={onCancelar} style={MS.btnCan}>Cancelar</button>
+          <button onClick={()=>onConfirmar(motivoFinal)} style={{...MS.btnOk,background:'#c62828'}}>
+            🗑 Confirmar anulación
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const MS = {
+  fondo: {position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500},
+  modal: {background:'#fff',borderRadius:10,padding:22,width:400,boxShadow:'0 8px 32px rgba(0,0,0,0.3)',display:'flex',flexDirection:'column',gap:11},
+  tit:   {fontSize:15,fontWeight:900,color:'#1a3a6b'},
+  lbl:   {display:'flex',flexDirection:'column',gap:4,fontSize:11,fontWeight:700,color:'#1a3a6b'},
+  inp:   {height:32,border:'1px solid #c8d5ea',borderRadius:4,padding:'0 10px',fontSize:13,outline:'none',marginTop:2},
+  btnCan:{background:'#888',color:'#fff',border:'none',borderRadius:6,padding:'8px 18px',cursor:'pointer',fontWeight:700},
+  btnOk: {background:'#1a3a6b',color:'#fff',border:'none',borderRadius:6,padding:'8px 18px',cursor:'pointer',fontWeight:700},
+}

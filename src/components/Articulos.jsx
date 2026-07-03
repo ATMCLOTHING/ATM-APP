@@ -4,6 +4,7 @@ import ModalNuevaMarca        from './ModalNuevaMarca'
 import ModalNuevoProveedor    from './ModalNuevoProveedor'
 import ModalListadoArticulos  from './ModalListadoArticulos'
 import ModalEntradaMercancia  from './ModalEntradaMercancia'
+import ModalInventario        from './ModalInventario'
 
 const VACIO = {
   codartic:'', tipo:'', tipotalla:'U', descartic:'', genero:'', marca:'',
@@ -15,7 +16,7 @@ const VACIO = {
 const TIPOS   = ['JEAN','SHORT','BLUSA','CAMISA','PANTALON','VESTIDO','FALDA','BERMUDA','LEGGIN','OTRO']
 const GENEROS = ['DAMA','CABALLERO','NIÑO','NIÑA','UNISEX']
 
-export default function Articulos({ supabase, usuario, onClose }) {
+export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
   const [form,       setForm]       = useState({...VACIO})
   const [allIds,     setAllIds]     = useState([])
   const [busy,       setBusy]       = useState(false)
@@ -176,6 +177,7 @@ export default function Articulos({ supabase, usuario, onClose }) {
           setModal(null)
         }}
         onClose={()=>setModal(null)}/>}
+      {modal==='inventario' && <ModalInventario supabase={supabase} onClose={()=>setModal(null)}/>}
 
       <div style={P.ventana}>
         {/* TÍTULO */}
@@ -316,6 +318,10 @@ export default function Articulos({ supabase, usuario, onClose }) {
               <IBtn src={WZNEXT}   onClick={navSiguiente}         title="Siguiente"/>
               <IBtn src={WZEND}    onClick={navUltimo}            title="Último"/>
               <IBtn src={WZLOCATE} onClick={()=>setModal('listado')} title="Listado de artículos"/>
+              <button onClick={()=>setModal('inventario')} title="Resumen del inventario"
+                style={{height:36,background:'#e8f5e9',border:'1px solid #a5d6a7',borderRadius:5,padding:'0 10px',cursor:'pointer',fontSize:12,fontWeight:700,color:'#2e7d32',whiteSpace:'nowrap'}}>
+                📊 Inventario
+              </button>
             </div>
             <div style={P.btnFila}>
               <IBtn src={WZNEW}      onClick={nuevoArt}             title="Nuevo artículo"/>
@@ -330,6 +336,7 @@ export default function Articulos({ supabase, usuario, onClose }) {
                 📦 Entrada
               </button>
               <IBtn src={WZCLOSE}    onClick={onClose}              title="Volver al menú"/>
+              {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:32,height:32,cursor:'pointer',fontSize:15,marginLeft:4}}>❓</button>}
             </div>
           </div>
 

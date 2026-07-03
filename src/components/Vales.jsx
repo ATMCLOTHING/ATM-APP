@@ -16,7 +16,7 @@ const ESTADO_STYLE = {
   ANULADO:  {bg:'#fdecea', color:'#c62828', label:'ANULADO'},
 }
 
-export default function Vales({ supabase, usuario, onClose }) {
+export default function Vales({ supabase, usuario, onClose, onAyuda }) {
   const [codigo,    setCodigo]    = useState('')
   const [cliente,   setCliente]   = useState('')
   const [estado,    setEstado]    = useState('todos')
@@ -118,6 +118,7 @@ export default function Vales({ supabase, usuario, onClose }) {
             <span style={{fontSize:9,color:'rgba(255,255,255,0.8)',letterSpacing:2}}>A TU MEDIDA</span>
           </div>
           <span style={P.titTxt}>🎫 CONSULTAR VALES</span>
+          {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14}}>❓</button>}
           <button onClick={onClose} style={P.btnCerrar}>← Menú</button>
         </div>
 
