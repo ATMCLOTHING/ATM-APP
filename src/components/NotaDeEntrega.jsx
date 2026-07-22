@@ -58,6 +58,8 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   const [resultDevolucion, setResultDevolucion] = useState(null)
   const [artNoEncontrado, setArtNoEncontrado] = useState(null) // {cod, idx} para modal de crear artículo
   const [modalAnular, setModalAnular] = useState(false) // modal de motivo de anulación
+  const [pinAnular,   setPinAnular]   = useState(false) // modal de PIN admin, previo a ejecutar la anulación
+  const [motivoAnular,setMotivoAnular]= useState(null)   // motivo elegido, en espera de la autorización por PIN
 
   const cedulaRef  = useRef()
   const inputRefs  = useRef({})   // refs a cada input de código por fila
@@ -538,6 +540,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   async function anularNota() {
     if (!guardada){setMsg({tipo:'warn',texto:'Esta nota no está guardada aún.'}); return}
     if (anulada){setMsg({tipo:'warn',texto:'Esta nota ya está anulada.'}); return}
+    if (usuario?.rol !== 'admin'){setMsg({tipo:'err',texto:'❌ Solo un administrador puede anular una nota de entrega.'}); return}
     setModalAnular(true)
   }
 
@@ -945,10 +948,18 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
 
       {/* Modal motivo de anulación — Punto 2 */}
       {modalAnular && <ModalMotivoAnulacion
-        onConfirmar={ejecutarAnulacion}
+        onConfirmar={motivo=>{ setModalAnular(false); setMotivoAnular(motivo); setPinAnular(true) }}
         onCancelar={()=>setModalAnular(false)}
         clienteGeneral={!cliente || String(cliente?.id||'99')==='99'}
         clienteNombre={cliente?.nombre||cliTxt||''}
+      />}
+      {/* PIN de administrador requerido para confirmar la anulación */}
+      {pinAnular && <ModalPin
+        supabase={supabase}
+        titulo="Autorizar Anulación"
+        descripcion={`Se anulará la nota ${nroDoc} y se restaurará el inventario. Esta acción requiere el PIN de administrador.`}
+        onConfirm={()=>{ setPinAnular(false); ejecutarAnulacion(motivoAnular); setMotivoAnular(null) }}
+        onClose={()=>{ setPinAnular(false); setMotivoAnular(null) }}
       />}
       {resultDevolucion        && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:600}}>
@@ -1203,7 +1214,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
                   🔒
                 </button>
               )}
-              <IBtn src={WZDELETE} onClick={anularNota}    title="Anular"      disabled={anulada||modoNueva}/>
+              <IBtn src={WZDELETE} onClick={anularNota}    title={usuario?.rol==='admin' ? "Anular" : "Solo un administrador puede anular"} disabled={anulada||modoNueva||usuario?.rol!=='admin'}/>
               <IBtn src={WZPRINT}  onClick={()=>setModal('print')} title="Imprimir"/>
               <IBtn src={WZCLOSE}  onClick={onClose}       title="Volver al menú"/>
             </div>

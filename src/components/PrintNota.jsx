@@ -25,6 +25,7 @@ export default function PrintNota({ datos, onClose }) {
         .sep { border-top: 1px dashed #000; margin: 4px 0; }
         .fila { display: flex; justify-content: space-between; }
         .total-fila { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; }
+        @page { size: 80mm auto; margin: 0; }
         @media print { body { width: 80mm; } }
       </style></head><body>
       <div class="centro bold grande">A TU MEDIDA</div>
@@ -63,7 +64,7 @@ export default function PrintNota({ datos, onClose }) {
       <div class="sep"></div>
       <div class="centro">Gracias por su compra</div>
       <div class="centro">A TU MEDIDA</div>
-      <br/><br/>
+      <br/><br/><br/>
       </body></html>
     `)
     w.document.close(); w.focus()
