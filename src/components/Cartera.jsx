@@ -11,8 +11,8 @@ const colorMora   = d => d >= 90 ? '#c62828' : d >= 60 ? '#e65100' : d >= 30 ? '
 const bgMora      = d => d >= 90 ? '#fdecea' : d >= 60 ? '#fff3e0' : d >= 30 ? '#fffde7' : '#e8f5e9'
 
 const TABS = [
-  {id:'resumen', label:'📋 Resumen por Cliente'},
-  {id:'detalle', label:'🔍 Detalle por Nota'},
+  {id:'resumen', icon:'📋', label:'Resumen por Cliente'},
+  {id:'detalle', icon:'🔍', label:'Detalle por Nota'},
 ]
 
 export default function Cartera({ supabase, usuario, onClose }) {
@@ -441,12 +441,12 @@ export default function Cartera({ supabase, usuario, onClose }) {
         </Fld>
         <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
           <button onClick={generar} disabled={cargando} style={S.btnGenerar}>
-            {cargando ? '⏳ Cargando…' : '🔍 Generar'}
+            {cargando ? <><span style={{fontSize:17}}>⏳</span> Cargando…</> : <><span style={{fontSize:17}}>🔍</span> Generar</>}
           </button>
           {generado && <>
-            <button onClick={()=>imprimir('resumen')} style={S.btnPrint}>🖨 Resumen</button>
-            <button onClick={()=>imprimir('detalle')} style={S.btnPrint}>🖨 Detalle</button>
-            <button onClick={imprimirCarteraCompleta} style={{...S.btnPrint,background:'#1a3a6b'}}>📄 Cartera Completa</button>
+            <button onClick={()=>imprimir('resumen')} style={S.btnPrint}><span style={{fontSize:16}}>🖨</span> Resumen</button>
+            <button onClick={()=>imprimir('detalle')} style={S.btnPrint}><span style={{fontSize:16}}>🖨</span> Detalle</button>
+            <button onClick={imprimirCarteraCompleta} style={{...S.btnPrint,background:'#1a3a6b'}}><span style={{fontSize:16}}>📄</span> Cartera Completa</button>
           </>}
         </div>
       </div>
@@ -471,10 +471,10 @@ export default function Cartera({ supabase, usuario, onClose }) {
           {/* INDICADOR CLIENTE SELECCIONADO */}
           {clienteSelDrill && (
             <div style={{background:'#e8f0fe',padding:'6px 16px',fontSize:12,display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid #c8d5ea'}}>
-              <span>🔍 Viendo notas de: <strong>{clienteSelDrill.nombre}</strong> ({clienteSelDrill.cedula})</span>
+              <span><span style={{fontSize:15}}>🔍</span> Viendo notas de: <strong>{clienteSelDrill.nombre}</strong> ({clienteSelDrill.cedula})</span>
               <button onClick={()=>{setClienteSelDrill(null);setTab('resumen')}}
                 style={{background:'#c62828',color:'#fff',border:'none',borderRadius:4,padding:'2px 10px',cursor:'pointer',fontSize:11}}>
-                ✕ Ver todos
+                <span style={{fontSize:14}}>✕</span> Ver todos
               </button>
             </div>
           )}
@@ -484,14 +484,14 @@ export default function Cartera({ supabase, usuario, onClose }) {
             {TABS.map(t=>(
               <button key={t.id} onClick={()=>setTab(t.id)}
                 style={{...S.tab,...(tab===t.id?S.tabActivo:{})}}>
-                {t.label}
+                <span style={{fontSize:17}}>{t.icon}</span> {t.label}
               </button>
             ))}
             {/* Botón abonar */}
             {(usuario?.rol==='admin'||usuario?.rol==='vendedor'||usuario?.rol==='cajera') && (
               <button onClick={()=>{setModoAbono(!modoAbono);setDistribucio([]);setMsgAbono(null)}}
                 style={{...S.tab,marginLeft:'auto',background:modoAbono?'#1a3a6b':'#2e7d32',color:'#fff',border:'none'}}>
-                💵 {modoAbono ? 'Cancelar abono' : 'Registrar abono'}
+                <span style={{fontSize:17}}>💵</span> {modoAbono ? 'Cancelar abono' : 'Registrar abono'}
               </button>
             )}
           </div>
@@ -500,7 +500,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
           {modoAbono && (
             <div style={S.abonoPanel}>
               <div style={S.abonoPanelTit}>
-                💵 REGISTRAR ABONO — selecciona las notas y el valor total a distribuir
+                <span style={{fontSize:17}}>💵</span> REGISTRAR ABONO — selecciona las notas y el valor total a distribuir
               </div>
 
               <div style={{display:'flex',gap:12,alignItems:'flex-end',flexWrap:'wrap',marginBottom:10}}>
@@ -520,7 +520,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
                   <button onClick={seleccionarTodas} style={S.btnSel}>Seleccionar todas</button>
                   <button onClick={limpiarSeleccion} style={S.btnSel}>Limpiar selección</button>
                   <button onClick={distribuir} style={{...S.btnGenerar,background:'#1565c0'}}>
-                    ⚡ Distribuir
+                    <span style={{fontSize:17}}>⚡</span> Distribuir
                   </button>
                 </div>
               </div>
@@ -548,7 +548,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
                   ))}
                   <div style={{marginTop:10,display:'flex',gap:10,alignItems:'center'}}>
                     <button onClick={guardarAbonos} disabled={guardandoA} style={S.btnGuardar}>
-                      {guardandoA ? '⏳ Guardando…' : '💾 Confirmar y guardar'}
+                      {guardandoA ? <><span style={{fontSize:17}}>⏳</span> Guardando…</> : <><span style={{fontSize:17}}>💾</span> Confirmar y guardar</>}
                     </button>
                     <span style={{fontSize:12,color:'#666'}}>
                       Total a aplicar: <strong>{fmtM(distribucio.reduce((s,d)=>s+d.aplicar,0))}</strong>

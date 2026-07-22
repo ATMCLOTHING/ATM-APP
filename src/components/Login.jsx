@@ -102,7 +102,7 @@ export default function Login({ supabase, onLogin }) {
             placeholder="Contraseña"/>
         </label>
         <button onClick={ingresar} disabled={cargando} style={S.btnLogin}>
-          {cargando ? '⏳ Verificando…' : 'Ingresar'}
+          {cargando ? <><span style={{fontSize:18}}>⏳</span> Verificando…</> : 'Ingresar'}
         </button>
         <p style={{textAlign:'center',fontSize:11,color:'#aab8d4',marginTop:16}}>
           ATM Clothing Brand © 2026

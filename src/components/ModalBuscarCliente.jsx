@@ -28,7 +28,7 @@ export default function ModalBuscarCliente({ supabase, onSelect, onClose }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>🔍 BUSCAR CLIENTE</span>
+          <span><span style={{fontSize:21}}>🔍</span> BUSCAR CLIENTE</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -42,7 +42,7 @@ export default function ModalBuscarCliente({ supabase, onSelect, onClose }) {
             placeholder="Nombre, cédula o NIT…"
           />
           <button onClick={buscar} disabled={buscando} style={S.btnBuscar}>
-            {buscando ? '⏳' : '🔍 Buscar'}
+            {buscando ? <span style={{fontSize:17}}>⏳</span> : <><span style={{fontSize:17}}>🔍</span> Buscar</>}
           </button>
         </div>
 

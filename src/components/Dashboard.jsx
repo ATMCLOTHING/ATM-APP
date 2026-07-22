@@ -117,7 +117,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
         {usuario.rol === 'admin' && (
           <div style={S.seccion}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:10}}>
-              <div style={S.secTit} className="no-mb">📈 {metricas?.esHoy ? 'Resumen del día' : `Resumen ${desde} → ${hasta}`}</div>
+              <div style={S.secTit} className="no-mb"><span style={{fontSize:17}}>📈</span> {metricas?.esHoy ? 'Resumen del día' : `Resumen ${desde} → ${hasta}`}</div>
               <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                 <label style={{fontSize:11,fontWeight:700,color:'#888'}}>Desde
                   <input type="date" value={desde} onChange={e=>setDesde(e.target.value)}
@@ -128,7 +128,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
                     style={{marginLeft:6,border:'1px solid #ccc',borderRadius:4,padding:'4px 8px',fontSize:12}}/>
                 </label>
                 <button onClick={buscarRango} disabled={buscando} style={{background:'#1a3a6b',color:'#fff',border:'none',borderRadius:5,padding:'5px 14px',cursor:'pointer',fontWeight:700,fontSize:12}}>
-                  {buscando?'⏳':'🔍'} Consultar
+                  <span style={{fontSize:16}}>{buscando?'⏳':'🔍'}</span> Consultar
                 </button>
                 {!metricas?.esHoy && (
                   <button onClick={()=>{setDesde(hoy());setHasta(hoy());cargarMetricas(hoy(),hoy())}}
@@ -160,7 +160,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
 
         <div style={{display:'grid',gridTemplateColumns:usuario.rol==='admin'?'1fr 1fr':'1fr',gap:16}}>
           <div style={S.seccion}>
-            <div style={S.secTit}>🚀 Módulos</div>
+            <div style={S.secTit}><span style={{fontSize:17}}>🚀</span> Módulos</div>
             <div style={S.modulosGrid}>
               {modulosVisibles.map(m=>(
                 <button key={m.id} onClick={()=>onModulo(m.id)}
@@ -176,7 +176,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
               {metricas.topVend.length > 0 && (
                 <div style={S.seccion}>
-                  <div style={S.secTit}>🏆 Top Vendedoras Hoy</div>
+                  <div style={S.secTit}><span style={{fontSize:17}}>🏆</span> Top Vendedoras Hoy</div>
                   {metricas.topVend.map((v,i)=>(
                     <div key={v.nombre} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid #eee'}}>
                       <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -194,7 +194,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
 
               {metricas.bajos.length > 0 && (
                 <div style={S.seccion}>
-                  <div style={S.secTit}>⚠️ Existencias Bajas</div>
+                  <div style={S.secTit}><span style={{fontSize:17}}>⚠️</span> Existencias Bajas</div>
                   {metricas.bajos.map(a=>(
                     <div key={a.codartic} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #eee',fontSize:12}}>
                       <span><strong>{a.codartic}</strong> — {a.descartic}</span>

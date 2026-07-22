@@ -549,19 +549,19 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   const TABS = [
-    {id:'consolidado', label:'📊 Consolidado'},
-    {id:'marcas',      label:'🏷️ Ventas por Marca'},
-    {id:'clientes',    label:'👥 Ventas por Cliente'},
-    {id:'resumen',     label:'💰 Resumen del Día'},
-    {id:'top',         label:'🏆 Top Artículos'},
-    {id:'cartera',     label:'📋 Cartera Pendiente'},
-    {id:'anuladas',    label:'🗑 Notas Anuladas'},
-    {id:'porusuario',  label:'👤 Por Usuario'},
+    {id:'consolidado', icon:'📊', label:'Consolidado'},
+    {id:'marcas',      icon:'🏷️', label:'Ventas por Marca'},
+    {id:'clientes',    icon:'👥', label:'Ventas por Cliente'},
+    {id:'resumen',     icon:'💰', label:'Resumen del Día'},
+    {id:'top',         icon:'🏆', label:'Top Artículos'},
+    {id:'cartera',     icon:'📋', label:'Cartera Pendiente'},
+    {id:'anuladas',    icon:'🗑', label:'Notas Anuladas'},
+    {id:'porusuario',  icon:'👤', label:'Por Usuario'},
   ]
 
   const TablaConsolidado = ({ titulo, datos: filas, icono }) => (
     <div style={{marginBottom:24}}>
-      <div style={P.secTit}>{icono} {titulo} — {desde} al {hasta}</div>
+      <div style={P.secTit}><span style={{fontSize:18}}>{icono}</span> {titulo} — {desde} al {hasta}</div>
       <table style={P.tabla}>
         <thead>
           <tr style={P.thead}>
@@ -608,18 +608,18 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
           <label style={P.lbl}>Desde<input type="date" style={P.inp} value={desde} onChange={e=>setDesde(e.target.value)}/></label>
           <label style={P.lbl}>Hasta<input type="date" style={P.inp} value={hasta} onChange={e=>setHasta(e.target.value)}/></label>
           <button onClick={generar} disabled={cargando} style={P.btnGenerar}>
-            {cargando ? '⏳ Calculando…' : '🔍 Generar Informes'}
+            {cargando ? <><span style={{fontSize:17}}>⏳</span> Calculando…</> : <><span style={{fontSize:17}}>🔍</span> Generar Informes</>}
           </button>
           {datos && (
             <div style={{marginLeft:'auto',display:'flex',gap:8}}>
-              {tab==='consolidado' && <button onClick={imprimirConsolidado} style={P.btnPrint}>🖨 Imprimir</button>}
-              {tab==='marcas'      && <button onClick={imprimirMarcas}      style={P.btnPrint}>🖨 Imprimir</button>}
-              {tab==='clientes'    && <button onClick={imprimirVentasCliente} style={P.btnPrint}>🖨 Imprimir</button>}
-              {tab==='resumen'     && <button onClick={imprimirResumen}     style={P.btnPrint}>🖨 Imprimir</button>}
-              {tab==='top'         && <button onClick={imprimirTop}         style={P.btnPrint}>🖨 Imprimir</button>}
-              {tab==='cartera'     && <button onClick={imprimirCartera}     style={P.btnPrint}>🖨 Imprimir</button>}
-              {tab==='anuladas'    && <button onClick={imprimirAnuladas}    style={P.btnPrint}>🖨 Imprimir</button>}
-              {tab==='porusuario'  && <button onClick={imprimirPorUsuario}  style={P.btnPrint}>🖨 Imprimir</button>}
+              {tab==='consolidado' && <button onClick={imprimirConsolidado} style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='marcas'      && <button onClick={imprimirMarcas}      style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='clientes'    && <button onClick={imprimirVentasCliente} style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='resumen'     && <button onClick={imprimirResumen}     style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='top'         && <button onClick={imprimirTop}         style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='cartera'     && <button onClick={imprimirCartera}     style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='anuladas'    && <button onClick={imprimirAnuladas}    style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='porusuario'  && <button onClick={imprimirPorUsuario}  style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
             </div>
           )}
         </div>
@@ -637,7 +637,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {TABS.map(t=>(
                 <button key={t.id} onClick={()=>setTab(t.id)}
                   style={{...P.tab,...(tab===t.id?P.tabActivo:{})}}>
-                  {t.label}
+                  <span style={{fontSize:16}}>{t.icon}</span> {t.label}
                 </button>
               ))}
             </div>
@@ -654,7 +654,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                   <TablaConsolidado titulo="Totales por Caja" icono="🏧" datos={cons.porCaja} />
 
                   {/* Fila de totales generales */}
-                  <div style={P.secTit}>📊 Totales Generales</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>📊</span> Totales Generales</div>
                   <table style={P.tabla}>
                     <tbody>
                       <tr style={P.totRow}>
@@ -672,7 +672,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
                   {/* DIGITAL — aparte, no se suma al cierre */}
                   <div style={P.digitalBox}>
-                    <span>📲 MARCA DIGITAL (no incluida en el cierre de caja)</span>
+                    <span><span style={{fontSize:17}}>📲</span> MARCA DIGITAL (no incluida en el cierre de caja)</span>
                     <strong>${fmt(cons.totales.digital)}</strong>
                   </div>
                 </div>
@@ -681,7 +681,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── VENTAS POR MARCA ── */}
               {tab==='marcas' && marcas && (
                 <div>
-                  <div style={P.secTit}>🏷️ Ventas por Marca — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>🏷️</span> Ventas por Marca — {desde} al {hasta}</div>
                   <table style={P.tabla}>
                     <thead>
                       <tr style={P.thead}>
@@ -695,7 +695,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                         const esDigital = m.trim().toUpperCase()==='DIGITAL'
                         return (
                           <tr key={m} style={{background:esDigital?'#ede7f6':i%2===0?'#fff':'#f5f7fc'}}>
-                            <td style={{...P.td,fontWeight:600,color:esDigital?'#4527a0':'#333'}}>{m}{esDigital?' 📲':''}</td>
+                            <td style={{...P.td,fontWeight:600,color:esDigital?'#4527a0':'#333'}}>{m}{esDigital?<> <span style={{fontSize:15}}>📲</span></>:''}</td>
                             <td style={{...P.td,textAlign:'right'}}>{v.unidades}</td>
                             <td style={{...P.td,textAlign:'right'}}>${fmt(v.unidades>0?v.total/v.unidades:0)}</td>
                             <td style={{...P.td,textAlign:'right',fontWeight:700,color:esDigital?'#4527a0':'#1a3a6b'}}>${fmt(v.total)}</td>
@@ -716,7 +716,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── RESUMEN DEL DÍA ── */}
               {tab==='resumen' && resumen && (
                 <div style={{maxWidth:600}}>
-                  <div style={P.secTit}>💰 Resumen del Día — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>💰</span> Resumen del Día — {desde} al {hasta}</div>
                   {[
                     {lbl:'Notas generadas',                          val:resumen.cantNotas},
                     {lbl:'Ventas totales (contado + crédito)',        val:`$${fmt(resumen.totalVentas)}`,        grande:true},
@@ -742,7 +742,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
                   {/* DIGITAL — aparte, no se suma al cierre */}
                   <div style={P.digitalBox}>
-                    <span>📲 MARCA DIGITAL (no incluida en el cierre de caja)</span>
+                    <span><span style={{fontSize:17}}>📲</span> MARCA DIGITAL (no incluida en el cierre de caja)</span>
                     <strong>${fmt(resumen.totalDigital)}</strong>
                   </div>
                 </div>
@@ -751,7 +751,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── TOP ARTÍCULOS ── */}
               {tab==='top' && (
                 <div>
-                  <div style={P.secTit}>🏆 Top 10 Artículos — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>🏆</span> Top 10 Artículos — {desde} al {hasta}</div>
                   <table style={P.tabla}>
                     <thead>
                       <tr style={P.thead}>
@@ -779,7 +779,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── VENTAS POR CLIENTE ── */}
               {tab==='clientes' && ventasCli && (
                 <div>
-                  <div style={P.secTit}>👥 Ventas por Cliente — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>👥</span> Ventas por Cliente — {desde} al {hasta}</div>
                   <div style={{background:'#1a3a6b',color:'#fff',padding:'6px 12px',borderRadius:5,marginBottom:8,fontWeight:700,fontSize:13}}>
                     VENTAS MOSTRADOR (CLIENTE GENERAL) — ${fmt(ventasCli.totMostrador)}
                     <span style={{marginLeft:16,fontSize:11,fontWeight:400,opacity:0.8}}>{ventasCli.mostrador.length} notas</span>
@@ -823,7 +823,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── CARTERA PENDIENTE ── */}
               {tab==='cartera' && (
                 <div>
-                  <div style={P.secTit}>📋 Cartera Pendiente — Notas con saldo sin pagar</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>📋</span> Cartera Pendiente — Notas con saldo sin pagar</div>
                   <table style={P.tabla}>
                     <thead>
                       <tr style={P.thead}>
@@ -851,7 +851,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                           <td style={P.td}></td>
                         </tr>
                       )}
-                      {cartera.length===0 && <tr><td colSpan={7} style={{textAlign:'center',padding:20,color:'#2e7d32',fontWeight:700}}>✅ Sin cartera pendiente en este período.</td></tr>}
+                      {cartera.length===0 && <tr><td colSpan={7} style={{textAlign:'center',padding:20,color:'#2e7d32',fontWeight:700}}><span style={{fontSize:16}}>✅</span> Sin cartera pendiente en este período.</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -863,7 +863,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                 if (!pu) return <div style={{textAlign:'center',padding:30,color:'#aaa'}}>Sin datos.</div>
                 return (
                   <div>
-                    <div style={P.secTit}>👤 Consolidado por Usuario — {desde} al {hasta}</div>
+                    <div style={P.secTit}><span style={{fontSize:18}}>👤</span> Consolidado por Usuario — {desde} al {hasta}</div>
                     {Object.entries(pu).sort((a,b)=>a[0].localeCompare(b[0])).map(([usu,u])=>(
                       <div key={usu} style={{marginBottom:24,border:'1px solid #e0e7f0',borderRadius:8,overflow:'hidden'}}>
                         {/* Header usuario */}
@@ -937,9 +937,9 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── NOTAS ANULADAS ── */}
               {tab==='anuladas' && (
                 <div>
-                  <div style={P.secTit}>🗑 Notas Anuladas — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>🗑</span> Notas Anuladas — {desde} al {hasta}</div>
                   {(datos.notasAnuladas||[]).length === 0
-                    ? <div style={{textAlign:'center',padding:30,color:'#2e7d32',fontWeight:700}}>✅ No hay notas anuladas en este período.</div>
+                    ? <div style={{textAlign:'center',padding:30,color:'#2e7d32',fontWeight:700}}><span style={{fontSize:16}}>✅</span> No hay notas anuladas en este período.</div>
                     : (
                       <table style={P.tabla}>
                         <thead>

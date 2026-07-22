@@ -28,7 +28,7 @@ export default function ModalDevolucion({ linea, onConfirmar, onClose }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.cabecera}>
-          <span>↩ CANTIDAD A DEVOLVER</span>
+          <span><span style={{fontSize:18}}>↩</span> CANTIDAD A DEVOLVER</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -57,7 +57,7 @@ export default function ModalDevolucion({ linea, onConfirmar, onClose }) {
         <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:16}}>
           <button onClick={onClose} style={S.btnCan}>Cancelar</button>
           <button onClick={confirmar} disabled={busy} style={S.btnOk}>
-            {busy ? 'Procesando…' : '↩ Devolver'}
+            {busy ? 'Procesando…' : <><span style={{fontSize:17}}>↩</span> Devolver</>}
           </button>
         </div>
       </div>

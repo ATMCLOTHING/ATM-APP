@@ -35,7 +35,7 @@ export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClo
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>✎ EDITAR CLIENTE — {cliente?.cedula||cliente?.id}</span>
+          <span><span style={{fontSize:18}}>✎</span> EDITAR CLIENTE — {cliente?.cedula||cliente?.id}</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -65,7 +65,7 @@ export default function ModalEditarCliente({ supabase, cliente, onGuardar, onClo
         <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:16}}>
           <button onClick={onClose} style={S.btnCancel}>Cancelar</button>
           <button onClick={guardar} disabled={guardando} style={S.btnGuardar}>
-            {guardando ? '⏳ Guardando…' : '💾 Guardar cambios'}
+            {guardando ? <><span style={{fontSize:17}}>⏳</span> Guardando…</> : <><span style={{fontSize:17}}>💾</span> Guardar cambios</>}
           </button>
         </div>
       </div>

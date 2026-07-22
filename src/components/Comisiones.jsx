@@ -259,17 +259,17 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
     <div style={S.wrap}>
       {/* HEADER */}
       <div style={S.header}>
-        <span style={S.headerTit}>💼 COMISIONES</span>
+        <span style={S.headerTit}><span style={{fontSize:23}}>💼</span> COMISIONES</span>
         {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18,marginLeft:'auto'}}>❓</button>}
         <button onClick={onClose} style={S.btnMenu}>← Menú</button>
       </div>
 
       {/* TABS */}
       <div style={S.tabs}>
-        {[{id:'liquidar',label:'💵 Liquidar Comisión'},{id:'historial',label:'📋 Historial'},{id:'porcentajes',label:'⚙️ Porcentajes'}].map(t=>(
+        {[{id:'liquidar',icon:'💵',label:'Liquidar Comisión'},{id:'historial',icon:'📋',label:'Historial'},{id:'porcentajes',icon:'⚙️',label:'Porcentajes'}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{...S.tab,...(tab===t.id?S.tabActivo:{})}}>
-            {t.label}
+            <span style={{fontSize:17}}>{t.icon}</span> {t.label}
           </button>
         ))}
       </div>
@@ -309,7 +309,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
               </Fld>
             </>}
             <button onClick={generar} disabled={cargando} style={{...S.btn,alignSelf:'flex-end'}}>
-              {cargando ? '⏳ Cargando…' : '🔍 Buscar notas'}
+              {cargando ? <><span style={{fontSize:17}}>⏳</span> Cargando…</> : <><span style={{fontSize:17}}>🔍</span> Buscar notas</>}
             </button>
           </div>
 
@@ -332,12 +332,12 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
           {generado && (
             <>
               <div style={S.acciones}>
-                <button onClick={selTodas}   style={S.btnSec}>✅ Seleccionar todas</button>
+                <button onClick={selTodas}   style={S.btnSec}><span style={{fontSize:16}}>✅</span> Seleccionar todas</button>
                 <button onClick={limpiarSel} style={S.btnSec}>☐ Limpiar selección</button>
-                <button onClick={imprimir}   style={S.btnSec} disabled={!notasSelArr.length}>🖨 Imprimir liquidación</button>
+                <button onClick={imprimir}   style={S.btnSec} disabled={!notasSelArr.length}><span style={{fontSize:16}}>🖨</span> Imprimir liquidación</button>
                 <button onClick={liquidar} disabled={liquidando||!notasSelArr.length}
                   style={{...S.btn,background:'#2e7d32',marginLeft:'auto'}}>
-                  {liquidando ? '⏳ Liquidando…' : `💾 Liquidar ${fmtM(valorComision)}`}
+                  {liquidando ? <><span style={{fontSize:17}}>⏳</span> Liquidando…</> : <><span style={{fontSize:17}}>💾</span> Liquidar {fmtM(valorComision)}</>}
                 </button>
               </div>
 
@@ -478,12 +478,12 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
       {tab==='porcentajes' && (
         <div style={{...S.contenido,padding:16}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <span style={{fontWeight:700,color:'#1a3a6b',fontSize:14}}>⚙️ Porcentajes de comisión por vendedor</span>
+            <span style={{fontWeight:700,color:'#1a3a6b',fontSize:14}}><span style={{fontSize:18}}>⚙️</span> Porcentajes de comisión por vendedor</span>
             {!editando
-              ? <button onClick={()=>setEditando(true)} style={S.btn}>✏️ Editar porcentajes</button>
+              ? <button onClick={()=>setEditando(true)} style={S.btn}><span style={{fontSize:17}}>✏️</span> Editar porcentajes</button>
               : <div style={{display:'flex',gap:8}}>
                   <button onClick={()=>setEditando(false)} style={S.btnSec}>Cancelar</button>
-                  <button onClick={guardarPorcentajes} style={{...S.btn,background:'#2e7d32'}}>💾 Guardar</button>
+                  <button onClick={guardarPorcentajes} style={{...S.btn,background:'#2e7d32'}}><span style={{fontSize:17}}>💾</span> Guardar</button>
                 </div>
             }
           </div>

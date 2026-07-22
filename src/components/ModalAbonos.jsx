@@ -113,7 +113,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
 
       <div style={S.modal}>
         <div style={S.cabecera}>
-          <span>💵 ABONOS — Nota {nroDoc}</span>
+          <span><span style={{fontSize:20}}>💵</span> ABONOS — Nota {nroDoc}</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -127,7 +127,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
         {msg && (
           <div style={{color:msg.tipo==='ok'?'#155724':'#721c24',background:msg.tipo==='ok'?'#d4edda':'#f8d7da',padding:'6px 10px',borderRadius:4,fontSize:12,marginBottom:10,display:'flex',justifyContent:'space-between'}}>
             {msg.texto}
-            <button onClick={()=>setMsg(null)} style={{background:'none',border:'none',cursor:'pointer',fontWeight:700}}>✕</button>
+            <button onClick={()=>setMsg(null)} style={{background:'none',border:'none',cursor:'pointer',fontWeight:700,fontSize:17}}>✕</button>
           </div>
         )}
 
@@ -152,7 +152,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
                         style={S.inpRev}
                         value={valoresRev[a.id]||''}
                         onChange={e=>setValoresRev(prev=>({...prev,[a.id]:e.target.value}))}/>
-                      <button onClick={()=>pedirRevertirParcial(a)} title="Revertir solo una parte" style={S.btnRevertirParcial}>↩ Parcial</button>
+                      <button onClick={()=>pedirRevertirParcial(a)} title="Revertir solo una parte" style={S.btnRevertirParcial}><span style={{fontSize:14}}>↩</span> Parcial</button>
                     </div>
                   </td>
                   <td style={{...S.td,textAlign:'center'}}>
@@ -160,7 +160,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
                       onClick={() => pedirRevertir(a)}
                       title="Revertir este abono por completo"
                       style={S.btnRevertir}>
-                      ↩ Total
+                      <span style={{fontSize:14}}>↩</span> Total
                     </button>
                   </td>
                 </tr>
@@ -192,13 +192,13 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
               <input style={S.inp} value={obs} onChange={e => setObs(e.target.value)} placeholder="Opcional…" />
             </label>
             <button onClick={registrarAbono} disabled={cargando} style={S.btnGuardar}>
-              {cargando ? 'Guardando…' : '💾 Registrar abono'}
+              {cargando ? 'Guardando…' : <><span style={{fontSize:17}}>💾</span> Registrar abono</>}
             </button>
           </div>
         )}
         {saldoFinal <= 0 && (
           <div style={{ textAlign:'center', color:'#27ae60', fontWeight:700, padding:12 }}>
-            ✅ Nota pagada completamente
+            <span style={{fontSize:17}}>✅</span> Nota pagada completamente
           </div>
         )}
       </div>

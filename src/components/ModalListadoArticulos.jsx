@@ -91,7 +91,7 @@ export default function ModalListadoArticulos({ supabase, onSelect, onClose }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>📦 LISTADO DE ARTÍCULOS</span>
+          <span><span style={{fontSize:20}}>📦</span> LISTADO DE ARTÍCULOS</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -114,10 +114,10 @@ export default function ModalListadoArticulos({ supabase, onSelect, onClose }) {
             <input style={S.inp} value={filtHasta} onChange={e=>setFiltHasta(e.target.value)} placeholder="Ej: 500"/>
           </label>
           <button onClick={buscar} disabled={cargando} style={S.btnBuscar}>
-            {cargando?'⏳':'🔍 Buscar'}
+            {cargando?<span style={{fontSize:17}}>⏳</span>:<><span style={{fontSize:17}}>🔍</span> Buscar</>}
           </button>
           <button onClick={imprimir} disabled={!articulos.length} style={S.btnImpr}>
-            🖨 Imprimir
+            <span style={{fontSize:17}}>🖨</span> Imprimir
           </button>
         </div>
 

@@ -178,7 +178,7 @@ export default function GestionUsuarios({ supabase, onClose }) {
                 </Campo>
                 {!modoNuevo && (
                   <div style={{alignSelf:'flex-end'}}>
-                    <button onClick={resetPass} style={P.btnReset}>🔄 Reset a Atm2026*</button>
+                    <button onClick={resetPass} style={P.btnReset}><span style={{fontSize:14}}>🔄</span> Reset a Atm2026*</button>
                   </div>
                 )}
               </div>
@@ -221,10 +221,10 @@ export default function GestionUsuarios({ supabase, onClose }) {
               {/* BOTONES */}
               <div style={{display:'flex',gap:8,marginTop:14,justifyContent:'flex-end'}}>
                 {!modoNuevo && seleccion?.rol!=='admin' && (
-                  <button onClick={eliminar} style={P.btnEliminar}>🗑 Eliminar</button>
+                  <button onClick={eliminar} style={P.btnEliminar}><span style={{fontSize:17}}>🗑</span> Eliminar</button>
                 )}
                 <button onClick={guardar} disabled={busy} style={P.btnGuardar}>
-                  {busy?'Guardando…':'💾 Guardar'}
+                  {busy?'Guardando…':<><span style={{fontSize:17}}>💾</span> Guardar</>}
                 </button>
               </div>
             </div>

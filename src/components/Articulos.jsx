@@ -320,7 +320,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
               <IBtn src={WZLOCATE} onClick={()=>setModal('listado')} title="Listado de artículos"/>
               <button onClick={()=>setModal('inventario')} title="Resumen del inventario"
                 style={{height:36,background:'#e8f5e9',border:'1px solid #a5d6a7',borderRadius:5,padding:'0 10px',cursor:'pointer',fontSize:12,fontWeight:700,color:'#2e7d32',whiteSpace:'nowrap'}}>
-                📊 Inventario
+                <span style={{fontSize:16}}>📊</span> Inventario
               </button>
             </div>
             <div style={P.btnFila}>
@@ -333,7 +333,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
                 onClick={()=>{ if(!guardado||modoNueva){setMsg({tipo:'err',texto:'Guarda el artículo antes de registrar una entrada.'}); return} setModal('entrada') }}
                 title="Registrar entrada de mercancía"
                 style={{background:'#e8f5e9',border:'1px solid #a5d6a7',borderRadius:5,padding:'4px 10px',cursor:'pointer',fontSize:11,fontWeight:800,color:'#2e7d32',height:38,display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap'}}>
-                📦 Entrada
+                <span style={{fontSize:14}}>📦</span> Entrada
               </button>
               <IBtn src={WZCLOSE}    onClick={onClose}              title="Volver al menú"/>
               {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:42,height:42,cursor:'pointer',fontSize:20,marginLeft:4}}>❓</button>}

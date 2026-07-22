@@ -637,8 +637,8 @@ export default function Manual({ onClose }) {
   return (
     <div style={S.wrap}>
       <div style={S.header}>
-        <span style={S.headerTit}>❓ MANUAL DE USUARIO — ATM CONTROL DE INVENTARIOS</span>
-        <button onClick={onClose} style={S.btnClose}>✕ Cerrar</button>
+        <span style={S.headerTit}><span style={{fontSize:21}}>❓</span> MANUAL DE USUARIO — ATM CONTROL DE INVENTARIOS</span>
+        <button onClick={onClose} style={S.btnClose}><span style={{fontSize:17}}>✕</span> Cerrar</button>
       </div>
 
       <div style={S.body}>

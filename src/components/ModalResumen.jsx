@@ -42,7 +42,7 @@ export default function ModalResumen({ supabase, onClose, onSelect }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.cabecera}>
-          <span>📊 RESUMEN DE VENTAS</span>
+          <span><span style={{fontSize:20}}>📊</span> RESUMEN DE VENTAS</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -55,7 +55,7 @@ export default function ModalResumen({ supabase, onClose, onSelect }) {
             <input type="date" style={S.inp} value={hasta} onChange={e => setHasta(e.target.value)} />
           </label>
           <button onClick={buscar} style={S.btnBuscar} disabled={cargando}>
-            {cargando ? '⏳ Buscando…' : '🔍 Buscar'}
+            {cargando ? <><span style={{fontSize:16}}>⏳</span> Buscando…</> : <><span style={{fontSize:16}}>🔍</span> Buscar</>}
           </button>
         </div>
 

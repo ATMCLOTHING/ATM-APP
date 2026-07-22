@@ -974,7 +974,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
 
             {resultDevolucion.vale ? (
               <div style={{background:'#fff8e1',border:'2px dashed #ffc107',borderRadius:8,padding:'14px 10px',marginBottom:14}}>
-                <div style={{fontSize:12,fontWeight:700,color:'#856404',marginBottom:4}}>🎫 SE GENERÓ UN VALE</div>
+                <div style={{fontSize:12,fontWeight:700,color:'#856404',marginBottom:4}}><span style={{fontSize:16}}>🎫</span> SE GENERÓ UN VALE</div>
                 <div style={{fontSize:22,fontWeight:900,color:'#856404',letterSpacing:1}}>{resultDevolucion.vale.codigo}</div>
                 <div style={{fontSize:15,fontWeight:700,color:'#1a3a6b',marginTop:4}}>${fmt(resultDevolucion.vale.valor)}</div>
               </div>
@@ -1032,7 +1032,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
                     </body></html>`)
                   w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},300)
                 }} style={{background:'#1a3a6b',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700,fontSize:13}}>
-                🖨 Imprimir comprobante
+                <span style={{fontSize:17}}>🖨</span> Imprimir comprobante
               </button>
               <button onClick={()=>setResultDevolucion(null)} style={{background:'#888',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700,fontSize:13}}>
                 Cerrar
@@ -1060,9 +1060,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
           <span style={P.titTxt}>NOTA DE ENTREGA</span>
           <div style={P.titNro}>
             N° <strong style={{fontSize:22}}>{nroDoc}</strong>
-            {modoNueva    && !guardada && <span style={{...P.badgeNueva,background:'#2e7d32'}}>➕ ADICIÓN</span>}
-            {guardada     && !desbloqueada && !anulada && <span style={{...P.badgeNueva,background:'#1a3a6b'}}>✅ GUARDADA</span>}
-            {desbloqueada && <span style={{...P.badgeNueva,background:'#ffc107',color:'#333'}}>🔓 EDICIÓN</span>}
+            {modoNueva    && !guardada && <span style={{...P.badgeNueva,background:'#2e7d32'}}><span style={{fontSize:13}}>➕</span> ADICIÓN</span>}
+            {guardada     && !desbloqueada && !anulada && <span style={{...P.badgeNueva,background:'#1a3a6b'}}><span style={{fontSize:13}}>✅</span> GUARDADA</span>}
+            {desbloqueada && <span style={{...P.badgeNueva,background:'#ffc107',color:'#333'}}><span style={{fontSize:13}}>🔓</span> EDICIÓN</span>}
             {anulada      && <span style={P.badgeAnul}>ANULADA</span>}
           </div>
           {onAyuda && <button onClick={onAyuda} title="Ayuda" style={P.btnAyuda}>❓</button>}
@@ -1281,7 +1281,7 @@ function BtnAcc({onClick,icon,children,disabled}){
   return(
     <button onClick={onClick} disabled={disabled}
       style={{background:disabled?'#f0f0f0':'#eef2ff',border:'1px solid #c8d5ea',borderRadius:8,padding:'7px 11px',cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.5:1,fontSize:12,fontWeight:700,color:'#1a3a6b',display:'flex',alignItems:'center',gap:5}}>
-      <span>{icon}</span>{children}
+      <span style={{fontSize:16}}>{icon}</span>{children}
     </button>
   )
 }
@@ -1465,7 +1465,7 @@ function ModalArticuloRapido({ cod, onConfirmar, onCancelar }) {
   return (
     <div style={MS.fondo}>
       <div style={MS.modal}>
-        <div style={MS.tit}>⚠️ Artículo no encontrado</div>
+        <div style={MS.tit}><span style={{fontSize:20}}>⚠️</span> Artículo no encontrado</div>
         <p style={{fontSize:13,color:'#555',margin:'0 0 12px'}}>
           El código <strong>{cod}</strong> no está registrado. ¿Deseas crearlo y agregarlo a la nota?
         </p>
@@ -1493,7 +1493,7 @@ function ModalArticuloRapido({ cod, onConfirmar, onCancelar }) {
             if (!form.descartic.trim()) return
             if (!form.valunit || Number(form.valunit)<=0) return
             onConfirmar({...form, cantidad:Number(form.cantidad)||1, valunit:Number(form.valunit)})
-          }} style={MS.btnOk}>✅ Crear y agregar</button>
+          }} style={MS.btnOk}><span style={{fontSize:17}}>✅</span> Crear y agregar</button>
         </div>
       </div>
     </div>
@@ -1515,7 +1515,7 @@ function ModalMotivoAnulacion({ onConfirmar, onCancelar }) {
   return (
     <div style={MS.fondo}>
       <div style={MS.modal}>
-        <div style={MS.tit}>🗑 Motivo de Anulación</div>
+        <div style={MS.tit}><span style={{fontSize:20}}>🗑</span> Motivo de Anulación</div>
         <label style={MS.lbl}>Selecciona el motivo
           <select style={MS.inp} value={motivo} onChange={e=>setMotivo(e.target.value)}>
             {MOTIVOS_ANULACION.map(m=><option key={m} value={m}>{m}</option>)}
@@ -1530,7 +1530,7 @@ function ModalMotivoAnulacion({ onConfirmar, onCancelar }) {
         <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
           <button onClick={onCancelar} style={MS.btnCan}>Cancelar</button>
           <button onClick={()=>onConfirmar(motivoFinal)} style={{...MS.btnOk,background:'#c62828'}}>
-            🗑 Confirmar anulación
+            <span style={{fontSize:17}}>🗑</span> Confirmar anulación
           </button>
         </div>
       </div>

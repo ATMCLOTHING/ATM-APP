@@ -64,7 +64,7 @@ export default function ModalBuscarNota({ supabase, onSelect, onClose }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>🔍 BUSCAR NOTA DE ENTREGA</span>
+          <span><span style={{fontSize:20}}>🔍</span> BUSCAR NOTA DE ENTREGA</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -113,7 +113,7 @@ export default function ModalBuscarNota({ supabase, onSelect, onClose }) {
               </Lbl>
             </>}
             <button onClick={buscar} disabled={buscando} style={S.btnBuscar}>
-              {buscando ? '⏳ Buscando…' : '🔍 Buscar'}
+              {buscando ? <><span style={{fontSize:17}}>⏳</span> Buscando…</> : <><span style={{fontSize:17}}>🔍</span> Buscar</>}
             </button>
           </div>
         </div>
@@ -190,7 +190,7 @@ export default function ModalBuscarNota({ supabase, onSelect, onClose }) {
             <button onClick={onClose} style={S.btnCx}>Cancelar</button>
             <button onClick={()=>seleccion&&elegir(seleccion)}
               disabled={!seleccion} style={S.btnOk}>
-              ✅ Abrir nota
+              <span style={{fontSize:17}}>✅</span> Abrir nota
             </button>
           </div>
         </div>

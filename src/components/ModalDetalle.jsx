@@ -14,7 +14,7 @@ export default function ModalDetalle({ nroDoc, lineas, onClose }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.cabecera}>
-          <span>🔍 DETALLE — Nota {nroDoc}</span>
+          <span><span style={{fontSize:20}}>🔍</span> DETALLE — Nota {nroDoc}</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 

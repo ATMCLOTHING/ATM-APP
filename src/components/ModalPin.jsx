@@ -34,7 +34,7 @@ export default function ModalPin({ supabase, titulo, descripcion, onConfirm, onC
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.cabecera}>
-          <span>🔐 {titulo || 'Autorización requerida'}</span>
+          <span><span style={{fontSize:20}}>🔐</span> {titulo || 'Autorización requerida'}</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
         {descripcion && (
@@ -56,7 +56,7 @@ export default function ModalPin({ supabase, titulo, descripcion, onConfirm, onC
         <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:14}}>
           <button onClick={onClose} style={S.btnCancelar}>Cancelar</button>
           <button onClick={validar} disabled={cargando} style={S.btnConfirmar}>
-            {cargando ? 'Verificando…' : '✅ Confirmar'}
+            {cargando ? 'Verificando…' : <><span style={{fontSize:17}}>✅</span> Confirmar</>}
           </button>
         </div>
       </div>

@@ -94,9 +94,9 @@ export default function ModalInventario({ supabase, onClose }) {
       <div style={S.modal}>
         {/* Header */}
         <div style={S.header}>
-          <span style={S.tit}>📊 RESUMEN DE INVENTARIO</span>
-          <button onClick={imprimir} style={S.btnPrint}>🖨 Imprimir</button>
-          <button onClick={onClose}  style={S.btnX}>✕ Cerrar</button>
+          <span style={S.tit}><span style={{fontSize:20}}>📊</span> RESUMEN DE INVENTARIO</span>
+          <button onClick={imprimir} style={S.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>
+          <button onClick={onClose}  style={S.btnX}><span style={{fontSize:17}}>✕</span> Cerrar</button>
         </div>
 
         {/* Controles */}

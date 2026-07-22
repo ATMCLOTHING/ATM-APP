@@ -49,7 +49,7 @@ export default function ModalVale({ supabase, saldoNota, onAplicar, onClose }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.cabecera}>
-          <span>🎫 APLICAR VALE COMO PAGO</span>
+          <span><span style={{fontSize:18}}>🎫</span> APLICAR VALE COMO PAGO</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -64,7 +64,7 @@ export default function ModalVale({ supabase, saldoNota, onAplicar, onClose }) {
                   onKeyDown={e=>e.key==='Enter'&&buscar()}
                   placeholder="Ej: V-000012 o nombre del cliente"/>
                 <button onClick={buscar} disabled={buscando} style={S.btnBuscar}>
-                  {buscando ? '…' : '🔍 Buscar'}
+                  {buscando ? '…' : <><span style={{fontSize:17}}>🔍</span> Buscar</>}
                 </button>
               </div>
             </label>
@@ -106,7 +106,7 @@ export default function ModalVale({ supabase, saldoNota, onAplicar, onClose }) {
           <button onClick={onClose} style={S.btnCan}>Cancelar</button>
           {vale && (
             <button onClick={aplicar} disabled={busy} style={S.btnOk}>
-              {busy ? 'Aplicando…' : '✅ Aplicar vale'}
+              {busy ? 'Aplicando…' : <><span style={{fontSize:17}}>✅</span> Aplicar vale</>}
             </button>
           )}
         </div>

@@ -117,7 +117,7 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
             <span style={{fontFamily:'Arial Black',fontWeight:900,fontSize:20,color:'#fff',letterSpacing:3}}>ATM</span>
             <span style={{fontSize:9,color:'rgba(255,255,255,0.8)',letterSpacing:2}}>A TU MEDIDA</span>
           </div>
-          <span style={P.titTxt}>🎫 CONSULTAR VALES</span>
+          <span style={P.titTxt}><span style={{fontSize:20}}>🎫</span> CONSULTAR VALES</span>
           {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18}}>❓</button>}
           <button onClick={onClose} style={P.btnCerrar}>← Menú</button>
         </div>
@@ -146,7 +146,7 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
             </select>
           </Campo>
           <button onClick={buscar} disabled={buscando} style={P.btnBuscar}>
-            {buscando ? '⏳ Buscando…' : '🔍 Buscar'}
+            {buscando ? <><span style={{fontSize:17}}>⏳</span> Buscando…</> : <><span style={{fontSize:17}}>🔍</span> Buscar</>}
           </button>
         </div>
 
@@ -207,9 +207,9 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
               ))}
 
               <div style={{display:'flex',gap:8,marginTop:14}}>
-                <button onClick={()=>reimprimir(seleccion)} style={P.btnAccion}>🖨 Reimprimir</button>
+                <button onClick={()=>reimprimir(seleccion)} style={P.btnAccion}><span style={{fontSize:16}}>🖨</span> Reimprimir</button>
                 {seleccion.estado!=='ANULADO' && (
-                  <button onClick={()=>pedirAnular(seleccion)} style={{...P.btnAccion,background:'#fdecea',color:'#c62828',border:'1px solid #ef9a9a'}}>🚫 Anular</button>
+                  <button onClick={()=>pedirAnular(seleccion)} style={{...P.btnAccion,background:'#fdecea',color:'#c62828',border:'1px solid #ef9a9a'}}><span style={{fontSize:16}}>🚫</span> Anular</button>
                 )}
               </div>
             </div>

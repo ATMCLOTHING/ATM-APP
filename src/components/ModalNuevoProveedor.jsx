@@ -24,7 +24,7 @@ export default function ModalNuevoProveedor({ supabase, onGuardar, onClose }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>➕ NUEVO PROVEEDOR</span>
+          <span><span style={{fontSize:18}}>➕</span> NUEVO PROVEEDOR</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
         {err && <div style={S.err}>{err}</div>}
@@ -60,7 +60,7 @@ export default function ModalNuevoProveedor({ supabase, onGuardar, onClose }) {
         <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:14}}>
           <button onClick={onClose} style={S.btnCan}>Cancelar</button>
           <button onClick={guardar} disabled={busy} style={S.btnOk}>
-            {busy?'Guardando…':'💾 Guardar proveedor'}
+            {busy?'Guardando…':<><span style={{fontSize:17}}>💾</span> Guardar proveedor</>}
           </button>
         </div>
       </div>

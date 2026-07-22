@@ -153,7 +153,7 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
         <span style={S.hTitle}>GESTIÓN DE VENDEDORES</span>
         <button style={S.hBtn} onClick={nuevo}>+ Nuevo</button>
         {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18}}>❓</button>}
-        <button style={S.hBtn} onClick={onClose}>✕ Cerrar</button>
+        <button style={S.hBtn} onClick={onClose}><span style={{fontSize:16}}>✕</span> Cerrar</button>
       </div>
 
       <div style={S.body}>
@@ -187,7 +187,7 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
         {form ? (
           <div style={S.form}>
             <div style={S.fTitulo}>
-              {esNuevo ? '➕ Nuevo Vendedor' : `✏️ Editar — ${form.nombre}`}
+              {esNuevo ? <><span style={{fontSize:20}}>➕</span> Nuevo Vendedor</> : <><span style={{fontSize:20}}>✏️</span> Editar — {form.nombre}</>}
             </div>
 
             {msg && <div style={{ ...S.msg, ...(msg.ok ? S.msgOk : S.msgErr) }}>{msg.txt}</div>}
@@ -225,16 +225,16 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
 
             <div style={S.btnBar}>
               <button style={{ ...S.btn, ...S.btnSave }} onClick={guardar} disabled={guardando}>
-                💾 {guardando ? 'Guardando…' : 'Guardar'}
+                <span style={{fontSize:16}}>💾</span> {guardando ? 'Guardando…' : 'Guardar'}
               </button>
               {!esNuevo && (
                 <button style={{ ...S.btn, ...S.btnDel, background: confirmDel ? '#b71c1c' : '#e53935' }}
                   onClick={retirar} disabled={guardando}>
-                  🚪 {confirmDel ? '¿Confirmar retiro?' : 'Retirar'}
+                  <span style={{fontSize:16}}>🚪</span> {confirmDel ? '¿Confirmar retiro?' : 'Retirar'}
                 </button>
               )}
               <button style={{ ...S.btn, ...S.btnNew }} onClick={nuevo} disabled={guardando}>
-                ➕ Nuevo
+                <span style={{fontSize:16}}>➕</span> Nuevo
               </button>
               <button style={{ ...S.btn, ...S.btnCx }} onClick={cancelar} disabled={guardando}>
                 Cancelar
@@ -246,7 +246,7 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
             <span style={{ fontSize:62 }}>🙋</span>
             <span>Selecciona un vendedor de la lista o crea uno nuevo</span>
             <button style={{ ...S.btn, ...S.btnNew, fontSize:14, padding:'10px 24px' }} onClick={nuevo}>
-              ➕ Nuevo Vendedor
+              <span style={{fontSize:18}}>➕</span> Nuevo Vendedor
             </button>
           </div>
         )}

@@ -175,7 +175,7 @@ export default function ControlDocumentos({ supabase, onClose }) {
                       <td style={{...P.td,textAlign:'right',fontWeight:700,color:n.saldo>0?'#c62828':'#2e7d32'}}>${fmt(n.saldo)}</td>
                       <td style={P.td}>
                         <span style={{...P.badge, background:est.bg, color:est.color, border:`1px solid ${est.color}44`}}>
-                          {est.icon} {est.label}
+                          <span style={{fontSize:14}}>{est.icon}</span> {est.label}
                         </span>
                       </td>
                       <td style={{...P.td,minWidth:200}}>

@@ -84,7 +84,7 @@ export default function ModalEntradaMercancia({ supabase, articulo, usuario, onG
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>📦 ENTRADA DE MERCANCÍA</span>
+          <span><span style={{fontSize:18}}>📦</span> ENTRADA DE MERCANCÍA</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -137,7 +137,7 @@ export default function ModalEntradaMercancia({ supabase, articulo, usuario, onG
         <div style={{display:'flex', gap:8, marginTop:16, justifyContent:'flex-end'}}>
           <button onClick={onClose} style={S.btnCan}>Cancelar</button>
           <button onClick={guardar} disabled={busy} style={S.btnOk}>
-            {busy ? 'Guardando…' : '📦 Registrar entrada'}
+            {busy ? 'Guardando…' : <><span style={{fontSize:17}}>📦</span> Registrar entrada</>}
           </button>
         </div>
       </div>

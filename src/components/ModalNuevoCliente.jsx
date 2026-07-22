@@ -93,7 +93,7 @@ export default function ModalNuevoCliente({ supabase, cedulaInicial = '', onGuar
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>👤 CLIENTE NUEVO</span>
+          <span><span style={{fontSize:20}}>👤</span> CLIENTE NUEVO</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
 
@@ -167,7 +167,7 @@ export default function ModalNuevoCliente({ supabase, cedulaInicial = '', onGuar
         <div style={S.pie}>
           <button onClick={onClose} style={S.btnCx} disabled={guardando}>Cancelar</button>
           <button onClick={guardar} style={S.btnOk} disabled={guardando}>
-            {guardando ? 'Guardando…' : '✔ Guardar Cliente'}
+            {guardando ? 'Guardando…' : <><span style={{fontSize:17}}>✔</span> Guardar Cliente</>}
           </button>
         </div>
       </div>

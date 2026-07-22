@@ -166,13 +166,13 @@ export default function Egresos({ supabase, usuario, onClose }) {
     <div style={S.pag}>
       {/* ── Header ── */}
       <div style={S.head}>
-        <span style={S.hTit}>💸 CONTROL DE EGRESOS</span>
+        <span style={S.hTit}><span style={{fontSize:20}}>💸</span> CONTROL DE EGRESOS</span>
         <div style={{ display:'flex', gap:8 }}>
           <TabBtn id="registrar" cur={tab} set={setTab} label="+ Registrar Egreso"/>
-          <TabBtn id="consultar" cur={tab} set={setTab} label="🔍 Consultar / Imprimir"/>
-          <TabBtn id="resumen"   cur={tab} set={setTab} label="📊 Resumen por Categoría"/>
-          <TabBtn id="tipos"     cur={tab} set={setTab} label="⚙️ Tipos"/>
-          <TabBtn id="terceros_tab" cur={tab} set={setTab} label="👥 Terceros"/>
+          <TabBtn id="consultar" cur={tab} set={setTab} icon="🔍" label="Consultar / Imprimir"/>
+          <TabBtn id="resumen"   cur={tab} set={setTab} icon="📊" label="Resumen por Categoría"/>
+          <TabBtn id="tipos"     cur={tab} set={setTab} icon="⚙️" label="Tipos"/>
+          <TabBtn id="terceros_tab" cur={tab} set={setTab} icon="👥" label="Terceros"/>
         </div>
         <button onClick={onClose} style={S.btnClose}>← Menú</button>
       </div>
@@ -186,7 +186,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
         {/* ══ TAB REGISTRAR ══ */}
         {tab==='registrar' && (
           <div style={S.tarjeta}>
-            <div style={S.secTit}>📝 Nuevo Egreso</div>
+            <div style={S.secTit}><span style={{fontSize:18}}>📝</span> Nuevo Egreso</div>
             <div style={S.fila}>
               <Campo label="Tipo de Egreso *" w={260}>
                 <select style={S.inp} value={form.tipoegreso} onChange={e=>setF('tipoegreso',e.target.value)}>
@@ -233,7 +233,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
                       ))}
                       <div onClick={()=>{ setTab('terceros_tab'); setShowTerc(false) }}
                         style={{...S.dropItem, color:'#1a3a6b', fontWeight:700, borderTop:'1px solid #eee'}}>
-                        ➕ Crear nuevo tercero
+                        <span style={{fontSize:16}}>➕</span> Crear nuevo tercero
                       </div>
                     </div>
                   )}
@@ -279,10 +279,10 @@ export default function Egresos({ supabase, usuario, onClose }) {
               <span style={{fontSize:13,fontWeight:700,color:'#333'}}>TOTAL A PAGAR</span>
               <span style={{fontSize:22,fontWeight:900,color:'#1a3a6b'}}>{fmtM(valtotal())}</span>
               <button onClick={guardar} disabled={guardando} style={S.btnGuardar}>
-                💾 {guardando?'Guardando…':'Guardar Egreso'}
+                <span style={{fontSize:16}}>💾</span> {guardando?'Guardando…':'Guardar Egreso'}
               </button>
               <button onClick={()=>{ setForm({...FORM_VACIO}); setBusqTerc(''); setMsg(null) }}
-                style={S.btnLimpiar}>🧹 Limpiar</button>
+                style={S.btnLimpiar}><span style={{fontSize:16}}>🧹</span> Limpiar</button>
             </div>
           </div>
         )}
@@ -306,9 +306,9 @@ export default function Egresos({ supabase, usuario, onClose }) {
                 </select>
               </Campo>
               <button onClick={consultar} disabled={cargando} style={S.btnBuscar}>
-                {cargando?'⏳ Cargando…':'🔍 Consultar'}
+                {cargando?<><span style={{fontSize:16}}>⏳</span> Cargando…</>:<><span style={{fontSize:16}}>🔍</span> Consultar</>}
               </button>
-              {egresos.length>0 && <button onClick={imprimirEgresos} style={S.btnPrint}>🖨 Imprimir</button>}
+              {egresos.length>0 && <button onClick={imprimirEgresos} style={S.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
             </div>
             {egresos.length > 0 && (
               <div style={{marginBottom:10,display:'flex',gap:16,fontSize:12,fontWeight:700}}>
@@ -351,7 +351,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
             <div style={{...S.fila,marginBottom:12}}>
               <Campo label="Desde" w={150}><input type="date" style={S.inp} value={filtDesde} onChange={e=>setFiltDesde(e.target.value)}/></Campo>
               <Campo label="Hasta" w={150}><input type="date" style={S.inp} value={filtHasta} onChange={e=>setFiltHasta(e.target.value)}/></Campo>
-              <button onClick={consultar} disabled={cargando} style={S.btnBuscar}>{cargando?'⏳':'🔍 Consultar'}</button>
+              <button onClick={consultar} disabled={cargando} style={S.btnBuscar}>{cargando?<span style={{fontSize:16}}>⏳</span>:<><span style={{fontSize:16}}>🔍</span> Consultar</>}</button>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:12}}>
               {grupos.filter(g=>{
@@ -427,12 +427,12 @@ function GestionTipos({ supabase, grupos, detalles, onRecargar }) {
   return (
     <div style={{display:'flex',gap:16}}>
       <div style={{...S.tarjeta, width:340, flexShrink:0}}>
-        <div style={S.secTit}>📋 Tipos de Egreso</div>
+        <div style={S.secTit}><span style={{fontSize:18}}>📋</span> Tipos de Egreso</div>
         {msg&&<div style={{...S.alerta,background:msg.ok?'#e8f5e9':'#ffebee',color:msg.ok?'#2e7d32':'#c62828',marginBottom:8}}>{msg.txt}</div>}
         <div style={{display:'flex',gap:6,marginBottom:10}}>
           <input style={{...S.inp,flex:1}} value={nuevoGrupo} onChange={e=>setNuevoGrupo(e.target.value)}
             onKeyDown={e=>e.key==='Enter'&&crearGrupo()} placeholder="Nombre del tipo…"/>
-          <button onClick={crearGrupo} style={S.btnGuardar}>➕ Agregar</button>
+          <button onClick={crearGrupo} style={S.btnGuardar}><span style={{fontSize:16}}>➕</span> Agregar</button>
         </div>
         <div style={{maxHeight:500,overflowY:'auto'}}>
           {grupos.map(g=>(
@@ -449,11 +449,11 @@ function GestionTipos({ supabase, grupos, detalles, onRecargar }) {
 
       {grupoSel && (
         <div style={{...S.tarjeta, flex:1}}>
-          <div style={S.secTit}>📌 Detalles de: {grupoSel.nombre}</div>
+          <div style={S.secTit}><span style={{fontSize:18}}>📌</span> Detalles de: {grupoSel.nombre}</div>
           <div style={{display:'flex',gap:6,marginBottom:10}}>
             <input style={{...S.inp,flex:1}} value={nuevoDet} onChange={e=>setNuevoDet(e.target.value)}
               onKeyDown={e=>e.key==='Enter'&&crearDetalle()} placeholder="Nombre del detalle…"/>
-            <button onClick={crearDetalle} style={S.btnGuardar}>➕ Agregar</button>
+            <button onClick={crearDetalle} style={S.btnGuardar}><span style={{fontSize:16}}>➕</span> Agregar</button>
           </div>
           {detDelGrupo.length===0
             ? <div style={{color:'#aaa',textAlign:'center',padding:20}}>Sin detalles para este tipo.</div>
@@ -514,7 +514,7 @@ function GestionTerceros({ supabase, terceros, onRecargar }) {
       <div style={{...S.tarjeta,width:340,flexShrink:0}}>
         <div style={{...S.fila,marginBottom:8}}>
           <input style={{...S.inp,flex:1}} value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar tercero…"/>
-          <button onClick={limpiar} style={S.btnGuardar}>➕ Nuevo</button>
+          <button onClick={limpiar} style={S.btnGuardar}><span style={{fontSize:16}}>➕</span> Nuevo</button>
         </div>
         <div style={{maxHeight:500,overflowY:'auto'}}>
           {filtrados.map(t=>(
@@ -529,7 +529,7 @@ function GestionTerceros({ supabase, terceros, onRecargar }) {
 
       {(sel||nuevo) && (
         <div style={{...S.tarjeta,flex:1}}>
-          <div style={S.secTit}>{nuevo?'➕ Nuevo Tercero':`✏️ Editar — ${sel?.nomtercero}`}</div>
+          <div style={S.secTit}>{nuevo?<><span style={{fontSize:18}}>➕</span> Nuevo Tercero</>:<><span style={{fontSize:18}}>✏️</span> Editar — {sel?.nomtercero}</>}</div>
           {msg&&<div style={{...S.alerta,background:msg.ok?'#e8f5e9':'#ffebee',color:msg.ok?'#2e7d32':'#c62828',marginBottom:10}}>{msg.txt}</div>}
           <div style={S.fila}>
             <Campo label="Cédula / NIT" w={180}>
@@ -551,8 +551,8 @@ function GestionTerceros({ supabase, terceros, onRecargar }) {
             <Campo label="Email"><input style={S.inp} value={form.email||''} onChange={e=>setForm(p=>({...p,email:e.target.value}))}/></Campo>
           </div>
           <div style={{display:'flex',gap:8,marginTop:12}}>
-            <button onClick={guardar} disabled={busy} style={S.btnGuardar}>💾 Guardar</button>
-            {!nuevo&&<button onClick={retirar} style={{...S.btnLimpiar,background:'#fdecea',color:'#c62828'}}>🚪 Retirar</button>}
+            <button onClick={guardar} disabled={busy} style={S.btnGuardar}><span style={{fontSize:16}}>💾</span> Guardar</button>
+            {!nuevo&&<button onClick={retirar} style={{...S.btnLimpiar,background:'#fdecea',color:'#c62828'}}><span style={{fontSize:16}}>🚪</span> Retirar</button>}
             <button onClick={()=>{setSel(null);setNuevo(false);setMsg(null)}} style={S.btnLimpiar}>Cancelar</button>
           </div>
         </div>
@@ -570,12 +570,12 @@ function Campo({label,children,w}){
     </div>
   )
 }
-function TabBtn({id,cur,set,label}){
+function TabBtn({id,cur,set,label,icon}){
   return(
     <button onClick={()=>set(id)}
       style={{padding:'5px 12px',border:'none',borderRadius:5,cursor:'pointer',fontSize:12,fontWeight:cur===id?700:500,
         background:cur===id?'#1a3a6b':'rgba(255,255,255,0.2)',color:cur===id?'#fff':'rgba(255,255,255,0.85)'}}>
-      {label}
+      {icon ? <><span style={{fontSize:16}}>{icon}</span> {label}</> : label}
     </button>
   )
 }
