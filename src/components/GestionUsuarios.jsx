@@ -3,8 +3,12 @@ import { useState, useEffect } from 'react'
 import { WZCLOSE, WZNEW, WZSAVE, WZDELETE } from '../lib/assets'
 
 const ROLES = ['admin','cajera','vendedor','bodega']
-const MODULOS = ['notas','articulos','cierre','cartera','usuarios']
-const MODULO_LABELS = {notas:'Nota de Entrega',articulos:'Artículos/Proveedores',cierre:'Cierre de Caja',cartera:'Cartera',usuarios:'Usuarios'}
+const MODULOS = ['nota','clientes','articulos','proveedores','cierre','cartera','vales','vendedores','documentos','egresos','comisiones','usuarios']
+const MODULO_LABELS = {
+  nota:'Nota de Entrega', clientes:'Clientes', articulos:'Artículos', proveedores:'Proveedores',
+  cierre:'Cierre de Caja', cartera:'Cartera', vales:'Consultar Vales', vendedores:'Vendedores',
+  documentos:'Control Documentos', egresos:'Egresos', comisiones:'Comisiones', usuarios:'Usuarios',
+}
 
 const VACIO = {usuario:'',nombre:'',password_hash:'Atm2026*',rol:'cajera',cedula_vendedor:'',activo:true,debe_cambiar_pass:true}
 
@@ -48,6 +52,13 @@ export default function GestionUsuarios({ supabase, onClose }) {
 
   function upd(k,v){setForm(p=>({...p,[k]:v}))}
   function updPerm(mod,accion,val){setPermisos(p=>({...p,[mod]:{...p[mod],[accion]:val}}))}
+  function marcarVerTodos(val){
+    setPermisos(p=>{
+      const nuevo={...p}
+      MODULOS.forEach(m=>{ nuevo[m]={...nuevo[m],puede_ver:val} })
+      return nuevo
+    })
+  }
 
   async function guardar() {
     if (!form.usuario.trim()||!form.nombre.trim()) { setMsg({tipo:'err',texto:'Usuario y nombre son obligatorios.'}); return }
@@ -186,7 +197,13 @@ export default function GestionUsuarios({ supabase, onClose }) {
               {/* PERMISOS GRANULARES */}
               {form.rol !== 'admin' && (
                 <div style={{marginTop:12}}>
-                  <div style={{fontWeight:700,color:'#1a3a6b',fontSize:12,marginBottom:8,textTransform:'uppercase'}}>Permisos por módulo</div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                    <div style={{fontWeight:700,color:'#1a3a6b',fontSize:12,textTransform:'uppercase'}}>Permisos por módulo</div>
+                    <div style={{display:'flex',gap:6}}>
+                      <button type="button" onClick={()=>marcarVerTodos(true)} style={P.btnTodos}>Dar acceso a todos los módulos</button>
+                      <button type="button" onClick={()=>marcarVerTodos(false)} style={{...P.btnTodos,background:'#eee',color:'#555'}}>Quitar acceso a todos</button>
+                    </div>
+                  </div>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                     <thead>
                       <tr style={{background:'#dde3ee'}}>
@@ -270,4 +287,5 @@ const P={
   btnReset:  {background:'#fff3cd',border:'1px solid #ffc107',borderRadius:5,padding:'5px 10px',cursor:'pointer',fontWeight:600,fontSize:11,color:'#856404'},
   btnEliminar:{background:'#ffebee',border:'1px solid #ef9a9a',color:'#c62828',borderRadius:5,padding:'7px 14px',cursor:'pointer',fontWeight:700},
   btnGuardar:{background:'#1a3a6b',color:'#fff',border:'none',borderRadius:5,padding:'7px 20px',cursor:'pointer',fontWeight:700,fontSize:13},
+  btnTodos:  {background:'#1a3a6b',color:'#fff',border:'none',borderRadius:5,padding:'5px 10px',cursor:'pointer',fontWeight:700,fontSize:11},
 }

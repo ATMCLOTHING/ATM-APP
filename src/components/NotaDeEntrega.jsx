@@ -10,6 +10,7 @@ import ModalNuevoCliente  from './ModalNuevoCliente'
 import ModalPin           from './ModalPin'
 import ModalDevolucion    from './ModalDevolucion'
 import ModalVale          from './ModalVale'
+import ModalNuevaMarca    from './ModalNuevaMarca'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
@@ -337,7 +338,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   }, [])
 
   const detValidas = useMemo(()=>
-    lineas.filter(l=>l.codartic&&Number(l.cantidad)>0),
+    lineas.filter(l=>l.codartic&&Number(l.cantidad)!==0),
   [lineas])
 
   const { subtotal, totDcto, totIva, total, saldo, prendas } = useMemo(()=>{
@@ -565,14 +566,14 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
 
   // ── CREAR ARTÍCULO DESDE LA NOTA ─────────────────────────────────────
   async function crearArticuloDesdeNota(datos) {
-    // datos = {codartic, descartic, cantidad, valunit}
+    // datos = {codartic, descartic, cantidad, valunit, marca}
     setBusy(true)
     try {
       const idx = artNoEncontrado.idx
       // Crear en articulo
       await supabase.from('articulo').upsert({
         codartic: datos.codartic, descartic: datos.descartic,
-        tipo:'', tipotalla:'U', genero:'', marca:'',
+        tipo:'', tipotalla:'U', genero:'', marca:datos.marca||'',
         preciovent: datos.valunit, preciovend: datos.valunit, preciovenv: datos.valunit,
         preciocomp: 0, existencia: datos.cantidad, existminim: 0, estado:'A',
         usuario: usuario?.usuario || 'sistema',
@@ -583,7 +584,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       if (!existeComp || !existeComp.length) {
         await supabase.from('articomp').insert({
           codartic: datos.codartic, descartic: datos.descartic,
-          talla:'U', tipotalla:'U', tipo:'', marca:'', genero:'',
+          talla:'U', tipotalla:'U', tipo:'', marca:datos.marca||'', genero:'',
           preciovent: datos.valunit, preciovend: datos.valunit, preciovenv: datos.valunit,
           preciocomp: 0, existencia: datos.cantidad, existminim: 0, porciva: 0,
         })
@@ -596,7 +597,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         const sig = [...prev]
         sig[idx] = recalc({...sig[idx],
           codartic: datos.codartic, descartic: datos.descartic,
-          talla:'U', marca:'', genero:'',
+          talla:'U', marca:datos.marca||'', genero:'',
           valunit: datos.valunit, cantidad: datos.cantidad, porciva:0
         })
         if (idx===sig.length-1) sig.push({...VACIA})
@@ -941,6 +942,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
 
       {/* Modal artículo no encontrado — Punto 1 */}
       {artNoEncontrado && <ModalArticuloRapido
+        supabase={supabase}
         cod={artNoEncontrado.cod}
         onConfirmar={crearArticuloDesdeNota}
         onCancelar={()=>{ setArtNoEncontrado(null); setMsg({tipo:'err',texto:`❌ Código "${artNoEncontrado.cod}" no encontrado.`}) }}
@@ -1459,9 +1461,23 @@ const FilaGrilla = memo(function FilaGrilla({
 })
 
 // ── Modal artículo rápido (Punto 1) ─────────────────────────────────────
-function ModalArticuloRapido({ cod, onConfirmar, onCancelar }) {
-  const [form, setForm] = useState({ codartic:cod, descartic:'', cantidad:1, valunit:'' })
+function ModalArticuloRapido({ supabase, cod, onConfirmar, onCancelar }) {
+  const [form, setForm] = useState({ codartic:cod, descartic:'', cantidad:1, valunit:'', marca:'' })
+  const [marcas, setMarcas] = useState([])
+  const [modalMarca, setModalMarca] = useState(false)
   const set = (k,v) => setForm(p=>({...p,[k]:v}))
+
+  useEffect(()=>{
+    supabase.from('marcas').select('id,descmarca').order('descmarca')
+      .then(({data})=>setMarcas(data||[]))
+  },[supabase])
+
+  function onMarcaGuardada(marca){
+    setMarcas(prev=>[...prev,marca].sort((a,b)=>a.descmarca.localeCompare(b.descmarca)))
+    set('marca',marca.descmarca)
+    setModalMarca(false)
+  }
+
   return (
     <div style={MS.fondo}>
       <div style={MS.modal}>
@@ -1476,6 +1492,16 @@ function ModalArticuloRapido({ cod, onConfirmar, onCancelar }) {
         <label style={MS.lbl}>Descripción *
           <input autoFocus style={MS.inp} value={form.descartic}
             onChange={e=>set('descartic',e.target.value)} placeholder="Nombre del artículo"/>
+        </label>
+        <label style={MS.lbl}>Marca
+          <div style={{display:'flex',gap:4}}>
+            <select style={{...MS.inp,flex:1}} value={form.marca} onChange={e=>set('marca',e.target.value)}>
+              <option value="">--</option>
+              {marcas.map(m=><option key={m.id} value={m.descmarca}>{m.descmarca}</option>)}
+            </select>
+            <button type="button" onClick={()=>setModalMarca(true)} title="Nueva marca"
+              style={{...MS.inp,width:28,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,background:'#e8f5e9',fontWeight:900,fontSize:14}}>+</button>
+          </div>
         </label>
         <div style={{display:'flex',gap:10}}>
           <label style={{...MS.lbl,flex:1}}>Cantidad
@@ -1496,6 +1522,7 @@ function ModalArticuloRapido({ cod, onConfirmar, onCancelar }) {
           }} style={MS.btnOk}><span style={{fontSize:17}}>✅</span> Crear y agregar</button>
         </div>
       </div>
+      {modalMarca && <ModalNuevaMarca supabase={supabase} onGuardar={onMarcaGuardada} onClose={()=>setModalMarca(false)}/>}
     </div>
   )
 }
