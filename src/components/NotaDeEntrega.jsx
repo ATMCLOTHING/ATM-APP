@@ -213,17 +213,38 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     }, 50)
   }
 
-  // Procesa un código ingresado (pistola o manual con Enter)
+  // Busca en articomp por codartic exacto
+  async function buscarArticomp(val) {
+    const {data} = await supabase.from('articomp')
+      .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
+      .eq('codartic', val).limit(10)
+    return data
+  }
+
+  // Procesa un código ingresado (pistola o manual con Enter).
+  // La pistola agrega la talla (2 dígitos) al final de la referencia; lo digitado a mano
+  // trae solo la referencia. Como la referencia no tiene longitud fija, primero se busca
+  // el código tal cual, y solo si eso falla se reintenta recortando los últimos 2 dígitos.
   async function procesarCodigo(txt, idx) {
     if (!txt.trim()) return
     const cod = extraerCodigo(txt)
-    // Buscar exacto en articomp
-    const {data} = await supabase.from('articomp')
-      .select('codartic,descartic,talla,marca,genero,preciovent,preciovend,preciovenv,porciva')
-      .eq('codartic', cod).limit(10)
+
+    // 1) Intento directo, tal cual fue ingresado
+    let data = await buscarArticomp(cod)
+    let codUsado = cod
+
+    // 2) Si no hay match, puede ser pistola con talla incluida: recortar los últimos 2 dígitos y reintentar
+    if (!data || !data.length) {
+      const recorte = txt.trim().slice(0, -2)
+      if (recorte) {
+        const codRecortado = extraerCodigo(recorte)
+        const dataRecorte = await buscarArticomp(codRecortado)
+        if (dataRecorte && dataRecorte.length) { data = dataRecorte; codUsado = codRecortado }
+      }
+    }
 
     if (!data || !data.length) {
-      // No encontrado → ofrecer crear el artículo
+      // No encontrado con ninguno de los dos intentos → ofrecer crear el artículo
       setLineas(prev => { const n=[...prev]; n[idx]={...n[idx],codartic:txt}; return n })
       setArtNoEncontrado({cod, idx})
       return
@@ -234,7 +255,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       elegirArtPistola(data[0], idx)
     } else {
       // Varias tallas → mostrar dropdown para elegir
-      setLineas(prev => { const n=[...prev]; n[idx]={...n[idx],codartic:cod}; return n })
+      setLineas(prev => { const n=[...prev]; n[idx]={...n[idx],codartic:codUsado}; return n })
       setArtSugg(data); setArtIdx(idx)
     }
   }
