@@ -964,7 +964,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       {resultDevolucion        && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:600}}>
           <div style={{background:'#fff',borderRadius:10,padding:24,width:400,textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
-            <div style={{fontSize:30,marginBottom:6}}>↩</div>
+            <div style={{fontSize:39,marginBottom:6}}>↩</div>
             <div style={{fontWeight:800,fontSize:15,color:'#1a3a6b',marginBottom:4}}>DEVOLUCIÓN REGISTRADA</div>
             <div style={{fontSize:13,color:'#666',marginBottom:14,textAlign:'left',background:'#f4f6fb',border:'1px solid #c8d5ea',borderRadius:6,padding:'10px 12px'}}>
               <div><strong>{resultDevolucion.cantidad}</strong> × {resultDevolucion.descripcion} {resultDevolucion.talla?`(T:${resultDevolucion.talla})`:''}</div>
@@ -1086,7 +1086,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
                   onKeyDown={e=>e.key==='Enter'&&onCedulaEnter()}
                   placeholder="Cédula o NIT…" disabled={anulada && !desbloqueada}/>
                 <button onClick={()=>setModal('buscarCliente')}
-                  style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:15,background:'#eef2ff'}}>
+                  style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:20,background:'#eef2ff'}}>
                   🔍
                 </button>
               </div>
@@ -1097,7 +1097,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
                   onChange={e=>setCliTxt(e.target.value)}
                   placeholder="Nombre…" disabled={anulada && !desbloqueada}/>
                 {cliente && <button onClick={()=>setModal('editarCliente')}
-                  style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:15,background:'#fff3cd'}}>✎</button>}
+                  style={{...P.inp,width:32,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,fontSize:20,background:'#fff3cd'}}>✎</button>}
               </div>
             </Fld>
             <Fld label="Empresa" w={180}>
@@ -1203,14 +1203,14 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
               {guardada && !anulada && !modoNueva && !desbloqueada && (
                 <button onClick={()=>setModal('desbloquear')}
                   title="Desbloquear nota para edición"
-                  style={{background:'#fff3cd',border:'1px solid #ffc107',borderRadius:6,padding:'0 10px',cursor:'pointer',fontSize:13,fontWeight:700,color:'#856404',height:40}}>
+                  style={{background:'#fff3cd',border:'1px solid #ffc107',borderRadius:6,padding:'0 10px',cursor:'pointer',fontSize:17,fontWeight:700,color:'#856404',height:40}}>
                   🔓
                 </button>
               )}
               {desbloqueada && (
                 <button onClick={()=>{setDesbloqueada(false);cargarDoc(nroDoc)}}
                   title="Bloquear nota (descartar cambios)"
-                  style={{background:'#ffebee',border:'1px solid #ef9a9a',borderRadius:6,padding:'0 10px',cursor:'pointer',fontSize:13,fontWeight:700,color:'#c62828',height:40}}>
+                  style={{background:'#ffebee',border:'1px solid #ef9a9a',borderRadius:6,padding:'0 10px',cursor:'pointer',fontSize:17,fontWeight:700,color:'#c62828',height:40}}>
                   🔒
                 </button>
               )}
@@ -1272,8 +1272,8 @@ function Fld({label,w,children}){
 function IBtn({src,onClick,title,disabled}){
   return(
     <button onClick={onClick} title={title} disabled={disabled}
-      style={{background:'#eef2ff',border:'1px solid #c8d5ea',borderRadius:6,padding:4,cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.35:1,display:'flex',alignItems:'center',justifyContent:'center',width:44,height:40}}>
-      <img src={src} alt={title} style={{width:30,height:30,objectFit:'contain'}}/>
+      style={{background:'#eef2ff',border:'1px solid #c8d5ea',borderRadius:6,padding:5,cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.35:1,display:'flex',alignItems:'center',justifyContent:'center',width:57,height:52}}>
+      <img src={src} alt={title} style={{width:39,height:39,objectFit:'contain'}}/>
     </button>
   )
 }
@@ -1337,7 +1337,7 @@ function VendedorInput({ listaVend, cedVend, onChange, disabled }) {
         {cedVend && !disabled && (
           <button onClick={limpiar} title="Quitar vendedor"
             style={{...P.inp, width:24, padding:0, cursor:'pointer', textAlign:'center',
-              background:'#fdecea', color:'#c62828', fontWeight:900, fontSize:13, flexShrink:0}}>
+              background:'#fdecea', color:'#c62828', fontWeight:900, fontSize:17, flexShrink:0}}>
             ✕
           </button>
         )}
@@ -1378,9 +1378,9 @@ const P={
   titNro:    {background:'rgba(255,255,255,0.2)',borderRadius:6,padding:'5px 16px',fontSize:14,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:8},
   badgeNueva:{fontSize:10,background:'rgba(255,255,255,0.25)',borderRadius:4,padding:'2px 7px'},
   badgeAnul: {fontSize:10,background:'#e74c3c',borderRadius:4,padding:'2px 7px'},
-  btnAyuda:  {background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14,flexShrink:0},
+  btnAyuda:  {background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18,flexShrink:0},
   alerta:    {margin:'6px 12px',padding:'8px 14px',borderRadius:6,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center'},
-  alertaX:   {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:16},
+  alertaX:   {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:21},
   bloque:    {margin:'8px 12px',background:'#fff',borderRadius:8,border:'1px solid #e0e7f0',padding:'12px 14px',display:'flex',flexDirection:'column',gap:8},
   fila:      {display:'flex',flexWrap:'wrap',gap:8,alignItems:'flex-end'},
   inp:       {height:30,border:'1px solid #c8d5ea',borderRadius:5,padding:'0 8px',fontSize:13,background:'#fff',outline:'none',width:'100%',color:'#1a3a6b'},
@@ -1394,8 +1394,8 @@ const P={
   th:        {padding:'7px 8px',textAlign:'center',fontWeight:700,color:'#fff',borderRight:'1px solid #2c5fa8',whiteSpace:'nowrap',fontSize:12},
   td:        {padding:'3px 4px',borderRight:'1px solid #e8eef5',borderBottom:'1px solid #e8eef5',verticalAlign:'middle'},
   ci:        {border:'none',background:'transparent',fontSize:12,padding:'3px 4px',outline:'none',color:'#1a3a6b',height:26},
-  btnX:      {background:'none',border:'none',color:'#c0392b',cursor:'pointer',fontSize:13,fontWeight:700},
-  btnDev:    {background:'#fff3cd',border:'1px solid #ffc107',borderRadius:4,color:'#856404',cursor:'pointer',fontSize:12,fontWeight:700,padding:'1px 5px'},
+  btnX:      {background:'none',border:'none',color:'#c0392b',cursor:'pointer',fontSize:17,fontWeight:700},
+  btnDev:    {background:'#fff3cd',border:'1px solid #ffc107',borderRadius:4,color:'#856404',cursor:'pointer',fontSize:16,fontWeight:700,padding:'1px 5px'},
   footer:    {display:'flex',gap:12,flexWrap:'wrap',padding:'10px 14px',background:'#eef2ff',borderTop:'2px solid #c8d5ea',alignItems:'flex-start'},
   footCol:   {display:'flex',flexDirection:'column',gap:6},
   btnFila:   {display:'flex',gap:4},

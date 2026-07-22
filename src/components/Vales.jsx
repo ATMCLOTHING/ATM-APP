@@ -118,7 +118,7 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
             <span style={{fontSize:9,color:'rgba(255,255,255,0.8)',letterSpacing:2}}>A TU MEDIDA</span>
           </div>
           <span style={P.titTxt}>🎫 CONSULTAR VALES</span>
-          {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14}}>❓</button>}
+          {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18}}>❓</button>}
           <button onClick={onClose} style={P.btnCerrar}>← Menú</button>
         </div>
 
@@ -237,7 +237,7 @@ const P = {
   titTxt:   {fontWeight:900,fontSize:15,letterSpacing:2,flex:1,textAlign:'center'},
   btnCerrar:{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:5,padding:'4px 12px',cursor:'pointer',fontWeight:700,fontSize:13},
   alerta:   {margin:'8px 10px 0',padding:'7px 12px',borderRadius:5,fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center'},
-  alertaX:  {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:14},
+  alertaX:  {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:18},
   filtros:  {display:'flex',gap:10,alignItems:'flex-end',padding:'12px 14px',background:'#fff',borderBottom:'1px solid #c8d5ea',flexWrap:'wrap'},
   inp:      {height:30,border:'1px solid #c8d5ea',borderRadius:5,padding:'0 8px',fontSize:13,color:'#1a3a6b',outline:'none',width:'100%'},
   btnBuscar:{height:30,background:'#1a3a6b',color:'#fff',border:'none',borderRadius:5,padding:'0 18px',cursor:'pointer',fontSize:13,fontWeight:700},

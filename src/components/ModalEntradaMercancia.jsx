@@ -149,7 +149,7 @@ const S = {
   fondo:   { position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:500 },
   modal:   { background:'#fff', borderRadius:10, padding:22, width:420, boxShadow:'0 8px 32px rgba(0,0,0,0.25)', display:'flex', flexDirection:'column', gap:12 },
   titulo:  { display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:14, fontWeight:900, color:'#1a3a6b' },
-  btnX:    { background:'#e74c3c', color:'#fff', border:'none', borderRadius:4, padding:'2px 9px', cursor:'pointer', fontWeight:900, fontSize:15 },
+  btnX:    { background:'#e74c3c', color:'#fff', border:'none', borderRadius:4, padding:'2px 9px', cursor:'pointer', fontWeight:900, fontSize:20 },
   info:    { background:'#f4f6fb', border:'1px solid #c8d5ea', borderRadius:6, padding:'10px 12px' },
   err:     { background:'#ffebee', color:'#c62828', border:'1px solid #ef9a9a', borderRadius:4, padding:'6px 10px', fontSize:12 },
   preview: { background:'#e8f5e9', border:'1px solid #a5d6a7', borderRadius:6, padding:'8px 12px', fontSize:13, color:'#333' },

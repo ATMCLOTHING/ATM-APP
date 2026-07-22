@@ -115,7 +115,7 @@ export default function Login({ supabase, onLogin }) {
 const S = {
   pagina:  {minHeight:'100vh',background:'linear-gradient(135deg,#1a3a6b,#2c5fa8)',display:'flex',alignItems:'center',justifyContent:'center',padding:24},
   card:    {background:'#fff',borderRadius:20,padding:'40px 36px',width:'100%',maxWidth:380,boxShadow:'0 20px 60px rgba(0,0,0,0.3)',display:'flex',flexDirection:'column',gap:12},
-  logo:    {height:80,objectFit:'contain',alignSelf:'center',marginBottom:4},
+  logo:    {height:104,objectFit:'contain',alignSelf:'center',marginBottom:4},
   empresa: {fontSize:24,fontWeight:900,color:'#1a3a6b',letterSpacing:2,textAlign:'center',margin:0},
   slogan:  {fontSize:10,color:'#7a99cc',letterSpacing:2,textAlign:'center',margin:0},
   divisor: {height:2,background:'linear-gradient(90deg,#1a3a6b,#2c5fa8,transparent)',borderRadius:2,margin:'4px 0'},

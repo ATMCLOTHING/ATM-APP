@@ -336,7 +336,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
                 📦 Entrada
               </button>
               <IBtn src={WZCLOSE}    onClick={onClose}              title="Volver al menú"/>
-              {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:32,height:32,cursor:'pointer',fontSize:15,marginLeft:4}}>❓</button>}
+              {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:42,height:42,cursor:'pointer',fontSize:20,marginLeft:4}}>❓</button>}
             </div>
           </div>
 
@@ -379,10 +379,10 @@ function InfoVal({label,val,color,grande}){
 function IBtn({src,onClick,title,disabled}){
   return(
     <button onClick={onClick} title={title} disabled={disabled}
-      style={{background:disabled?'#e8ecf5':'#eef2ff',border:'1px solid #c8d5ea',borderRadius:5,padding:3,
+      style={{background:disabled?'#e8ecf5':'#eef2ff',border:'1px solid #c8d5ea',borderRadius:5,padding:4,
         cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.35:1,
-        display:'flex',alignItems:'center',justifyContent:'center',width:42,height:38}}>
-      <img src={src} alt={title} style={{width:28,height:28,objectFit:'contain'}}/>
+        display:'flex',alignItems:'center',justifyContent:'center',width:55,height:49}}>
+      <img src={src} alt={title} style={{width:36,height:36,objectFit:'contain'}}/>
     </button>
   )
 }
@@ -396,7 +396,7 @@ const P={
   titCod:  {background:'rgba(255,255,255,0.2)',borderRadius:5,padding:'4px 12px',fontSize:13,display:'flex',alignItems:'center',gap:6},
   badgeN:  {fontSize:10,background:'rgba(255,255,255,0.3)',borderRadius:3,padding:'1px 5px'},
   alerta:  {margin:'5px 10px',padding:'7px 12px',borderRadius:5,fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center'},
-  alertaX: {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:14},
+  alertaX: {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:18},
   bloque:  {margin:'8px 10px',background:'#fff',borderRadius:6,border:'1px solid #c8d5ea',padding:'12px 14px',display:'flex',flexDirection:'column',gap:8},
   fila:    {display:'flex',flexWrap:'wrap',gap:8,alignItems:'flex-end'},
   inp:     {height:26,border:'1px solid #aab8d4',borderRadius:3,padding:'0 6px',fontSize:12,background:'#fff',outline:'none',width:'100%',color:'#1a3a6b'},

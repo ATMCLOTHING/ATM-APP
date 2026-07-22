@@ -647,7 +647,7 @@ export default function Manual({ onClose }) {
           {SECCIONES.map(s => (
             <button key={s.id} onClick={() => setSecActiva(s.id)}
               style={{...S.sideItem, ...(secActiva === s.id ? S.sideItemActivo : {})}}>
-              <span style={{fontSize:18}}>{s.icon}</span>
+              <span style={{fontSize:23}}>{s.icon}</span>
               <span>{s.titulo}</span>
             </button>
           ))}
@@ -655,7 +655,7 @@ export default function Manual({ onClose }) {
 
         <div style={S.contenido}>
           <div style={S.secTitulo}>
-            <span style={{fontSize:28}}>{seccion.icon}</span>
+            <span style={{fontSize:36}}>{seccion.icon}</span>
             <span>{seccion.titulo}</span>
           </div>
 

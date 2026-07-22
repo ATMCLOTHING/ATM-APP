@@ -26,7 +26,7 @@ export default function PrintNota({ datos, onClose }) {
         .fila { display: flex; justify-content: space-between; }
         .total-fila { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; }
         @page { size: 80mm auto; margin: 0; }
-        @media print { body { width: 80mm; } }
+        @media print { body { width: 72mm; margin: 0 auto; } }
       </style></head><body>
       <div class="centro bold grande">A TU MEDIDA</div>
       <div class="centro">NOTA DE ENTREGA</div>
@@ -105,7 +105,7 @@ export default function PrintNota({ datos, onClose }) {
 
       <div class="header">
         <div style="display:flex;align-items:center;gap:12px;">
-          <img src="${LOGO}" alt="ATM" style="height:60px;object-fit:contain;"/>
+          <img src="${LOGO}" alt="ATM" style="height:78px;object-fit:contain;"/>
           <div class="subtitulo" style="font-size:11px;">A TU MEDIDA<br/>Control de Inventarios</div>
         </div>
         <div class="doc-info">
@@ -190,7 +190,7 @@ export default function PrintNota({ datos, onClose }) {
     <div style={S.fondo}>
       <div style={S.modal}>
         <div style={S.titulo}>
-          <span>🖨 IMPRIMIR — Nota {nroDoc}</span>
+          <span><span style={{fontSize:20}}>🖨</span> IMPRIMIR — Nota {nroDoc}</span>
           <button onClick={onClose} style={S.btnX}>✕</button>
         </div>
         <p style={{color:'#555',fontSize:13,marginBottom:20}}>
@@ -198,13 +198,13 @@ export default function PrintNota({ datos, onClose }) {
         </p>
         <div style={{display:'flex',gap:16,justifyContent:'center'}}>
           <button onClick={imprimirTicket} style={S.btnTicket}>
-            🧾<br/>
-            <strong>Ticket</strong><br/>
+            <span style={{fontSize:36}}>🧾</span><br/>
+            <strong style={{fontSize:28}}>Ticket</strong><br/>
             <span style={{fontSize:11}}>Impresora térmica 80mm</span>
           </button>
           <button onClick={imprimirMediaCarta} style={S.btnCarta}>
-            📄<br/>
-            <strong>Media Carta</strong><br/>
+            <span style={{fontSize:36}}>📄</span><br/>
+            <strong style={{fontSize:28}}>Media Carta</strong><br/>
             <span style={{fontSize:11}}>Impresora normal / PDF</span>
           </button>
         </div>
@@ -220,7 +220,7 @@ const S = {
   fondo:    {position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300},
   modal:    {background:'#fff',borderRadius:10,padding:28,width:420,boxShadow:'0 12px 40px rgba(0,0,0,0.3)',textAlign:'center'},
   titulo:   {display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,fontSize:15,fontWeight:900,color:'#1a3a6b'},
-  btnX:     {background:'#e74c3c',color:'#fff',border:'none',borderRadius:5,padding:'3px 10px',cursor:'pointer',fontWeight:900,fontSize:15},
+  btnX:     {background:'#e74c3c',color:'#fff',border:'none',borderRadius:5,padding:'3px 10px',cursor:'pointer',fontWeight:900,fontSize:20},
   btnTicket:{background:'#f0f4ff',border:'2px solid #1a3a6b',borderRadius:10,padding:'20px 28px',cursor:'pointer',fontSize:28,color:'#1a3a6b',lineHeight:1.8},
   btnCarta: {background:'#f0fff4',border:'2px solid #2e7d32',borderRadius:10,padding:'20px 28px',cursor:'pointer',fontSize:28,color:'#2e7d32',lineHeight:1.8},
   btnCerrar:{background:'#888',color:'#fff',border:'none',borderRadius:6,padding:'7px 20px',cursor:'pointer',fontWeight:700,fontSize:13},

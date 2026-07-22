@@ -8,7 +8,7 @@ const S = {
   fondo:  { position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:3000,display:'flex',alignItems:'center',justifyContent:'center' },
   modal:  { background:'#fff',borderRadius:10,width:520,boxShadow:'0 8px 32px rgba(0,0,0,0.25)',fontFamily:'Arial,sans-serif',overflow:'hidden' },
   titulo: { background:'#1a1a2e',color:'#fff',padding:'12px 18px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:15,fontWeight:'bold' },
-  btnX:   { background:'none',border:'none',color:'#fff',fontSize:20,cursor:'pointer',lineHeight:1 },
+  btnX:   { background:'none',border:'none',color:'#fff',fontSize:26,cursor:'pointer',lineHeight:1 },
   body:   { padding:20,display:'flex',flexDirection:'column',gap:12 },
   fila:   { display:'flex',gap:12 },
   grp:    { display:'flex',flexDirection:'column',gap:4,flex:1 },

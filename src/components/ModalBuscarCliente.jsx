@@ -95,7 +95,7 @@ const S = {
   fondo:    {position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300},
   modal:    {background:'#fff',borderRadius:10,padding:24,width:680,maxHeight:'85vh',display:'flex',flexDirection:'column',boxShadow:'0 12px 40px rgba(0,0,0,0.3)'},
   titulo:   {display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,fontSize:16,fontWeight:900,color:'#1a3a6b'},
-  btnX:     {background:'#e74c3c',color:'#fff',border:'none',borderRadius:5,padding:'3px 10px',cursor:'pointer',fontWeight:900,fontSize:15},
+  btnX:     {background:'#e74c3c',color:'#fff',border:'none',borderRadius:5,padding:'3px 10px',cursor:'pointer',fontWeight:900,fontSize:20},
   buscaFila:{display:'flex',gap:8,marginBottom:14},
   inp:      {flex:1,height:36,border:'2px solid #c8d5ea',borderRadius:6,padding:'0 12px',fontSize:14,outline:'none',color:'#1a3a6b'},
   btnBuscar:{background:'#1a3a6b',color:'#fff',border:'none',borderRadius:6,padding:'0 20px',cursor:'pointer',fontWeight:700,fontSize:13,height:36},

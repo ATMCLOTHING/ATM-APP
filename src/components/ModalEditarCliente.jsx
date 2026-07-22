@@ -86,7 +86,7 @@ const S = {
   fondo:     {position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300},
   modal:     {background:'#fff',borderRadius:10,padding:24,width:560,boxShadow:'0 12px 40px rgba(0,0,0,0.3)'},
   titulo:    {display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,fontSize:14,fontWeight:900,color:'#1a3a6b'},
-  btnX:      {background:'#e74c3c',color:'#fff',border:'none',borderRadius:5,padding:'3px 10px',cursor:'pointer',fontWeight:900,fontSize:15},
+  btnX:      {background:'#e74c3c',color:'#fff',border:'none',borderRadius:5,padding:'3px 10px',cursor:'pointer',fontWeight:900,fontSize:20},
   err:       {background:'#ffebee',color:'#c62828',border:'1px solid #ef9a9a',borderRadius:5,padding:'6px 12px',marginBottom:12,fontSize:12},
   grid:      {display:'grid',gridTemplateColumns:'1fr 1fr',gap:12},
   inp:       {height:32,border:'1px solid #c8d5ea',borderRadius:5,padding:'0 10px',fontSize:13,outline:'none',color:'#1a3a6b'},

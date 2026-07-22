@@ -98,7 +98,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
   return (
     <div style={S.pagina}>
       <div style={S.header}>
-        <img src={LOGO} alt="ATM" style={{height:40,objectFit:'contain'}}/>
+        <img src={LOGO} alt="ATM" style={{height:52,objectFit:'contain'}}/>
         <div style={{flex:1}}>
           <div style={S.headerTitulo}>A TU MEDIDA — Control de Inventarios</div>
           <div style={S.headerSub}>Hoy: {new Date().toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
@@ -165,7 +165,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
               {modulosVisibles.map(m=>(
                 <button key={m.id} onClick={()=>onModulo(m.id)}
                   style={{...S.moduloBtn,border:`2px solid ${m.color}`,boxShadow:`0 4px 12px ${m.color}22`}}>
-                  <span style={{fontSize:30}}>{m.icon}</span>
+                  <span style={{fontSize:39}}>{m.icon}</span>
                   <span style={{fontSize:12,fontWeight:800,color:m.color,textAlign:'center'}}>{m.label}</span>
                 </button>
               ))}
@@ -214,7 +214,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
 function Metrica({label,val,color,icon}){
   return(
     <div style={{background:'#fff',borderRadius:10,padding:'14px 18px',border:`2px solid ${color}22`,boxShadow:`0 2px 8px ${color}11`,display:'flex',alignItems:'center',gap:12}}>
-      <span style={{fontSize:28}}>{icon}</span>
+      <span style={{fontSize:36}}>{icon}</span>
       <div>
         <div style={{fontSize:11,color:'#888',fontWeight:600,textTransform:'uppercase'}}>{label}</div>
         <div style={{fontSize:20,fontWeight:900,color}}>{val}</div>
@@ -228,7 +228,7 @@ const S={
   header:      {background:'linear-gradient(90deg,#1a3a6b,#2c5fa8)',padding:'12px 24px',display:'flex',alignItems:'center',gap:16},
   headerTitulo:{color:'#fff',fontWeight:900,fontSize:15,letterSpacing:1},
   headerSub:   {color:'rgba(255,255,255,0.7)',fontSize:11},
-  btnSalir:    {background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'},
+  btnSalir:    {background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',color:'#fff',borderRadius:'50%',width:47,height:47,cursor:'pointer',fontSize:21,display:'flex',alignItems:'center',justifyContent:'center'},
   contenido:   {padding:20,flex:1,display:'flex',flexDirection:'column',gap:16,maxWidth:1200,margin:'0 auto',width:'100%'},
   seccion:     {background:'#fff',borderRadius:10,padding:16,boxShadow:'0 2px 8px rgba(0,0,0,0.06)'},
   secTit:      {fontSize:13,fontWeight:800,color:'#1a3a6b',marginBottom:12,paddingBottom:6,borderBottom:'2px solid #eef0f5'},

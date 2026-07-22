@@ -69,7 +69,7 @@ const S = {
   fondo:  {position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:400},
   modal:  {background:'#fff',borderRadius:8,padding:20,width:360,boxShadow:'0 8px 32px rgba(0,0,0,0.25)'},
   cabecera:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,fontSize:14,fontWeight:800,color:'#1a3a6b'},
-  btnX:   {background:'#e74c3c',color:'#fff',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700},
+  btnX:   {background:'#e74c3c',color:'#fff',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700,fontSize:17},
   info:   {background:'#f4f6fb',border:'1px solid #c8d5ea',borderRadius:6,padding:'8px 10px',marginBottom:12},
   err:    {background:'#ffebee',color:'#c62828',border:'1px solid #ef9a9a',borderRadius:4,padding:'5px 10px',marginBottom:10,fontSize:12},
   lbl:    {display:'flex',flexDirection:'column',gap:4,fontSize:11,fontWeight:700,color:'#1a3a6b'},

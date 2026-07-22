@@ -258,7 +258,7 @@ const P={
   titTxt:    {fontWeight:900,fontSize:15,letterSpacing:2,flex:1,textAlign:'center'},
   btnCerrar: {background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:5,padding:'4px 12px',cursor:'pointer',fontWeight:700,fontSize:13},
   alerta:    {margin:'5px 10px',padding:'7px 12px',borderRadius:5,fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center'},
-  alertaX:   {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:14},
+  alertaX:   {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:18},
   cuerpo:    {display:'flex',gap:0,height:'calc(100vh - 80px)'},
   lista:     {width:240,background:'#fff',borderRight:'2px solid #c8d5ea',padding:12,overflowY:'auto',flexShrink:0},
   listaItem: {padding:'8px 10px',borderRadius:6,marginBottom:4,cursor:'pointer',border:'1px solid #e0e7f0'},

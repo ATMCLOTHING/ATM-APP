@@ -219,7 +219,7 @@ const S = {
   fondo:      { position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
   modal:      { background:'#fff',borderRadius:8,padding:20,width:700,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 8px 32px rgba(0,0,0,0.3)' },
   cabecera:   { display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,fontSize:15,fontWeight:800,color:'#1a3a6b' },
-  btnX:       { background:'#e74c3c',color:'#fff',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700 },
+  btnX:       { background:'#e74c3c',color:'#fff',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700,fontSize:17 },
   resumen:    { display:'flex',justifyContent:'space-around',background:'#f0f4ff',borderRadius:6,padding:'10px 0',marginBottom:14,border:'1px solid #c8d5ea' },
   tabla:      { width:'100%',borderCollapse:'collapse',fontSize:12,marginBottom:14 },
   thead:      { background:'#dde3ee' },

@@ -260,7 +260,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
       {/* HEADER */}
       <div style={S.header}>
         <span style={S.headerTit}>💼 COMISIONES</span>
-        {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14,marginLeft:'auto'}}>❓</button>}
+        {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18,marginLeft:'auto'}}>❓</button>}
         <button onClick={onClose} style={S.btnMenu}>← Menú</button>
       </div>
 
@@ -277,7 +277,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
       {msg && (
         <div style={{...S.msg,...(msg.ok?S.msgOk:S.msgErr),margin:'10px 16px'}}>
           {msg.txt}
-          <button onClick={()=>setMsg(null)} style={{float:'right',background:'none',border:'none',cursor:'pointer',fontWeight:700}}>✕</button>
+          <button onClick={()=>setMsg(null)} style={{float:'right',background:'none',border:'none',cursor:'pointer',fontWeight:700,fontSize:18}}>✕</button>
         </div>
       )}
 
@@ -347,7 +347,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
                 <table style={S.tabla}>
                   <thead>
                     <tr style={S.thead}>
-                      <th style={S.th}>✓</th>
+                      <th style={{...S.th,fontSize:16}}>✓</th>
                       <th style={S.th}>Nota</th>
                       <th style={S.th}>Fecha</th>
                       <th style={{...S.th,textAlign:'left'}}>Cliente</th>
@@ -425,7 +425,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
                       <td style={{...S.td,color:'#888',fontSize:11}}>{h.usuario}</td>
                       <td style={{...S.td,textAlign:'center'}}>
                         <button onClick={e=>{e.stopPropagation();imprimirLiquidacion(h,histSel?.id===h.id?histDetalle:[])}}
-                          style={{...S.btnSec,padding:'2px 8px',fontSize:11}}>🖨</button>
+                          style={{...S.btnSec,padding:'2px 8px',fontSize:14}}>🖨</button>
                       </td>
                     </tr>
                     {histSel?.id===h.id && (

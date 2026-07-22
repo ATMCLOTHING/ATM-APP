@@ -217,7 +217,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
                       onChange={e=>{ setBusqTerc(e.target.value); setShowTerc(true); if(!e.target.value) limpiarTercero() }}
                       onFocus={()=>setShowTerc(true)}
                       placeholder="Busca por nombre o cédula…"/>
-                    {busqTerc && <button onClick={limpiarTercero} style={{...S.inp,width:26,padding:0,cursor:'pointer',textAlign:'center',background:'#fdecea',color:'#c62828',fontWeight:900,flexShrink:0}}>✕</button>}
+                    {busqTerc && <button onClick={limpiarTercero} style={{...S.inp,width:26,padding:0,cursor:'pointer',textAlign:'center',background:'#fdecea',color:'#c62828',fontWeight:900,fontSize:16,flexShrink:0}}>✕</button>}
                   </div>
                   {showTerc && (
                     <div style={S.drop}>
@@ -441,7 +441,7 @@ function GestionTipos({ supabase, grupos, detalles, onRecargar }) {
                 display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontWeight:grupoSel?.id===g.id?700:400}}>{g.nombre}</span>
               <button onClick={e=>{e.stopPropagation();eliminarGrupo(g)}}
-                style={{background:'none',border:'none',color:'#c62828',cursor:'pointer',fontSize:14}}>✕</button>
+                style={{background:'none',border:'none',color:'#c62828',cursor:'pointer',fontSize:18}}>✕</button>
             </div>
           ))}
         </div>
@@ -461,7 +461,7 @@ function GestionTipos({ supabase, grupos, detalles, onRecargar }) {
               <div key={d.id} style={{...S.dropItem,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <span>{d.nombre}</span>
                 <button onClick={()=>eliminarDetalle(d)}
-                  style={{background:'none',border:'none',color:'#c62828',cursor:'pointer',fontSize:14}}>✕</button>
+                  style={{background:'none',border:'none',color:'#c62828',cursor:'pointer',fontSize:18}}>✕</button>
               </div>
             ))
           }
@@ -586,7 +586,7 @@ const estilos = {
   hTit:      {fontSize:15,fontWeight:900,color:'#fff',letterSpacing:2,marginRight:8},
   btnClose:  {marginLeft:'auto',background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:5,padding:'4px 12px',cursor:'pointer',fontWeight:700,fontSize:13},
   alerta:    {margin:'6px 12px 0',padding:'7px 12px',borderRadius:5,fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center'},
-  alertaX:   {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:14},
+  alertaX:   {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:18},
   cuerpo:    {flex:1,padding:14,overflowY:'auto'},
   tarjeta:   {background:'#fff',borderRadius:8,padding:16,boxShadow:'0 2px 8px rgba(0,0,0,0.06)',marginBottom:14},
   secTit:    {fontSize:14,fontWeight:800,color:'#1a3a6b',marginBottom:12,paddingBottom:8,borderBottom:'2px solid #eef0f5'},

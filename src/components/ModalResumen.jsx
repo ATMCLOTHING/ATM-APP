@@ -115,7 +115,7 @@ const S = {
   fondo:       { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 },
   modal:       { background: '#fff', borderRadius: 8, padding: 20, width: 780, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' },
   cabecera:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, fontSize: 15, fontWeight: 800, color: '#1a3a6b' },
-  btnX:        { background: '#e74c3c', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 700 },
+  btnX:        { background: '#e74c3c', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 700, fontSize: 17 },
   filtros:     { display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 14, background: '#f0f4ff', padding: 10, borderRadius: 6, border: '1px solid #c8d5ea' },
   lbl:         { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, fontWeight: 700, color: '#1a3a6b' },
   inp:         { height: 26, border: '1px solid #aab8d4', borderRadius: 3, padding: '0 6px', fontSize: 12, outline: 'none', marginTop: 2 },

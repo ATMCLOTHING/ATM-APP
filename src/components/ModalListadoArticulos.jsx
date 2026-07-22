@@ -169,7 +169,7 @@ const S = {
   fondo:    {position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300},
   modal:    {background:'#fff',borderRadius:10,padding:20,width:900,maxHeight:'92vh',display:'flex',flexDirection:'column',gap:10,boxShadow:'0 12px 40px rgba(0,0,0,0.3)'},
   titulo:   {display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:15,fontWeight:900,color:'#1a3a6b'},
-  btnX:     {background:'#e74c3c',color:'#fff',border:'none',borderRadius:5,padding:'3px 10px',cursor:'pointer',fontWeight:900,fontSize:15},
+  btnX:     {background:'#e74c3c',color:'#fff',border:'none',borderRadius:5,padding:'3px 10px',cursor:'pointer',fontWeight:900,fontSize:20},
   filtros:  {display:'flex',gap:10,alignItems:'flex-end',flexWrap:'wrap',background:'#f0f4ff',border:'1px solid #c8d5ea',borderRadius:6,padding:10},
   lbl:      {display:'flex',flexDirection:'column',gap:3,fontSize:11,fontWeight:700,color:'#1a3a6b',flex:1,minWidth:130},
   inp:      {height:28,border:'1px solid #c8d5ea',borderRadius:4,padding:'0 8px',fontSize:12,outline:'none'},

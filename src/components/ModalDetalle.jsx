@@ -68,7 +68,7 @@ const S = {
   fondo:    { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 },
   modal:    { background: '#fff', borderRadius: 8, padding: 20, width: 860, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' },
   cabecera: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, fontSize: 15, fontWeight: 800, color: '#1a3a6b' },
-  btnX:     { background: '#e74c3c', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 700 },
+  btnX:     { background: '#e74c3c', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontWeight: 700, fontSize: 17 },
   tabla:    { width: '100%', borderCollapse: 'collapse' },
   thead:    { background: '#dde3ee' },
   th:       { padding: '6px 8px', fontWeight: 700, color: '#1a3a6b', borderBottom: '2px solid #aab8d4', textAlign: 'left', fontSize: 11, whiteSpace: 'nowrap' },

@@ -616,7 +616,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
               <table style={S.tabla}>
                 <thead>
                   <tr style={S.thead}>
-                    {modoAbono && <th style={S.th}>✓</th>}
+                    {modoAbono && <th style={{...S.th,fontSize:16}}>✓</th>}
                     {['Nota','Fecha','Vence','Cliente','$ Valor','$ Abonado','$ Saldo','Días nota','Días vencido'].map(h=>(
                       <th key={h} style={{...S.th,textAlign:['$ Valor','$ Abonado','$ Saldo','Días nota','Días vencido'].includes(h)?'right':'left'}}>{h}</th>
                     ))}

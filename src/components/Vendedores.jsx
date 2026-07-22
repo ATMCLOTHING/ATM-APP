@@ -149,10 +149,10 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
   return (
     <div style={S.wrap}>
       <div style={S.header}>
-        <img src={LOGO} alt="ATM" style={{ height:32 }} />
+        <img src={LOGO} alt="ATM" style={{ height:42 }} />
         <span style={S.hTitle}>GESTIÓN DE VENDEDORES</span>
         <button style={S.hBtn} onClick={nuevo}>+ Nuevo</button>
-        {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:28,height:28,cursor:'pointer',fontSize:14}}>❓</button>}
+        {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18}}>❓</button>}
         <button style={S.hBtn} onClick={onClose}>✕ Cerrar</button>
       </div>
 
@@ -243,7 +243,7 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
           </div>
         ) : (
           <div style={S.vacio}>
-            <span style={{ fontSize:48 }}>🙋</span>
+            <span style={{ fontSize:62 }}>🙋</span>
             <span>Selecciona un vendedor de la lista o crea uno nuevo</span>
             <button style={{ ...S.btn, ...S.btnNew, fontSize:14, padding:'10px 24px' }} onClick={nuevo}>
               ➕ Nuevo Vendedor

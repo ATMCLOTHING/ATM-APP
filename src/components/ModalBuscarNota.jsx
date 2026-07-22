@@ -212,7 +212,7 @@ const S = {
   fondo:    {position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'},
   modal:    {background:'#fff',borderRadius:10,width:'92vw',maxWidth:1100,maxHeight:'88vh',display:'flex',flexDirection:'column',boxShadow:'0 8px 40px rgba(0,0,0,0.25)',fontFamily:'Arial,sans-serif'},
   titulo:   {background:'#1a3a6b',color:'#fff',padding:'12px 18px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:15,fontWeight:'bold',borderRadius:'10px 10px 0 0'},
-  btnX:     {background:'none',border:'none',color:'#fff',fontSize:20,cursor:'pointer'},
+  btnX:     {background:'none',border:'none',color:'#fff',fontSize:26,cursor:'pointer'},
   filtros:  {padding:'14px 16px',borderBottom:'1px solid #eee',display:'flex',flexDirection:'column',gap:10},
   filaF:    {display:'flex',gap:12,alignItems:'flex-end',flexWrap:'wrap'},
   inp:      {height:30,border:'1px solid #c8d5ea',borderRadius:5,padding:'0 8px',fontSize:13,color:'#1a3a6b',outline:'none',width:160},

@@ -115,7 +115,7 @@ export default function ControlDocumentos({ supabase, onClose }) {
             <div key={e.id}
               onClick={()=>setFiltroEst(filtroEst===e.id?'':e.id)}
               style={{...P.resumenCard, background:e.bg, border:`2px solid ${filtroEst===e.id?e.color:'transparent'}`, cursor:'pointer'}}>
-              <span style={{fontSize:20}}>{e.icon}</span>
+              <span style={{fontSize:26}}>{e.icon}</span>
               <div>
                 <div style={{fontSize:10,color:'#666',fontWeight:600,textTransform:'uppercase'}}>{e.label}</div>
                 <div style={{fontSize:18,fontWeight:900,color:e.color}}>{e.cant}</div>
@@ -217,17 +217,17 @@ const P = {
   titTxt:      {fontWeight:900,fontSize:15,letterSpacing:2,flex:1,textAlign:'center'},
   btnCerrar:   {background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:5,padding:'4px 12px',cursor:'pointer',fontWeight:700,fontSize:13},
   alerta:      {margin:'6px 12px',padding:'7px 12px',borderRadius:5,fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center'},
-  alertaX:     {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:14},
+  alertaX:     {background:'none',border:'none',cursor:'pointer',fontWeight:900,fontSize:18},
   resumenGrid: {display:'flex',gap:10,padding:'12px 16px',flexWrap:'wrap'},
   resumenCard: {display:'flex',alignItems:'center',gap:10,padding:'10px 16px',borderRadius:8,flex:1,minWidth:140,transition:'all 0.15s',userSelect:'none'},
   filtros:     {display:'flex',gap:8,padding:'0 16px 10px',alignItems:'center',flexWrap:'wrap'},
   sel:         {height:32,border:'1px solid #c8d5ea',borderRadius:5,padding:'0 8px',fontSize:12,outline:'none',color:'#1a3a6b',background:'#fff',minWidth:180},
-  btnRecargar: {height:32,padding:'0 10px',border:'1px solid #c8d5ea',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:14},
+  btnRecargar: {height:32,padding:'0 10px',border:'1px solid #c8d5ea',borderRadius:5,background:'#fff',cursor:'pointer',fontSize:18},
   tablaWrap:   {overflowX:'auto',overflowY:'auto',flex:1,maxHeight:'calc(100vh - 280px)',margin:'0 0 0 0'},
   tabla:       {width:'100%',borderCollapse:'collapse',fontSize:12},
   thead:       {background:'#1a3a6b',position:'sticky',top:0,zIndex:2},
   th:          {padding:'8px 10px',textAlign:'left',fontWeight:700,color:'#fff',whiteSpace:'nowrap',borderRight:'1px solid #2c5fa8'},
   td:          {padding:'5px 8px',borderBottom:'1px solid #e8eef5',verticalAlign:'middle',fontSize:12},
   badge:       {display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:700,whiteSpace:'nowrap'},
-  btnEst:      {border:'none',borderRadius:4,padding:'3px 7px',cursor:'pointer',fontSize:13,fontWeight:700,whiteSpace:'nowrap'},
+  btnEst:      {border:'none',borderRadius:4,padding:'3px 7px',cursor:'pointer',fontSize:17,fontWeight:700,whiteSpace:'nowrap'},
 }
