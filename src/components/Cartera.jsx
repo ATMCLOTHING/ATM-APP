@@ -2,6 +2,7 @@
 // v3 — corrige bug anulada null, agrega abonos distribuidos entre notas
 
 import { useState, useEffect, useRef } from 'react'
+import ModalAbonos from './ModalAbonos'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
@@ -39,6 +40,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
   const [modoAbono,   setModoAbono]   = useState(false)
   const [guardandoA,  setGuardandoA]  = useState(false)
   const [msgAbono,    setMsgAbono]    = useState(null)
+  const [notaAbonosSel, setNotaAbonosSel] = useState(null) // nota para ver su detalle de abonos
 
   const printRef = useRef()
 
@@ -638,7 +640,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
                               }
                             </td>
                           )}
-                          <td style={{...S.td,fontWeight:700,color:'#1a3a6b'}}>{n.numnotaent}</td>
+                          <td style={{...S.td,fontWeight:700,color:'#1a3a6b',textDecoration:'underline',cursor:'pointer'}}
+                            title="Ver detalle de abonos de esta nota"
+                            onClick={e=>{e.stopPropagation(); setNotaAbonosSel(n)}}>{n.numnotaent}</td>
                           <td style={S.td}>{n.fechanotae?.slice(0,10)||''}</td>
                           <td style={S.td}>{n.fechavence?.slice(0,10)||''}</td>
                           <td style={{...S.td,maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{n.nombreclie}</td>
@@ -671,6 +675,16 @@ export default function Cartera({ supabase, usuario, onClose }) {
             )}
           </div>
         </>
+      )}
+
+      {notaAbonosSel && (
+        <ModalAbonos
+          supabase={supabase}
+          nroDoc={notaAbonosSel.numnotaent}
+          totalNota={notaAbonosSel.valtotal}
+          totalAbonos={notaAbonosSel.valabono}
+          onClose={async()=>{setNotaAbonosSel(null); await generar()}}
+        />
       )}
     </div>
   )
