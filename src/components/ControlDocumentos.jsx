@@ -37,7 +37,6 @@ export default function ControlDocumentos({ supabase, onClose }) {
     setCargando(true)
     let q = supabase.from('encnotaen')
       .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,saldo,estado_doc,anulada')
-      .lt('numnotaent', 1000000)          // solo notas de vendedor
       .or('anulada.is.null,anulada.neq.S')
       .order('numnotaent', {ascending:false})
       .limit(300)

@@ -37,13 +37,12 @@ const SECCIONES = [
     contenido: [
       {
         subtitulo: '¿Qué es una Nota de Entrega?',
-        texto: 'Es el documento principal de venta. Registra qué artículos se vendieron, a qué cliente, a qué precio, cuándo y cómo se pagó. Existen dos series: notas de Caja (números desde 1.000.000, usadas por cajeras) y notas de Vendedor (números menores, usadas por vendedoras externas).'
+        texto: 'Es el documento principal de venta. Registra qué artículos se vendieron, a qué cliente, a qué precio, cuándo y cómo se pagó. Todas las notas (de caja o de vendedor) comparten un mismo número consecutivo.'
       },
       {
         subtitulo: 'Cómo crear una Nota de Entrega',
         pasos: [
           'Haz clic en el ícono ➕ Nueva (hoja en blanco) en la barra inferior izquierda',
-          'Si eres administrador, elige la serie antes de crear: Caja (≥1.000.000) en el combo izquierdo',
           'Ingresa la cédula del cliente en el campo CÉDULA / NIT y presiona Enter — si el cliente existe, sus datos se cargan automáticamente',
           'Si la cédula no está registrada, el sistema abre un formulario para crear el cliente nuevo',
           'Para buscar un cliente por nombre en vez de cédula, haz clic en la lupa 🔍 junto al campo de cédula',
@@ -612,8 +611,8 @@ const SECCIONES = [
           headers: ['Rol', 'Qué puede hacer'],
           filas: [
             ['admin', 'Acceso total sin restricciones'],
-            ['cajera', 'Notas de entrega, abonos, vales y cierre de caja — serie caja (≥1.000.000)'],
-            ['vendedor', 'Sus propias notas (serie vendedor), su cartera y vales'],
+            ['cajera', 'Notas de entrega, abonos, vales y cierre de caja'],
+            ['vendedor', 'Notas de entrega, su cartera y vales'],
             ['bodega', 'Artículos, proveedores y entradas de mercancía'],
           ]
         }

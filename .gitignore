@@ -3,3 +3,14 @@ dist
 .env
 .env.local
 supabase/.temp
+supabase/*.DBF
+supabase/*.dbf
+supabase/*.CDX
+supabase/*.cdx
+supabase/*.FPT
+supabase/*.fpt
+supabase/*.TXT
+supabase/*.txt
+supabase/_*.mjs
+supabase/respaldo_*/
+sql/*.sql
