@@ -36,7 +36,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
   const [notasSel,    setNotasSel]    = useState({})   // {numnotaent: true}
   const [valorAbono,  setValorAbono]  = useState('')
   const [medioAbono,  setMedioAbono]  = useState('E')
-  const [distribucio, setDistribucio] = useState([])   // [{numnotaent, aplicar, saldo}]
+  const [tipoDescTotal, setTipoDescTotal] = useState('pct') // 'pct' | 'monto', descuento sobre lo que no cubre el abono
+  const [valorDescTotal, setValorDescTotal] = useState('')
+  const [distribucio, setDistribucio] = useState([])   // [{numnotaent, aplicar, descuento, saldo}]
   const [modoAbono,   setModoAbono]   = useState(false)
   const [guardandoA,  setGuardandoA]  = useState(false)
   const [msgAbono,    setMsgAbono]    = useState(null)
@@ -59,9 +61,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
     // FIX: usar neq('anulada','S') en lugar de eq('anulada','N')
     // así captura null y cualquier valor distinto de 'S'
     let q = supabase.from('encnotaen')
-      .select('numnotaent,fechanotae,fechavence,cedrifclie,nombreclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,anulada')
+      .select('numnotaent,fechanotae,fechavence,cedrifclie,nombreclie,cedvended,valtotal,valdescue,porcdescue,valabono,saldo,formapago,mediopago,anulada')
       .or('anulada.is.null,anulada.neq.S')
-      .order('fechanotae', {ascending:true})
+      .order('numnotaent', {ascending:true})
 
     // filtro vendedor
     const cedVend = filtVend
@@ -87,6 +89,19 @@ export default function Cartera({ supabase, usuario, onClose }) {
     if (filtMora === 'mora30') resultado = resultado.filter(n => n.diasVencido >= 30)
     else if (filtMora === 'mora60') resultado = resultado.filter(n => n.diasVencido >= 60)
     else if (filtMora === 'mora90') resultado = resultado.filter(n => n.diasVencido >= 90)
+
+    // orden: Vendedor + Cliente + Número de orden ascendente
+    const vendMap = {}
+    vendedores.forEach(v => { vendMap[v.cedula] = v.nombre })
+    resultado.sort((a,b) => {
+      const va = vendMap[a.cedvended] || a.cedvended || ''
+      const vb = vendMap[b.cedvended] || b.cedvended || ''
+      const cmpVend = va.localeCompare(vb)
+      if (cmpVend !== 0) return cmpVend
+      const cmpCli = (a.nombreclie||'').localeCompare(b.nombreclie||'')
+      if (cmpCli !== 0) return cmpCli
+      return a.numnotaent - b.numnotaent
+    })
 
     setNotas(resultado)
 
@@ -276,11 +291,13 @@ export default function Cartera({ supabase, usuario, onClose }) {
   }
 
   // ── DISTRIBUIR ABONO ──────────────────────────────────────────────────────
-  // Aplica el valor disponible a las notas seleccionadas en orden cronológico
+  // Aplica el valor disponible a las notas seleccionadas en orden cronológico;
+  // el descuento (si hay) se reparte proporcionalmente sobre lo que queda sin cubrir con el abono.
   function distribuir() {
     setMsgAbono(null)
-    const val = Number(valorAbono)
-    if (!val || val <= 0) { setMsgAbono({ok:false, txt:'Ingresa un valor de abono válido.'}); return }
+    const val = Number(valorAbono) || 0
+    const descIngresado = Number(valorDescTotal) || 0
+    if (val <= 0 && descIngresado <= 0) { setMsgAbono({ok:false, txt:'Ingresa un valor de abono y/o de descuento.'}); return }
     const seleccionadas = notas
       .filter(n => notasSel[n.numnotaent] && (n.saldo||0) > 0)
       .sort((a,b) => new Date(a.fechanotae) - new Date(b.fechanotae)) // cronológico
@@ -288,15 +305,29 @@ export default function Cartera({ supabase, usuario, onClose }) {
     if (!seleccionadas.length) { setMsgAbono({ok:false, txt:'Selecciona al menos una nota con saldo.'}); return }
 
     let disponible = val
-    const dist = seleccionadas.map(n => {
+    let dist = seleccionadas.map(n => {
       const saldo = n.saldo||0
       const aplicar = Math.min(disponible, saldo)
       disponible = Math.max(0, disponible - aplicar)
-      return { numnotaent:n.numnotaent, nombreclie:n.nombreclie, saldo, aplicar }
+      return { numnotaent:n.numnotaent, nombreclie:n.nombreclie, valtotal:n.valtotal, valdescue:n.valdescue||0, saldo, aplicar, descuento:0 }
     })
 
     if (disponible > 0) {
       setMsgAbono({ok:false, txt:`⚠️ El abono ($${fmt(val)}) supera el saldo de las notas seleccionadas ($${fmt(val - disponible)}). Ajusta el valor.`})
+    }
+
+    // repartir descuento proporcionalmente sobre lo que NO cubre el abono
+    if (descIngresado > 0) {
+      const totalRestante = dist.reduce((s,d) => s + (d.saldo - d.aplicar), 0)
+      const descGlobal = Math.min(
+        tipoDescTotal === 'pct' ? totalRestante * descIngresado / 100 : descIngresado,
+        totalRestante
+      )
+      dist = dist.map(d => {
+        const restante = d.saldo - d.aplicar
+        const descuento = totalRestante > 0 ? Math.round(descGlobal * (restante / totalRestante)) : 0
+        return { ...d, descuento }
+      })
     }
 
     setDistribucio(dist)
@@ -308,29 +339,43 @@ export default function Cartera({ supabase, usuario, onClose }) {
     setGuardandoA(true); setMsgAbono(null)
     try {
       for (const d of distribucio) {
-        if (d.aplicar <= 0) continue
-        // insertar abono
-        const {error:ea} = await supabase.from('detabonos').insert({
-          numnotaent: String(d.numnotaent),
-          fechaabono: hoy(),
-          valabono:   d.aplicar,
-          mediopago:  medioAbono,
-          observacio: 'Abono cartera',
-        })
-        if (ea) throw ea
-        // actualizar saldo en encnotaen
+        if (d.aplicar <= 0 && d.descuento <= 0) continue
+        if (d.aplicar > 0) {
+          const {error:ea} = await supabase.from('detabonos').insert({
+            numnotaent: String(d.numnotaent),
+            fechaabono: hoy(),
+            valabono:   d.aplicar,
+            mediopago:  medioAbono,
+            observacio: 'Abono cartera',
+          })
+          if (ea) throw ea
+        }
+        // actualizar saldo/total en encnotaen
         const notaActual = notas.find(n => n.numnotaent === d.numnotaent)
-        const nuevoAbono = (notaActual?.valabono||0) + d.aplicar
-        const nuevoSaldo = Math.max(0, (notaActual?.saldo||0) - d.aplicar)
+        const nuevoAbono   = (notaActual?.valabono||0) + d.aplicar
+        const nuevoValTotal = (notaActual?.valtotal||0) - d.descuento
+        const nuevoValDescue = (notaActual?.valdescue||0) + d.descuento
+        const nuevoSaldo   = Math.max(0, nuevoValTotal - nuevoAbono)
+        const nuevoPorcDescue = (nuevoValTotal + nuevoValDescue) > 0
+          ? Number((nuevoValDescue / (nuevoValTotal + nuevoValDescue) * 100).toFixed(2))
+          : 0
         const {error:eu} = await supabase.from('encnotaen').update({
-          valabono: nuevoAbono,
-          saldo:    nuevoSaldo,
+          valabono:  nuevoAbono,
+          valtotal:  nuevoValTotal,
+          valdescue: nuevoValDescue,
+          porcdescue: nuevoPorcDescue,
+          saldo:     nuevoSaldo,
           fecultabon: hoy(),
         }).eq('numnotaent', String(d.numnotaent))
         if (eu) throw eu
       }
       const totalAplicado = distribucio.reduce((s,d) => s + d.aplicar, 0)
-      setMsgAbono({ok:true, txt:`✅ Abono de $${fmt(totalAplicado)} aplicado correctamente a ${distribucio.filter(d=>d.aplicar>0).length} nota(s).`})
+      const totalDescontado = distribucio.reduce((s,d) => s + (d.descuento||0), 0)
+      const partes = []
+      if (totalAplicado > 0) partes.push(`abono de $${fmt(totalAplicado)}`)
+      if (totalDescontado > 0) partes.push(`descuento de $${fmt(totalDescontado)}`)
+      setMsgAbono({ok:true, txt:`✅ Se aplicó ${partes.join(' y ')} a ${distribucio.filter(d=>d.aplicar>0||d.descuento>0).length} nota(s).`})
+      setValorDescTotal('')
       setModoAbono(false)
       setNotasSel({})
       setDistribucio([])
@@ -518,6 +563,17 @@ export default function Cartera({ supabase, usuario, onClose }) {
                     <option value="M">Mixto</option>
                   </select>
                 </Fld>
+                <Fld label="Tipo descuento" w={140}>
+                  <select style={S.inp} value={tipoDescTotal} onChange={e=>setTipoDescTotal(e.target.value)}>
+                    <option value="pct">Porcentaje (%)</option>
+                    <option value="monto">Monto fijo ($)</option>
+                  </select>
+                </Fld>
+                <Fld label={tipoDescTotal==='pct' ? 'Descuento (%)' : 'Descuento ($)'} w={160}>
+                  <input style={{...S.inp,fontWeight:700,color:'#8e44ad'}} type="number" min={0}
+                    value={valorDescTotal} onChange={e=>setValorDescTotal(e.target.value)}
+                    placeholder="0" onKeyDown={e=>e.key==='Enter'&&distribuir()}/>
+                </Fld>
                 <div style={{display:'flex',gap:8}}>
                   <button onClick={seleccionarTodas} style={S.btnSel}>Seleccionar todas</button>
                   <button onClick={limpiarSeleccion} style={S.btnSel}>Limpiar selección</button>
@@ -543,8 +599,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
                       <span style={{color:'#555'}}>{d.nombreclie}</span>
                       <span>Saldo: <strong>{fmtM(d.saldo)}</strong></span>
                       <span style={{color:'#2e7d32',fontWeight:700}}>Aplica: {fmtM(d.aplicar)}</span>
-                      <span style={{color: d.saldo-d.aplicar===0?'#2e7d32':'#c62828'}}>
-                        Resta: {fmtM(d.saldo-d.aplicar)}
+                      {d.descuento > 0 && <span style={{color:'#8e44ad',fontWeight:700}}>Descuento: {fmtM(d.descuento)}</span>}
+                      <span style={{color: d.saldo-d.aplicar-(d.descuento||0)<=0?'#2e7d32':'#c62828'}}>
+                        Resta: {fmtM(d.saldo-d.aplicar-(d.descuento||0))}
                       </span>
                     </div>
                   ))}
@@ -554,6 +611,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
                     </button>
                     <span style={{fontSize:12,color:'#666'}}>
                       Total a aplicar: <strong>{fmtM(distribucio.reduce((s,d)=>s+d.aplicar,0))}</strong>
+                      {distribucio.some(d=>d.descuento>0) && <> &nbsp;|&nbsp; Total descuento: <strong style={{color:'#8e44ad'}}>{fmtM(distribucio.reduce((s,d)=>s+(d.descuento||0),0))}</strong></>}
                     </span>
                   </div>
                 </div>

@@ -18,7 +18,13 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
   const [pinAccion,     setPinAccion]     = useState(null) // {tipo:'revertir'|'revertirParcial', abono:{...}, valor?}
   const [valoresRev,    setValoresRev]    = useState({}) // {abonoId: valorParcialADigitar}
 
-  useEffect(() => { cargarAbonos() }, [])
+  // ── descuento aplicado junto con el abono ──
+  const [valTotalActual, setValTotalActual] = useState(totalNota)
+  const [valDescueActual, setValDescueActual] = useState(0)
+  const [tipoDesc,      setTipoDesc]      = useState('pct') // 'pct' | 'monto'
+  const [valDesc,       setValDesc]       = useState('')
+
+  useEffect(() => { cargarAbonos(); cargarNota() }, [])
 
   async function cargarAbonos() {
     const { data } = await supabase
@@ -27,25 +33,53 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
     setAbonos(data || [])
   }
 
+  async function cargarNota() {
+    const { data } = await supabase
+      .from('encnotaen').select('valtotal,valdescue').eq('numnotaent', nroDoc).limit(1)
+    if (data?.length) {
+      setValTotalActual(data[0].valtotal)
+      setValDescueActual(data[0].valdescue || 0)
+    }
+  }
+
   const sumaAbonos = abonos.reduce((s, a) => s + (a.valabono || 0), 0)
-  const saldoFinal = totalNota - sumaAbonos
+  const saldoFinal = valTotalActual - sumaAbonos
+  const descuentoValor = valDesc && Number(valDesc) > 0
+    ? (tipoDesc === 'pct' ? Math.round(saldoFinal * Number(valDesc) / 100) : Number(valDesc))
+    : 0
 
   async function registrarAbono() {
-    const val = Number(valor)
-    if (!val || val <= 0) { setMsg({ tipo: 'err', texto: 'Ingresa un valor válido.' }); return }
-    if (val > saldoFinal + 0.01) { setMsg({ tipo: 'err', texto: `El abono ($${fmt(val)}) supera el saldo ($${fmt(saldoFinal)}).` }); return }
+    const val = Number(valor) || 0
+    const desc = descuentoValor
+    if (val <= 0 && desc <= 0) { setMsg({ tipo: 'err', texto: 'Ingresa un valor de abono y/o de descuento.' }); return }
+    if (val + desc > saldoFinal + 0.01) { setMsg({ tipo: 'err', texto: `El abono + descuento ($${fmt(val + desc)}) supera el saldo ($${fmt(saldoFinal)}).` }); return }
     setCargando(true)
-    const { error } = await supabase.from('detabonos').insert({
-      numnotaent: nroDoc, fechaabono: fecha, valabono: val, mediopago: medio, observacio: obs,
-    })
-    if (error) {
-      setMsg({ tipo: 'err', texto: error.message })
+    if (val > 0) {
+      const { error } = await supabase.from('detabonos').insert({
+        numnotaent: nroDoc, fechaabono: fecha, valabono: val, mediopago: medio, observacio: obs,
+      })
+      if (error) { setMsg({ tipo: 'err', texto: error.message }); setCargando(false); return }
+    }
+    const nuevoAbono   = sumaAbonos + val
+    const nuevoValDescue = valDescueActual + desc
+    const nuevoValTotal  = valTotalActual - desc
+    const nuevoSaldo   = nuevoValTotal - nuevoAbono
+    const nuevoPorcDescue = nuevoValTotal + nuevoValDescue > 0
+      ? Number((nuevoValDescue / (nuevoValTotal + nuevoValDescue) * 100).toFixed(2))
+      : 0
+    const { error: eu } = await supabase.from('encnotaen').update({
+      valabono: nuevoAbono, saldo: nuevoSaldo, valtotal: nuevoValTotal,
+      valdescue: nuevoValDescue, porcdescue: nuevoPorcDescue,
+    }).eq('numnotaent', nroDoc)
+    if (eu) {
+      setMsg({ tipo: 'err', texto: eu.message })
     } else {
-      const nuevoAbono = sumaAbonos + val
-      const nuevoSaldo = totalNota - nuevoAbono
-      await supabase.from('encnotaen').update({ valabono: nuevoAbono, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
-      setMsg({ tipo: 'ok', texto: `✅ Abono de $${fmt(val)} registrado.` })
-      setValor(''); setObs('')
+      const partes = []
+      if (val > 0)  partes.push(`abono de $${fmt(val)}`)
+      if (desc > 0) partes.push(`descuento de $${fmt(desc)}`)
+      setMsg({ tipo: 'ok', texto: `✅ Se registró ${partes.join(' y ')}.` })
+      setValor(''); setObs(''); setValDesc('')
+      setValTotalActual(nuevoValTotal); setValDescueActual(nuevoValDescue)
       cargarAbonos()
     }
     setCargando(false)
@@ -68,7 +102,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
   async function ejecutarReversion(abono) {
     setPinAccion(null)
     const nuevaSum = sumaAbonos - abono.valabono
-    const nuevoSaldo = totalNota - nuevaSum
+    const nuevoSaldo = valTotalActual - nuevaSum
     const { error } = await supabase.from('detabonos').delete().eq('id', abono.id)
     if (error) { setMsg({ tipo: 'err', texto: `❌ ${error.message}` }); return }
     await supabase.from('encnotaen').update({ valabono: nuevaSum, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
@@ -81,7 +115,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
     setPinAccion(null)
     const nuevoValAbono = abono.valabono - valor
     const nuevaSum = sumaAbonos - valor
-    const nuevoSaldo = totalNota - nuevaSum
+    const nuevoSaldo = valTotalActual - nuevaSum
     const { error } = await supabase.from('detabonos').update({ valabono: nuevoValAbono }).eq('id', abono.id)
     if (error) { setMsg({ tipo: 'err', texto: `❌ ${error.message}` }); return }
     await supabase.from('encnotaen').update({ valabono: nuevaSum, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
@@ -119,8 +153,9 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
 
         {/* resumen */}
         <div style={S.resumen}>
-          <Dato label="Total nota"   valor={fmt(totalNota)}  />
+          <Dato label="Total nota"   valor={fmt(valTotalActual)}  />
           <Dato label="Total abonos" valor={fmt(sumaAbonos)} color="#27ae60" />
+          <Dato label="Descuentos"   valor={fmt(valDescueActual)} color="#8e44ad" />
           <Dato label="Saldo"        valor={fmt(saldoFinal)} color={saldoFinal > 0 ? '#c0392b' : '#27ae60'} />
         </div>
 
@@ -191,8 +226,31 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
             <label style={S.lbl}>Observación
               <input style={S.inp} value={obs} onChange={e => setObs(e.target.value)} placeholder="Opcional…" />
             </label>
+
+            <div style={S.descBox}>
+              <strong style={{ color: '#8e44ad', fontSize: 12 }}>Descuento (opcional)</strong>
+              <div style={S.filaForm}>
+                <label style={S.lbl}>Tipo
+                  <select style={S.inp} value={tipoDesc} onChange={e => setTipoDesc(e.target.value)}>
+                    <option value="pct">Porcentaje (%)</option>
+                    <option value="monto">Monto fijo ($)</option>
+                  </select>
+                </label>
+                <label style={S.lbl}>{tipoDesc === 'pct' ? 'Descuento (%)' : 'Descuento ($)'}
+                  <input type="number" style={S.inp} value={valDesc} min={0}
+                    max={tipoDesc === 'pct' ? 100 : saldoFinal}
+                    onChange={e => setValDesc(e.target.value)} placeholder="0" />
+                </label>
+                {descuentoValor > 0 && (
+                  <div style={{ ...S.lbl, justifyContent:'flex-end' }}>
+                    <span style={{ color:'#8e44ad', fontWeight:700, fontSize:13 }}>= ${fmt(descuentoValor)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <button onClick={registrarAbono} disabled={cargando} style={S.btnGuardar}>
-              {cargando ? 'Guardando…' : <><span style={{fontSize:17}}>💾</span> Registrar abono</>}
+              {cargando ? 'Guardando…' : <><span style={{fontSize:17}}>💾</span> Registrar {descuentoValor > 0 && Number(valor) > 0 ? 'abono y descuento' : descuentoValor > 0 ? 'descuento' : 'abono'}</>}
             </button>
           </div>
         )}
@@ -221,6 +279,7 @@ const S = {
   cabecera:   { display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,fontSize:15,fontWeight:800,color:'#1a3a6b' },
   btnX:       { background:'#e74c3c',color:'#fff',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700,fontSize:17 },
   resumen:    { display:'flex',justifyContent:'space-around',background:'#f0f4ff',borderRadius:6,padding:'10px 0',marginBottom:14,border:'1px solid #c8d5ea' },
+  descBox:    { display:'flex',flexDirection:'column',gap:6,background:'#f9f0ff',borderRadius:6,padding:10,border:'1px solid #e0c3f5' },
   tabla:      { width:'100%',borderCollapse:'collapse',fontSize:12,marginBottom:14 },
   thead:      { background:'#dde3ee' },
   th:         { padding:'5px 8px',fontWeight:700,color:'#1a3a6b',borderBottom:'2px solid #aab8d4',textAlign:'left' },

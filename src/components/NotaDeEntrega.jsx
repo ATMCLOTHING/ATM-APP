@@ -438,14 +438,20 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     if (!detValidas.length){setMsg({tipo:'err',texto:'Agrega al menos un artículo con cantidad.'}); return}
     setBusy(true)
     try {
-      // Al editar una nota ya guardada, leer el abono real de la BD para no pisarlo
+      // Al editar una nota ya guardada, leer de la BD el abono real y cualquier
+      // descuento aplicado después (ej. desde Cartera/Abonos) para no pisarlos
       let abonoReal = abonos
+      let extraDescue = 0
       if (!modoNueva && guardada) {
         const {data:encActual} = await supabase.from('encnotaen')
-          .select('valabono').eq('numnotaent',nroDoc).single()
-        if (encActual) abonoReal = Number(encActual.valabono)||0
+          .select('valabono,valdescue').eq('numnotaent',nroDoc).single()
+        if (encActual) {
+          abonoReal = Number(encActual.valabono)||0
+          extraDescue = Math.max(0, (Number(encActual.valdescue)||0) - totDcto)
+        }
       }
-      const saldoReal = Math.max(0, total - abonoReal)
+      const totalReal = total - extraDescue
+      const saldoReal = Math.max(0, totalReal - abonoReal)
 
       const enc = {
         numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
@@ -459,7 +465,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         departamen:cliente?.departamento||'',
         nomempresa:cliente?.nom_empresa||'',
         porcdescue:pDesc, porciva:pIva,
-        subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
+        subtotal, valdescue:totDcto+extraDescue, valiva:totIva, valtotal:totalReal,
         valabono:abonoReal, saldo:saldoReal, cedvended:cedVend,
         cantotal:prendas, anulada:'N',
         usuario: usuario?.usuario || usuario?.nombre || 'sistema',
