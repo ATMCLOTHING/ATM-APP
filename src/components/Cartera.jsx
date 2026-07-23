@@ -4,6 +4,9 @@
 import { useState, useEffect, useRef } from 'react'
 import ModalAbonos from './ModalAbonos'
 
+const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
 const hoy  = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
@@ -220,7 +223,15 @@ export default function Cartera({ supabase, usuario, onClose }) {
       .mora-o{color:#e65100;font-weight:700;}
       .mora-y{color:#f9a825;font-weight:700;}
       .mora-g{color:#2e7d32;}
-      @media print{body{margin:10px;}button{display:none!important;}}
+      .nro-nota{cursor:pointer;text-decoration:underline;color:#1a3a6b!important;}
+      #abonoOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:999;}
+      #abonoModal{background:#fff;border-radius:8px;padding:18px;width:480px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);text-align:left;}
+      #abonoModal h3{margin:0 0 10px;color:#1a3a6b;font-size:14px;display:flex;justify-content:space-between;align-items:center;}
+      #abonoModal .resumen{display:flex;justify-content:space-around;background:#f0f4ff;border-radius:6px;padding:8px 0;margin-bottom:10px;border:1px solid #c8d5ea;font-size:11px;}
+      #abonoModal .resumen b{display:block;font-size:14px;}
+      #abonoModal table{margin:0;}
+      #abonoModal .cerrar{background:#e74c3c;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-weight:700;font-size:14px;}
+      @media print{body{margin:10px;}button{display:none!important;}#abonoOverlay{display:none!important;}}
     </style></head><body>
     <h2>CARTERA VIGENTE</h2>
     <div class="vendedor">VENDEDOR: ${vendNombre.toUpperCase()}</div>
@@ -252,7 +263,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
         const mora = n.diasVencido||0
         const clMora = mora>=90?'mora-r':mora>=60?'mora-o':mora>=30?'mora-y':'mora-g'
         w.document.write(`<tr>
-          <td style="text-align:left;font-weight:700">${n.numnotaent}</td>
+          <td class="nro-nota" style="text-align:left;font-weight:700" onclick="verAbonos(${n.numnotaent})" title="Ver detalle de abonos">${n.numnotaent}</td>
           <td style="text-align:left">${(n.fechanotae||'').slice(0,10)}</td>
           <td style="text-align:left">${(n.fechavence||'').slice(0,10)}</td>
           <td class="${clMora}">${mora}</td>
@@ -286,6 +297,47 @@ export default function Cartera({ supabase, usuario, onClose }) {
           </tr>
         </tbody>
       </table>
+
+      <div id="abonoOverlay" onclick="if(event.target===this)cerrarAbonos()">
+        <div id="abonoModal"></div>
+      </div>
+      <script>
+        var NOTAS_INFO = ${JSON.stringify(
+          Object.fromEntries(notas.map(n => [n.numnotaent, {
+            nombreclie: n.nombreclie, valtotal: n.valtotal, valabono: n.valabono, saldo: n.saldo,
+          }]))
+        ).replace(/</g,'\\u003c')};
+        var SUPA_URL = ${JSON.stringify(SUPA_URL)};
+        var SUPA_KEY = ${JSON.stringify(SUPA_KEY)};
+        function fmtN(n){ return Math.round(Number(n)||0).toLocaleString('es-CO'); }
+        function cerrarAbonos(){ document.getElementById('abonoOverlay').style.display='none'; }
+        function verAbonos(num){
+          var info = NOTAS_INFO[num] || {};
+          var modal = document.getElementById('abonoModal');
+          modal.innerHTML = '<h3>💵 Abonos — Nota '+num+' ('+(info.nombreclie||'')+')<button class="cerrar" onclick="cerrarAbonos()">✕</button></h3>'
+            + '<div class="resumen">'
+            + '<div>TOTAL<b>$'+fmtN(info.valtotal)+'</b></div>'
+            + '<div>ABONADO<b style="color:#2e7d32">$'+fmtN(info.valabono)+'</b></div>'
+            + '<div>SALDO<b style="color:'+((info.saldo||0)>0?'#c0392b':'#2e7d32')+'">$'+fmtN(info.saldo)+'</b></div>'
+            + '</div>'
+            + '<div id="abonoLista">Cargando…</div>';
+          document.getElementById('abonoOverlay').style.display='flex';
+          fetch(SUPA_URL+'/rest/v1/detabonos?numnotaent=eq.'+num+'&select=fechaabono,valabono,mediopago,observacio&order=fechaabono.asc', {
+            headers: { apikey: SUPA_KEY, Authorization: 'Bearer '+SUPA_KEY }
+          }).then(function(r){ return r.json(); }).then(function(rows){
+            var el = document.getElementById('abonoLista');
+            if (!rows || !rows.length) { el.innerHTML = '<p style="color:#888;text-align:center">Sin abonos registrados.</p>'; return; }
+            var html = '<table><thead><tr style="background:#dde3ee"><th style="text-align:left">Fecha</th><th style="text-align:right">Valor</th><th style="text-align:left">Medio</th><th style="text-align:left">Obs.</th></tr></thead><tbody>';
+            rows.forEach(function(a){
+              html += '<tr><td style="text-align:left">'+(a.fechaabono||'')+'</td><td style="text-align:right;color:#2e7d32;font-weight:700">$'+fmtN(a.valabono)+'</td><td style="text-align:left">'+(a.mediopago||'')+'</td><td style="text-align:left">'+(a.observacio||'')+'</td></tr>';
+            });
+            html += '</tbody></table>';
+            el.innerHTML = html;
+          }).catch(function(){
+            document.getElementById('abonoLista').innerHTML = '<p style="color:#c62828;text-align:center">Error al cargar los abonos.</p>';
+          });
+        }
+      </script>
     </body></html>`)
     w.document.close()
   }
