@@ -272,6 +272,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
 
     clientes.forEach(cli => {
       const totVal = cli.notas.reduce((s,n)=>s+(n.valtotal||0),0)
+      const totDct = cli.notas.reduce((s,n)=>s+(n.valdescue||0),0)
       const totAbo = cli.notas.reduce((s,n)=>s+(n.valabono||0),0)
       const totSal = cli.notas.reduce((s,n)=>s+(n.saldo||0),0)
       w.document.write(`
@@ -300,7 +301,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
           <td style="text-align:left">${fmtFecha(n.fechavence)}</td>
           <td class="${clMora}">${mora}</td>
           <td>$${fmt(n.valtotal)}</td>
-          <td>0</td>
+          <td>${n.valdescue ? '$'+fmt(n.valdescue) : '0'}</td>
           <td>$${fmt(n.valabono)}</td>
           <td style="font-weight:700;color:#c62828">$${fmt(n.saldo)}</td>
         </tr>`)
@@ -309,7 +310,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
           <tr class="tot-cli">
             <td colspan="4" style="text-align:right">$TOTAL CLIENTE</td>
             <td>$${fmt(totVal)}</td>
-            <td>$0</td>
+            <td>${totDct ? '$'+fmt(totDct) : '$0'}</td>
             <td>$${fmt(totAbo)}</td>
             <td style="color:#c62828">$${fmt(totSal)}</td>
           </tr>
@@ -317,13 +318,14 @@ export default function Cartera({ supabase, usuario, onClose }) {
     })
 
     // Total general
+    const totDescGeneral = notas.reduce((s,n)=>s+(n.valdescue||0),0)
     w.document.write(`
       <table style="margin-top:16px;">
         <tbody>
           <tr class="tot-gen">
             <td colspan="4" style="text-align:right;padding:6px 8px;">TOTAL GENERAL — ${clientes.length} clientes / ${notas.length} notas</td>
             <td style="padding:6px 8px;">$${fmt(totales.valor)}</td>
-            <td style="padding:6px 8px;">$0</td>
+            <td style="padding:6px 8px;">$${fmt(totDescGeneral)}</td>
             <td style="padding:6px 8px;">$${fmt(totales.abonado)}</td>
             <td style="padding:6px 8px;">$${fmt(totales.saldo)}</td>
           </tr>
