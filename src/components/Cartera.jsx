@@ -10,6 +10,8 @@ const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
 const hoy  = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
+// Formato DD/MM/AAAA (igual al sistema Fox viejo) — la fecha llega de Supabase en formato AAAA-MM-DD
+const fmtFecha = f => { if (!f) return ''; const [y,m,d] = f.slice(0,10).split('-'); return `${d}/${m}/${y}` }
 const diasDesde   = f => f ? Math.floor((new Date()-new Date(f))/(1000*60*60*24)) : 0
 const colorMora   = d => d >= 90 ? '#c62828' : d >= 60 ? '#e65100' : d >= 30 ? '#f9a825' : '#2e7d32'
 const bgMora      = d => d >= 90 ? '#fdecea' : d >= 60 ? '#fff3e0' : d >= 30 ? '#fffde7' : '#e8f5e9'
@@ -82,8 +84,16 @@ export default function Cartera({ supabase, usuario, onClose }) {
     const {data, error} = await q.limit(5000)
     if (error) { console.error('Cartera error:', error); setTotales({valor:0,abonado:0,saldo:0}); setNotas([]); setResumen([]); setGenerado(true); setCargando(false); return }
 
+    // el nombre guardado nota por nota (nombreclie) puede variar entre notas de un mismo cliente
+    // (ej. cambios de razón social con el tiempo) — se usa el nombre completo y actual de la
+    // tabla maestra `clientes` (no se toca en las recargas de Fox) para que coincida con el sistema viejo
+    const {data: clientesData} = await supabase.from('clientes').select('cedula,nombre')
+    const nombreClienteMap = {}
+    ;(clientesData||[]).forEach(c => { nombreClienteMap[c.cedula] = c.nombre })
+
     let resultado = (data||[]).map(n => ({
       ...n,
+      nombreclie:  nombreClienteMap[n.cedrifclie] || n.nombreclie,
       diasNota:    diasDesde(n.fechanotae),
       diasVencido: n.fechavence ? Math.max(0, diasDesde(n.fechavence)) : 0,
     }))
@@ -235,7 +245,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
     </style></head><body>
     <h2>CARTERA VIGENTE</h2>
     <div class="vendedor">VENDEDOR: ${vendNombre.toUpperCase()}</div>
-    <div class="sub">Fecha: ${new Date().toLocaleDateString('es-CO')} &nbsp;|&nbsp; ${clientes.length} clientes &nbsp;|&nbsp; ${notas.length} notas</div>
+    <div class="sub">Fecha: ${fmtFecha(hoy())} &nbsp;|&nbsp; ${clientes.length} clientes &nbsp;|&nbsp; ${notas.length} notas</div>
     <button onclick="window.print()" style="margin-bottom:14px;padding:6px 18px;background:#1a3a6b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">🖨 Imprimir</button>`)
 
     clientes.forEach(cli => {
@@ -264,8 +274,8 @@ export default function Cartera({ supabase, usuario, onClose }) {
         const clMora = mora>=90?'mora-r':mora>=60?'mora-o':mora>=30?'mora-y':'mora-g'
         w.document.write(`<tr>
           <td class="nro-nota" style="text-align:left;font-weight:700" onclick="verAbonos(${n.numnotaent})" title="Ver detalle de abonos">${n.numnotaent}</td>
-          <td style="text-align:left">${(n.fechanotae||'').slice(0,10)}</td>
-          <td style="text-align:left">${(n.fechavence||'').slice(0,10)}</td>
+          <td style="text-align:left">${fmtFecha(n.fechanotae)}</td>
+          <td style="text-align:left">${fmtFecha(n.fechavence)}</td>
           <td class="${clMora}">${mora}</td>
           <td>$${fmt(n.valtotal)}</td>
           <td>0</td>
@@ -448,7 +458,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
 
     const filas = tipo === 'resumen'
       ? resumen.map(c => `${c.cedula}\t${c.nombre}\t${c.notas}\t${fmtM(c.valor)}\t${fmtM(c.abonado)}\t${fmtM(c.saldo)}\t${c.maxMora} días`).join('\n')
-      : notas.map(n => `${n.numnotaent}\t${n.fechanotae?.slice(0,10)}\t${n.nombreclie}\t${fmtM(n.valtotal)}\t${fmtM(n.valabono)}\t${fmtM(n.saldo)}\t${n.diasVencido} días`).join('\n')
+      : notas.map(n => `${n.numnotaent}\t${fmtFecha(n.fechanotae)}\t${n.nombreclie}\t${fmtM(n.valtotal)}\t${fmtM(n.valabono)}\t${fmtM(n.saldo)}\t${n.diasVencido} días`).join('\n')
 
     const w = window.open('','_blank','width=900,height=700')
     w.document.write(`<html><head><title>${titulo}</title>
@@ -472,7 +482,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
     } else {
       w.document.write(`<table><thead><tr><th>Nota</th><th>Fecha</th><th>Vence</th><th>Cliente</th><th>$ Valor</th><th>$ Abonado</th><th>$ Saldo</th><th>Días nota</th><th>Días vencido</th></tr></thead><tbody>`)
       notas.forEach(n => {
-        w.document.write(`<tr><td>${n.numnotaent}</td><td>${n.fechanotae?.slice(0,10)||''}</td><td>${n.fechavence?.slice(0,10)||''}</td><td>${n.nombreclie}</td><td style="text-align:right">${fmtM(n.valtotal)}</td><td style="text-align:right">${fmtM(n.valabono)}</td><td style="text-align:right;color:#c62828;font-weight:bold">${fmtM(n.saldo)}</td><td style="text-align:right">${n.diasNota}</td><td style="text-align:right;color:${colorMora(n.diasVencido)}">${n.diasVencido}</td></tr>`)
+        w.document.write(`<tr><td>${n.numnotaent}</td><td>${fmtFecha(n.fechanotae)}</td><td>${fmtFecha(n.fechavence)}</td><td>${n.nombreclie}</td><td style="text-align:right">${fmtM(n.valtotal)}</td><td style="text-align:right">${fmtM(n.valabono)}</td><td style="text-align:right;color:#c62828;font-weight:bold">${fmtM(n.saldo)}</td><td style="text-align:right">${n.diasNota}</td><td style="text-align:right;color:${colorMora(n.diasVencido)}">${n.diasVencido}</td></tr>`)
       })
       w.document.write(`<tr class="tot"><td colspan="4">TOTALES — ${notas.length} notas</td><td style="text-align:right">${fmtM(totales.valor)}</td><td style="text-align:right">${fmtM(totales.abonado)}</td><td style="text-align:right;color:#c62828">${fmtM(totales.saldo)}</td><td colspan="2"></td></tr>`)
     }
@@ -753,8 +763,8 @@ export default function Cartera({ supabase, usuario, onClose }) {
                           <td style={{...S.td,fontWeight:700,color:'#1a3a6b',textDecoration:'underline',cursor:'pointer'}}
                             title="Ver detalle de abonos de esta nota"
                             onClick={e=>{e.stopPropagation(); setNotaAbonosSel(n)}}>{n.numnotaent}</td>
-                          <td style={S.td}>{n.fechanotae?.slice(0,10)||''}</td>
-                          <td style={S.td}>{n.fechavence?.slice(0,10)||''}</td>
+                          <td style={S.td}>{fmtFecha(n.fechanotae)}</td>
+                          <td style={S.td}>{fmtFecha(n.fechavence)}</td>
                           <td style={{...S.td,maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{n.nombreclie}</td>
                           <td style={{...S.td,textAlign:'right'}}>{fmtM(n.valtotal)}</td>
                           <td style={{...S.td,textAlign:'right',color:'#2e7d32'}}>{fmtM(n.valabono)}</td>
