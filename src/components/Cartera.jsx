@@ -86,10 +86,15 @@ export default function Cartera({ supabase, usuario, onClose }) {
 
     // el nombre guardado nota por nota (nombreclie) puede variar entre notas de un mismo cliente
     // (ej. cambios de razón social con el tiempo) — se usa el nombre completo y actual de la
-    // tabla maestra `clientes` (no se toca en las recargas de Fox) para que coincida con el sistema viejo
-    const {data: clientesData} = await supabase.from('clientes').select('cedula,nombre')
+    // tabla maestra `clientes` (no se toca en las recargas de Fox) para que coincida con el sistema viejo.
+    // Excepción: cédulas genéricas ("99","999","5122603","9999980","32293713") comparten un registro
+    // "CLIENTE GENERAL" en `clientes` para muchos compradores distintos — ahí el nombre real y
+    // específico es el de la nota, no el de la tabla maestra.
+    const {data: clientesData} = await supabase.from('clientes').select('cedula,nombre').limit(5000)
     const nombreClienteMap = {}
-    ;(clientesData||[]).forEach(c => { nombreClienteMap[c.cedula] = c.nombre })
+    ;(clientesData||[]).forEach(c => {
+      if ((c.nombre||'').trim().toUpperCase() !== 'CLIENTE GENERAL') nombreClienteMap[c.cedula] = c.nombre
+    })
 
     let resultado = (data||[]).map(n => ({
       ...n,
