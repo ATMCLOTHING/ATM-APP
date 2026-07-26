@@ -12,6 +12,7 @@ const fmtM = n => '$' + fmt(n)
 const hoy  = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 // Formato DD/MM/AAAA (igual al sistema Fox viejo) — la fecha llega de Supabase en formato AAAA-MM-DD
 const fmtFecha = f => { if (!f) return ''; const [y,m,d] = f.slice(0,10).split('-'); return `${d}/${m}/${y}` }
+const normaliza   = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase()
 const diasDesde   = f => f ? Math.floor((new Date()-new Date(f))/(1000*60*60*24)) : 0
 const colorMora   = d => d >= 90 ? '#c62828' : d >= 60 ? '#e65100' : d >= 30 ? '#f9a825' : '#2e7d32'
 const bgMora      = d => d >= 90 ? '#fdecea' : d >= 60 ? '#fff3e0' : d >= 30 ? '#fffde7' : '#e8f5e9'
@@ -33,6 +34,10 @@ export default function Cartera({ supabase, usuario, onClose }) {
   const [cargando,    setCargando]    = useState(false)
   const [generado,    setGenerado]    = useState(false)
   const [tab,         setTab]         = useState('resumen')
+
+  // ── búsqueda dentro de los resultados ya generados (no dispara consulta nueva) ──
+  const [busquedaPost,     setBusquedaPost]     = useState('')
+  const [busquedaAplicada, setBusquedaAplicada] = useState('')
 
   // ── abonos ──
   const [clienteSelDrill, setClienteSelDrill] = useState(null)  // cliente seleccionado para ver sus notas
@@ -62,6 +67,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
   async function generar() {
     setCargando(true); setGenerado(false); setModoAbono(false)
     setNotasSel({}); setDistribucio([]); setMsgAbono(null)
+    setBusquedaPost(''); setBusquedaAplicada(''); setClienteSelDrill(null)
 
     // FIX: usar neq('anulada','S') en lugar de eq('anulada','N')
     // así captura null y cualquier valor distinto de 'S'
@@ -201,9 +207,20 @@ export default function Cartera({ supabase, usuario, onClose }) {
     setTab('detalle')
   }
 
-  const notasFiltradas = clienteSelDrill
+  const notasFiltradas = (clienteSelDrill
     ? notas.filter(n => n.cedrifclie === clienteSelDrill.cedula)
     : notas
+  ).filter(n => !busquedaAplicada || normaliza(n.nombreclie).includes(normaliza(busquedaAplicada)))
+
+  const resumenFiltrado = !busquedaAplicada ? resumen : resumen.filter(c =>
+    normaliza(c.nombre).includes(normaliza(busquedaAplicada)) || (c.cedula||'').includes(busquedaAplicada.trim())
+  )
+  const totalesResumenFiltrado = resumenFiltrado.reduce((acc,c) => ({
+    notas:   acc.notas   + c.notas,
+    valor:   acc.valor   + c.valor,
+    abonado: acc.abonado + c.abonado,
+    saldo:   acc.saldo   + c.saldo,
+  }), {notas:0,valor:0,abonado:0,saldo:0})
 
   // ── IMPRIMIR CARTERA COMPLETA POR VENDEDOR ────────────────────────────────
   function imprimirCarteraCompleta() {
@@ -582,6 +599,27 @@ export default function Cartera({ supabase, usuario, onClose }) {
             <Tot label="$ Saldo"  val={fmtM(totales.saldo)}     color="#c62828" grande/>
           </div>
 
+          {/* BUSCAR CLIENTE DENTRO DE LOS RESULTADOS YA GENERADOS */}
+          <div style={S.buscaResultados}>
+            <input style={{...S.inp, maxWidth:280}} value={busquedaPost}
+              placeholder="Buscar cliente en estos resultados..."
+              onChange={e=>setBusquedaPost(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&setBusquedaAplicada(busquedaPost.trim())}/>
+            <button onClick={()=>setBusquedaAplicada(busquedaPost.trim())} style={S.btnSel}>
+              <span style={{fontSize:15}}>🔍</span> Buscar
+            </button>
+            {busquedaAplicada && (
+              <>
+                <span style={{fontSize:12,color:'#555'}}>
+                  {resumenFiltrado.length} cliente(s) encontrados para "<strong>{busquedaAplicada}</strong>"
+                </span>
+                <button onClick={()=>{setBusquedaPost('');setBusquedaAplicada('')}} style={S.btnSel}>
+                  <span style={{fontSize:13}}>✕</span> Limpiar
+                </button>
+              </>
+            )}
+          </div>
+
           {/* INDICADOR CLIENTE SELECCIONADO */}
           {clienteSelDrill && (
             <div style={{background:'#e8f0fe',padding:'6px 16px',fontSize:12,display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid #c8d5ea'}}>
@@ -703,9 +741,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {resumen.length === 0
-                    ? <tr><td colSpan={7} style={{textAlign:'center',padding:30,color:'#aaa'}}>Sin resultados con esos filtros.</td></tr>
-                    : resumen.map((c,i) => (
+                  {resumenFiltrado.length === 0
+                    ? <tr><td colSpan={7} style={{textAlign:'center',padding:30,color:'#aaa'}}>{busquedaAplicada ? `Ningún cliente coincide con "${busquedaAplicada}".` : 'Sin resultados con esos filtros.'}</td></tr>
+                    : resumenFiltrado.map((c,i) => (
                       <tr key={c.cedula||i}
                         onClick={()=>verDetalleCliente(c)}
                         style={{background:clienteSelDrill?.cedula===c.cedula?'#e8f0fe':i%2===0?'#fff':'#f5f7ff',cursor:'pointer'}}
@@ -727,11 +765,11 @@ export default function Cartera({ supabase, usuario, onClose }) {
                 </tbody>
                 <tfoot>
                   <tr style={{background:'#e8eaf6',fontWeight:700}}>
-                    <td style={S.td} colSpan={2}>TOTALES — {resumen.length} clientes</td>
-                    <td style={{...S.td,textAlign:'right'}}>{notas.length}</td>
-                    <td style={{...S.td,textAlign:'right'}}>{fmtM(totales.valor)}</td>
-                    <td style={{...S.td,textAlign:'right',color:'#2e7d32'}}>{fmtM(totales.abonado)}</td>
-                    <td style={{...S.td,textAlign:'right',color:'#c62828'}}>{fmtM(totales.saldo)}</td>
+                    <td style={S.td} colSpan={2}>TOTALES — {resumenFiltrado.length} clientes</td>
+                    <td style={{...S.td,textAlign:'right'}}>{totalesResumenFiltrado.notas}</td>
+                    <td style={{...S.td,textAlign:'right'}}>{fmtM(totalesResumenFiltrado.valor)}</td>
+                    <td style={{...S.td,textAlign:'right',color:'#2e7d32'}}>{fmtM(totalesResumenFiltrado.abonado)}</td>
+                    <td style={{...S.td,textAlign:'right',color:'#c62828'}}>{fmtM(totalesResumenFiltrado.saldo)}</td>
                     <td style={S.td}></td>
                   </tr>
                 </tfoot>
@@ -751,7 +789,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
                 </thead>
                 <tbody>
                   {notasFiltradas.length === 0
-                    ? <tr><td colSpan={modoAbono?10:9} style={{textAlign:'center',padding:30,color:'#aaa'}}>Sin resultados con esos filtros.</td></tr>
+                    ? <tr><td colSpan={modoAbono?10:9} style={{textAlign:'center',padding:30,color:'#aaa'}}>{busquedaAplicada ? `Ningún cliente coincide con "${busquedaAplicada}".` : 'Sin resultados con esos filtros.'}</td></tr>
                     : notasFiltradas.map((n,i) => {
                       const selec = !!notasSel[n.numnotaent]
                       return (
@@ -770,7 +808,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
                             onClick={e=>{e.stopPropagation(); setNotaAbonosSel(n)}}>{n.numnotaent}</td>
                           <td style={S.td}>{fmtFecha(n.fechanotae)}</td>
                           <td style={S.td}>{fmtFecha(n.fechavence)}</td>
-                          <td style={{...S.td,maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{n.nombreclie}</td>
+                          <td style={S.td}>{n.nombreclie}</td>
                           <td style={{...S.td,textAlign:'right'}}>{fmtM(n.valtotal)}</td>
                           <td style={{...S.td,textAlign:'right',color:'#2e7d32'}}>{fmtM(n.valabono)}</td>
                           <td style={{...S.td,textAlign:'right',fontWeight:700,color:n.saldo>0?'#c62828':'#2e7d32'}}>{fmtM(n.saldo)}</td>
@@ -847,6 +885,7 @@ const S = {
   btnSel:     {height:32,background:'#eef2ff',color:'#1a3a6b',border:'1px solid #c8d5ea',borderRadius:6,padding:'0 12px',cursor:'pointer',fontSize:12,fontWeight:600},
   btnGuardar: {height:36,background:'#2e7d32',color:'#fff',border:'none',borderRadius:6,padding:'0 20px',cursor:'pointer',fontSize:13,fontWeight:700},
   totalBar:   {display:'flex',gap:20,padding:'10px 20px',background:'#fff',borderBottom:'1px solid #dde3ee',flexWrap:'wrap'},
+  buscaResultados: {display:'flex',gap:10,alignItems:'center',padding:'8px 20px',background:'#f5f7fb',borderBottom:'1px solid #dde3ee',flexWrap:'wrap'},
   tabs:       {display:'flex',gap:4,padding:'8px 16px',background:'#f5f7fb',borderBottom:'1px solid #dde3ee'},
   tab:        {padding:'7px 16px',border:'1px solid #c8d5ea',borderRadius:'6px 6px 0 0',background:'#fff',color:'#555',cursor:'pointer',fontSize:13,fontWeight:600},
   tabActivo:  {background:'#1a3a6b',color:'#fff',border:'1px solid #1a3a6b'},
