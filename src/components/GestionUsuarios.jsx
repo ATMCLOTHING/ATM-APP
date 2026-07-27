@@ -2,7 +2,11 @@
 import { useState, useEffect } from 'react'
 import { WZCLOSE, WZNEW, WZSAVE, WZDELETE } from '../lib/assets'
 
-const ROLES = ['admin','cajera','vendedor','bodega']
+// 'consulta' es un rol "en blanco": no trae ningún módulo por defecto (a diferencia de
+// cajera/vendedor/bodega, que sí tienen módulos fijos asignados en Dashboard.jsx y además
+// entran directo a un módulo fijo al iniciar sesión, ver App.jsx). Sirve para crear usuarios
+// que solo deben ver módulos puntuales — lo que se marque abajo en "Permisos por módulo".
+const ROLES = ['admin','cajera','vendedor','bodega','consulta']
 const MODULOS = ['nota','clientes','articulos','proveedores','cierre','cartera','vales','vendedores','documentos','egresos','comisiones','usuarios']
 const MODULO_LABELS = {
   nota:'Nota de Entrega', clientes:'Clientes', articulos:'Artículos', proveedores:'Proveedores',
