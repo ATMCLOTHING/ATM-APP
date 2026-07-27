@@ -234,8 +234,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   }
 
   // ── CARTERA PENDIENTE POR VENDEDOR ────────────────────────────────────────
-  // Agrupa toda la cartera pendiente (saldo>0, sin filtrar por fecha) según el vendedor
-  // que hizo la nota (cedvended), para saber cuánto le deben los clientes a cada vendedor.
+  // Resumen de toda la cartera pendiente (saldo>0, sin filtrar por fecha) agrupado por el
+  // vendedor que hizo la nota (cedvended): una fila por vendedor con sus totales.
   function calcCarteraPorVendedor() {
     if (!datos) return []
     const { carteraGlobal, vendMap } = datos
@@ -243,15 +243,18 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     ;(carteraGlobal||[]).forEach(n => {
       const cedv = String(n.cedvended||'')
       const nombre = cedv ? (vendMap[cedv] || `Vendedor ${cedv}`) : 'Sin vendedor asignado'
-      if (!porVend[nombre]) porVend[nombre] = { notas: [], totalSaldo: 0, totalAbonado: 0, totalFacturado: 0 }
+      if (!porVend[nombre]) porVend[nombre] = { notas:0, totalSaldo:0, totalAbonado:0, totalFacturado:0, sumaDias:0, ultimaFecha:null }
+      const v = porVend[nombre]
       const diasVencido = Math.floor((new Date()-new Date(n.fechanotae))/(1000*60*60*24))
-      porVend[nombre].notas.push({...n, diasVencido})
-      porVend[nombre].totalSaldo     += n.saldo||0
-      porVend[nombre].totalAbonado   += n.valabono||0
-      porVend[nombre].totalFacturado += n.valtotal||0
+      v.notas++
+      v.totalSaldo     += n.saldo||0
+      v.totalAbonado   += n.valabono||0
+      v.totalFacturado += n.valtotal||0
+      v.sumaDias       += diasVencido
+      if (!v.ultimaFecha || n.fechanotae > v.ultimaFecha) v.ultimaFecha = n.fechanotae
     })
     return Object.entries(porVend)
-      .map(([nombre, v]) => ({ nombre, ...v, notas: v.notas.sort((a,b)=>b.saldo-a.saldo) }))
+      .map(([nombre, v]) => ({ nombre, ...v, promedioDias: v.notas>0 ? Math.round(v.sumaDias/v.notas) : 0 }))
       .sort((a,b) => b.totalSaldo-a.totalSaldo)
   }
 
@@ -376,22 +379,18 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     w.document.write(`<html><head><title>Cartera</title><style>${estilosImp}.mora{color:#c62828;font-weight:700;}</style></head><body>
     <h2>ATM — CARTERA PENDIENTE POR VENDEDOR</h2>
     <div class="sub">Corte al ${hoy()} (cartera completa, no depende del rango de fechas)</div>
-    ${carteraPorVend.map(v=>`
-      <table><tbody>
-        <tr class="sec"><td colspan="7">${v.nombre} — ${v.notas.length} nota(s) — Saldo: $${fmt(v.totalSaldo)}</td></tr>
-        <tr style="background:#1a3a6b">
-          <th style="text-align:left">Nota</th><th style="text-align:left">Fecha</th><th style="text-align:left">Cliente</th>
-          <th>Total</th><th>Abonado</th><th>Saldo</th><th>Días</th>
-        </tr>
-        ${v.notas.map(n=>`<tr><td>${n.numnotaent}</td><td>${n.fechanotae}</td><td>${n.nombreclie}</td>
-          <td>$${fmt(n.valtotal)}</td><td>$${fmt(n.valabono)}</td>
-          <td style="color:#c62828;font-weight:700">$${fmt(n.saldo)}</td>
-          <td class="${n.diasVencido>30?'mora':''}">${n.diasVencido}d</td></tr>`).join('')}
-      </tbody></table>`).join('')}
-    <table><tbody>
-      <tr class="tot"><td colspan="6">TOTAL CARTERA PENDIENTE (todos los vendedores)</td><td>$${fmt(carteraPorVend.reduce((s,v)=>s+v.totalSaldo,0))}</td></tr>
-    </tbody></table>
-    </body></html>`)
+    <table><thead><tr>
+      <th style="text-align:left">Vendedor</th><th style="text-align:left">Última nota</th>
+      <th>Total adeudado</th><th>Abonado</th><th>Saldo</th><th>Prom. días</th>
+    </tr></thead><tbody>
+    ${carteraPorVend.map(v=>`<tr>
+      <td>${v.nombre}</td><td>${v.ultimaFecha||''}</td>
+      <td>$${fmt(v.totalFacturado)}</td><td>$${fmt(v.totalAbonado)}</td>
+      <td style="color:#c62828;font-weight:700">$${fmt(v.totalSaldo)}</td>
+      <td class="${v.promedioDias>30?'mora':''}">${v.promedioDias}d</td></tr>`).join('')}
+    <tr class="tot"><td colspan="4">TOTAL CARTERA PENDIENTE (todos los vendedores)</td>
+      <td>$${fmt(carteraPorVend.reduce((s,v)=>s+v.totalSaldo,0))}</td><td></td></tr>
+    </tbody></table></body></html>`)
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
   }
 
@@ -853,57 +852,35 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                   <div style={{fontSize:11,color:'#888',marginBottom:12,marginTop:-6}}>
                     Muestra toda la cartera pendiente actual (no depende del rango de fechas de arriba).
                   </div>
-
-                  {carteraPorVend.length===0 && (
-                    <div style={{textAlign:'center',padding:20,color:'#2e7d32',fontWeight:700}}><span style={{fontSize:16}}>✅</span> Sin cartera pendiente.</div>
-                  )}
-
-                  {carteraPorVend.map(v=>(
-                    <div key={v.nombre} style={{marginBottom:20,border:'1px solid #e0e7f0',borderRadius:8,overflow:'hidden'}}>
-                      <div style={{background:'#1a3a6b',color:'#fff',padding:'9px 14px',fontWeight:900,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                        <span>👤 {v.nombre}</span>
-                        <span style={{fontSize:12,fontWeight:700}}>{v.notas.length} nota(s) — Saldo: ${fmt(v.totalSaldo)}</span>
-                      </div>
-                      <table style={P.tabla}>
-                        <thead>
-                          <tr style={P.thead}>
-                            {['Nota','Fecha','Cliente','Total','Abonado','Saldo','Días'].map(h=>(
-                              <th key={h} style={{...P.th,textAlign:['Total','Abonado','Saldo','Días'].includes(h)?'right':'left'}}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {v.notas.map((n,i)=>(
-                            <tr key={n.numnotaent} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
-                              <td style={{...P.td,fontWeight:700,color:'#1a3a6b'}}>{n.numnotaent}</td>
-                              <td style={P.td}>{n.fechanotae}</td>
-                              <td style={P.td}>{n.nombreclie}</td>
-                              <td style={{...P.td,textAlign:'right'}}>${fmt(n.valtotal)}</td>
-                              <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(n.valabono)}</td>
-                              <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#c62828'}}>${fmt(n.saldo)}</td>
-                              <td style={{...P.td,textAlign:'right',color:n.diasVencido>30?'#c62828':n.diasVencido>15?'#e65100':'#555'}}>{n.diasVencido}d</td>
-                            </tr>
-                          ))}
-                          <tr style={P.totRow}>
-                            <td colSpan={5} style={P.td}><strong>Subtotal {v.nombre}</strong></td>
-                            <td style={{...P.td,textAlign:'right',fontSize:13,color:'#c62828'}}>${fmt(v.totalSaldo)}</td>
-                            <td style={P.td}></td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  ))}
-
-                  {carteraPorVend.length>0 && (
-                    <table style={P.tabla}>
-                      <tbody>
-                        <tr style={{...P.totRow,background:'#1a3a6b'}}>
-                          <td style={{...P.td,color:'#fff',fontSize:14}}><strong>TOTAL CARTERA PENDIENTE (todos los vendedores)</strong></td>
-                          <td style={{...P.td,textAlign:'right',color:'#fff',fontSize:15}}><strong>${fmt(carteraPorVend.reduce((s,v)=>s+v.totalSaldo,0))}</strong></td>
+                  <table style={P.tabla}>
+                    <thead>
+                      <tr style={P.thead}>
+                        {['Vendedor','Última nota','Total adeudado','Abonado','Saldo','Prom. días'].map(h=>(
+                          <th key={h} style={{...P.th,textAlign:['Total adeudado','Abonado','Saldo','Prom. días'].includes(h)?'right':'left'}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {carteraPorVend.map((v,i)=>(
+                        <tr key={v.nombre} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
+                          <td style={{...P.td,fontWeight:700,color:'#1a3a6b'}}>{v.nombre}</td>
+                          <td style={P.td}>{v.ultimaFecha}</td>
+                          <td style={{...P.td,textAlign:'right'}}>${fmt(v.totalFacturado)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(v.totalAbonado)}</td>
+                          <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#c62828'}}>${fmt(v.totalSaldo)}</td>
+                          <td style={{...P.td,textAlign:'right',color:v.promedioDias>30?'#c62828':v.promedioDias>15?'#e65100':'#555'}}>{v.promedioDias}d</td>
                         </tr>
-                      </tbody>
-                    </table>
-                  )}
+                      ))}
+                      {carteraPorVend.length>0 && (
+                        <tr style={P.totRow}>
+                          <td colSpan={4} style={P.td}><strong>TOTAL CARTERA PENDIENTE (todos los vendedores)</strong></td>
+                          <td style={{...P.td,textAlign:'right',fontSize:14,color:'#c62828'}}>${fmt(carteraPorVend.reduce((s,v)=>s+v.totalSaldo,0))}</td>
+                          <td style={P.td}></td>
+                        </tr>
+                      )}
+                      {carteraPorVend.length===0 && <tr><td colSpan={6} style={{textAlign:'center',padding:20,color:'#2e7d32',fontWeight:700}}><span style={{fontSize:16}}>✅</span> Sin cartera pendiente.</td></tr>}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
