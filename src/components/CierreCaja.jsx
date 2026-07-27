@@ -65,9 +65,12 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
         .select('numnotaent,valabono,mediopago,fechaabono,cedvended,usuario')
         .gte('fechaabono', desde).lte('fechaabono', hasta)
 
-      const {data:carteraTotal} = await supabase.from('encnotaen')
-        .select('saldo').or('anulada.is.null,anulada.neq.S').gt('saldo', 0)
-      const totalCarteraGlobal = (carteraTotal||[]).reduce((s,n) => s+(n.saldo||0), 0)
+      // Cartera pendiente: se trae SIEMPRE completa (sin filtrar por desde/hasta), porque una
+      // deuda de un cliente no desaparece solo porque el rango de fechas del informe cambió.
+      const {data:carteraGlobal} = await supabase.from('encnotaen')
+        .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo')
+        .or('anulada.is.null,anulada.neq.S').gt('saldo', 0)
+      const totalCarteraGlobal = (carteraGlobal||[]).reduce((s,n) => s+(n.saldo||0), 0)
 
       // Notas anuladas en el período
       const {data:notasAnuladas} = await supabase.from('encnotaen')
@@ -86,7 +89,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
         }
       })
 
-      setDatos({ notas:notas||[], detalle, vendMap, abonos:abonos||[], notasAyer:notasAyer||[], totalCarteraGlobal, digitalPorNota, totalDigital, notasAnuladas:notasAnuladas||[] })
+      setDatos({ notas:notas||[], detalle, vendMap, abonos:abonos||[], notasAyer:notasAyer||[], carteraGlobal:carteraGlobal||[], totalCarteraGlobal, digitalPorNota, totalDigital, notasAnuladas:notasAnuladas||[] })
     } catch(e) { console.error(e) }
     setCargando(false)
   }
@@ -230,12 +233,26 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     return Object.values(map).sort((a,b) => b.total-a.total).slice(0,10)
   }
 
-  // ── CARTERA ───────────────────────────────────────────────────────────────
-  function calcCartera() {
+  // ── CARTERA PENDIENTE POR VENDEDOR ────────────────────────────────────────
+  // Agrupa toda la cartera pendiente (saldo>0, sin filtrar por fecha) según el vendedor
+  // que hizo la nota (cedvended), para saber cuánto le deben los clientes a cada vendedor.
+  function calcCarteraPorVendedor() {
     if (!datos) return []
-    return datos.notas.filter(n => n.saldo>0)
-      .sort((a,b) => a.fechanotae.localeCompare(b.fechanotae))
-      .map(n => ({...n, diasVencido: Math.floor((new Date()-new Date(n.fechanotae))/(1000*60*60*24))}))
+    const { carteraGlobal, vendMap } = datos
+    const porVend = {}
+    ;(carteraGlobal||[]).forEach(n => {
+      const cedv = String(n.cedvended||'')
+      const nombre = cedv ? (vendMap[cedv] || `Vendedor ${cedv}`) : 'Sin vendedor asignado'
+      if (!porVend[nombre]) porVend[nombre] = { notas: [], totalSaldo: 0, totalAbonado: 0, totalFacturado: 0 }
+      const diasVencido = Math.floor((new Date()-new Date(n.fechanotae))/(1000*60*60*24))
+      porVend[nombre].notas.push({...n, diasVencido})
+      porVend[nombre].totalSaldo     += n.saldo||0
+      porVend[nombre].totalAbonado   += n.valabono||0
+      porVend[nombre].totalFacturado += n.valtotal||0
+    })
+    return Object.entries(porVend)
+      .map(([nombre, v]) => ({ nombre, ...v, notas: v.notas.sort((a,b)=>b.saldo-a.saldo) }))
+      .sort((a,b) => b.totalSaldo-a.totalSaldo)
   }
 
   // ── VENTAS POR CLIENTE ────────────────────────────────────────────────────
@@ -258,7 +275,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   const marcas    = calcMarcas()
   const resumen   = calcResumen()
   const topArts   = calcTopArticulos()
-  const cartera   = calcCartera()
+  const carteraPorVend = calcCarteraPorVendedor()
   const ventasCli = calcVentasCliente()
 
   // ── HELPERS IMPRESIÓN ─────────────────────────────────────────────────────
@@ -357,15 +374,24 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   function imprimirCartera() {
     const w = window.open('','_blank','width=900,height=600')
     w.document.write(`<html><head><title>Cartera</title><style>${estilosImp}.mora{color:#c62828;font-weight:700;}</style></head><body>
-    <h2>ATM — CARTERA PENDIENTE</h2>
-    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
-    <table><thead><tr><th style="text-align:left">Nota</th><th style="text-align:left">Fecha</th><th style="text-align:left">Cliente</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Días</th></tr></thead><tbody>
-    ${cartera.map(n=>`<tr><td>${n.numnotaent}</td><td>${n.fechanotae}</td><td>${n.nombreclie}</td>
-      <td>$${fmt(n.valtotal)}</td><td>$${fmt(n.valabono)}</td>
-      <td style="color:#c62828;font-weight:700">$${fmt(n.saldo)}</td>
-      <td class="${n.diasVencido>30?'mora':''}">${n.diasVencido}d</td></tr>`).join('')}
-    <tr class="tot"><td colspan="5">TOTAL PENDIENTE</td><td>$${fmt(cartera.reduce((s,n)=>s+n.saldo,0))}</td><td></td></tr>
-    </tbody></table></body></html>`)
+    <h2>ATM — CARTERA PENDIENTE POR VENDEDOR</h2>
+    <div class="sub">Corte al ${hoy()} (cartera completa, no depende del rango de fechas)</div>
+    ${carteraPorVend.map(v=>`
+      <table><tbody>
+        <tr class="sec"><td colspan="7">${v.nombre} — ${v.notas.length} nota(s) — Saldo: $${fmt(v.totalSaldo)}</td></tr>
+        <tr style="background:#1a3a6b">
+          <th style="text-align:left">Nota</th><th style="text-align:left">Fecha</th><th style="text-align:left">Cliente</th>
+          <th>Total</th><th>Abonado</th><th>Saldo</th><th>Días</th>
+        </tr>
+        ${v.notas.map(n=>`<tr><td>${n.numnotaent}</td><td>${n.fechanotae}</td><td>${n.nombreclie}</td>
+          <td>$${fmt(n.valtotal)}</td><td>$${fmt(n.valabono)}</td>
+          <td style="color:#c62828;font-weight:700">$${fmt(n.saldo)}</td>
+          <td class="${n.diasVencido>30?'mora':''}">${n.diasVencido}d</td></tr>`).join('')}
+      </tbody></table>`).join('')}
+    <table><tbody>
+      <tr class="tot"><td colspan="6">TOTAL CARTERA PENDIENTE (todos los vendedores)</td><td>$${fmt(carteraPorVend.reduce((s,v)=>s+v.totalSaldo,0))}</td></tr>
+    </tbody></table>
+    </body></html>`)
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
   }
 
@@ -820,40 +846,64 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                 </div>
               )}
 
-              {/* ── CARTERA PENDIENTE ── */}
+              {/* ── CARTERA PENDIENTE POR VENDEDOR ── */}
               {tab==='cartera' && (
                 <div>
-                  <div style={P.secTit}><span style={{fontSize:18}}>📋</span> Cartera Pendiente — Notas con saldo sin pagar</div>
-                  <table style={P.tabla}>
-                    <thead>
-                      <tr style={P.thead}>
-                        {['Nota','Fecha','Cliente','Total','Abonado','Saldo','Días'].map(h=>(
-                          <th key={h} style={{...P.th,textAlign:['Total','Abonado','Saldo','Días'].includes(h)?'right':'left'}}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cartera.map((n,i)=>(
-                        <tr key={n.numnotaent} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
-                          <td style={{...P.td,fontWeight:700,color:'#1a3a6b'}}>{n.numnotaent}</td>
-                          <td style={P.td}>{n.fechanotae}</td>
-                          <td style={P.td}>{n.nombreclie}</td>
-                          <td style={{...P.td,textAlign:'right'}}>${fmt(n.valtotal)}</td>
-                          <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(n.valabono)}</td>
-                          <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#c62828'}}>${fmt(n.saldo)}</td>
-                          <td style={{...P.td,textAlign:'right',color:n.diasVencido>30?'#c62828':n.diasVencido>15?'#e65100':'#555'}}>{n.diasVencido}d</td>
+                  <div style={P.secTit}><span style={{fontSize:18}}>📋</span> Cartera Pendiente por Vendedor</div>
+                  <div style={{fontSize:11,color:'#888',marginBottom:12,marginTop:-6}}>
+                    Muestra toda la cartera pendiente actual (no depende del rango de fechas de arriba).
+                  </div>
+
+                  {carteraPorVend.length===0 && (
+                    <div style={{textAlign:'center',padding:20,color:'#2e7d32',fontWeight:700}}><span style={{fontSize:16}}>✅</span> Sin cartera pendiente.</div>
+                  )}
+
+                  {carteraPorVend.map(v=>(
+                    <div key={v.nombre} style={{marginBottom:20,border:'1px solid #e0e7f0',borderRadius:8,overflow:'hidden'}}>
+                      <div style={{background:'#1a3a6b',color:'#fff',padding:'9px 14px',fontWeight:900,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span>👤 {v.nombre}</span>
+                        <span style={{fontSize:12,fontWeight:700}}>{v.notas.length} nota(s) — Saldo: ${fmt(v.totalSaldo)}</span>
+                      </div>
+                      <table style={P.tabla}>
+                        <thead>
+                          <tr style={P.thead}>
+                            {['Nota','Fecha','Cliente','Total','Abonado','Saldo','Días'].map(h=>(
+                              <th key={h} style={{...P.th,textAlign:['Total','Abonado','Saldo','Días'].includes(h)?'right':'left'}}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {v.notas.map((n,i)=>(
+                            <tr key={n.numnotaent} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
+                              <td style={{...P.td,fontWeight:700,color:'#1a3a6b'}}>{n.numnotaent}</td>
+                              <td style={P.td}>{n.fechanotae}</td>
+                              <td style={P.td}>{n.nombreclie}</td>
+                              <td style={{...P.td,textAlign:'right'}}>${fmt(n.valtotal)}</td>
+                              <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(n.valabono)}</td>
+                              <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#c62828'}}>${fmt(n.saldo)}</td>
+                              <td style={{...P.td,textAlign:'right',color:n.diasVencido>30?'#c62828':n.diasVencido>15?'#e65100':'#555'}}>{n.diasVencido}d</td>
+                            </tr>
+                          ))}
+                          <tr style={P.totRow}>
+                            <td colSpan={5} style={P.td}><strong>Subtotal {v.nombre}</strong></td>
+                            <td style={{...P.td,textAlign:'right',fontSize:13,color:'#c62828'}}>${fmt(v.totalSaldo)}</td>
+                            <td style={P.td}></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+
+                  {carteraPorVend.length>0 && (
+                    <table style={P.tabla}>
+                      <tbody>
+                        <tr style={{...P.totRow,background:'#1a3a6b'}}>
+                          <td style={{...P.td,color:'#fff',fontSize:14}}><strong>TOTAL CARTERA PENDIENTE (todos los vendedores)</strong></td>
+                          <td style={{...P.td,textAlign:'right',color:'#fff',fontSize:15}}><strong>${fmt(carteraPorVend.reduce((s,v)=>s+v.totalSaldo,0))}</strong></td>
                         </tr>
-                      ))}
-                      {cartera.length>0 && (
-                        <tr style={P.totRow}>
-                          <td colSpan={5} style={P.td}><strong>TOTAL PENDIENTE</strong></td>
-                          <td style={{...P.td,textAlign:'right',fontSize:14,color:'#c62828'}}>${fmt(cartera.reduce((s,n)=>s+n.saldo,0))}</td>
-                          <td style={P.td}></td>
-                        </tr>
-                      )}
-                      {cartera.length===0 && <tr><td colSpan={7} style={{textAlign:'center',padding:20,color:'#2e7d32',fontWeight:700}}><span style={{fontSize:16}}>✅</span> Sin cartera pendiente en este período.</td></tr>}
-                    </tbody>
-                  </table>
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               )}
 
