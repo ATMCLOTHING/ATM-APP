@@ -79,7 +79,8 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
         .fila { display:flex; justify-content:space-between; }
         .vale-codigo { font-size:20px; font-weight:bold; letter-spacing:2px; text-align:center; margin:4px 0; }
         .vale-valor { font-size:15px; font-weight:bold; text-align:center; }
-        @media print { body { width:80mm; } }
+        @page { size: 80mm auto; margin: 0; }
+        @media print { body { width:72mm; margin:0 auto; } }
       </style></head><body>
       <div class="centro bold grande">A TU MEDIDA</div>
       <div class="centro">REIMPRESIÓN DE VALE</div>
@@ -94,7 +95,7 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
       <div class="centro" style="font-size:9px;margin-top:4px;">Válido como parte de pago en<br/>cualquier Nota de Entrega futura.</div>
       <div class="sep"></div>
       <div class="centro" style="font-size:9px;">REIMPRESIÓN — ${hoy()}</div>
-      <br/><br/>
+      <div style="height:6mm;"></div>
       </body></html>`)
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},300)
   }

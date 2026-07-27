@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { LOGO, WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO } from '../lib/assets'
+import { LOGO, WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT, WZEND, WZLOCATE, WZUNDO, WZUBICACION } from '../lib/assets'
 import ModalAbonos        from './ModalAbonos'
 import ModalBuscarNota    from './ModalBuscarNota'
 import ModalDetalle       from './ModalDetalle'
@@ -1019,7 +1019,8 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
                       .fila { display:flex; justify-content:space-between; }
                       .vale-codigo { font-size:20px; font-weight:bold; letter-spacing:2px; text-align:center; margin:4px 0; }
                       .vale-valor { font-size:15px; font-weight:bold; text-align:center; }
-                      @media print { body { width:80mm; } }
+                      @page { size: 80mm auto; margin: 0; }
+                      @media print { body { width:72mm; margin:0 auto; } }
                     </style></head><body>
                     <div class="centro bold grande">A TU MEDIDA</div>
                     <div class="centro">COMPROBANTE DE DEVOLUCIÓN</div>
@@ -1047,7 +1048,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
                     `}
                     <div class="sep"></div>
                     <div class="centro" style="font-size:9px;">Conserve este comprobante</div>
-                    <br/><br/>
+                    <div style="height:6mm;"></div>
                     </body></html>`)
                   w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},300)
                 }} style={{background:'#1a3a6b',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700,fontSize:13}}>
@@ -1215,24 +1216,23 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
               {guardada && !anulada && !modoNueva && !desbloqueada && (
                 <button onClick={()=>setModal('desbloquear')}
                   title="Desbloquear nota para edición"
-                  style={{background:'#fff3cd',border:'1px solid #ffc107',borderRadius:6,padding:'0 10px',cursor:'pointer',fontSize:17,fontWeight:700,color:'#856404',height:40}}>
+                  style={{background:'#fff3cd',border:'1px solid #ffc107',borderRadius:6,padding:'0 13px',cursor:'pointer',fontSize:22,fontWeight:700,color:'#856404',height:52}}>
                   🔓
                 </button>
               )}
               {desbloqueada && (
                 <button onClick={()=>{setDesbloqueada(false);cargarDoc(nroDoc)}}
                   title="Bloquear nota (descartar cambios)"
-                  style={{background:'#ffebee',border:'1px solid #ef9a9a',borderRadius:6,padding:'0 10px',cursor:'pointer',fontSize:17,fontWeight:700,color:'#c62828',height:40}}>
+                  style={{background:'#ffebee',border:'1px solid #ef9a9a',borderRadius:6,padding:'0 13px',cursor:'pointer',fontSize:22,fontWeight:700,color:'#c62828',height:52}}>
                   🔒
                 </button>
               )}
               <IBtn src={WZDELETE} onClick={anularNota}    title={usuario?.rol==='admin' ? "Anular" : "Solo un administrador puede anular"} disabled={anulada||modoNueva||usuario?.rol!=='admin'}/>
-              <IBtn src={WZPRINT}  onClick={()=>setModal('print')} title="Imprimir"/>
-              <button onClick={imprimirGuia} title="Generar guía de envío"
-                style={{background:'#e8f5e9',border:'1px solid #2e7d32',borderRadius:6,padding:0,cursor:'pointer',fontSize:24,width:57,height:52,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                📍
-              </button>
-              <IBtn src={WZCLOSE}  onClick={onClose}       title="Volver al menú"/>
+            </div>
+            <div style={P.btnFila}>
+              <IBtn src={WZPRINT}      onClick={()=>setModal('print')} title="Imprimir"/>
+              <IBtn src={WZUBICACION}  onClick={imprimirGuia}          title="Generar guía de envío"/>
+              <IBtn src={WZCLOSE}      onClick={onClose}               title="Volver al menú"/>
             </div>
           </div>
 
@@ -1288,8 +1288,8 @@ function Fld({label,w,children}){
 function IBtn({src,onClick,title,disabled}){
   return(
     <button onClick={onClick} title={title} disabled={disabled}
-      style={{background:'#eef2ff',border:'1px solid #c8d5ea',borderRadius:6,padding:5,cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.35:1,display:'flex',alignItems:'center',justifyContent:'center',width:57,height:52}}>
-      <img src={src} alt={title} style={{width:39,height:39,objectFit:'contain'}}/>
+      style={{background:'#eef2ff',border:'1px solid #c8d5ea',borderRadius:6,padding:6,cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.35:1,display:'flex',alignItems:'center',justifyContent:'center',width:74,height:68}}>
+      <img src={src} alt={title} style={{width:51,height:51,objectFit:'contain'}}/>
     </button>
   )
 }

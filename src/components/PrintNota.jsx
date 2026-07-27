@@ -7,7 +7,7 @@ const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,ma
 
 // Umbral de ítems a partir del cual la factura ya no cabe completa (tabla + totales + firmas)
 // en una hoja media carta (5.5in x 8.5in) y debe imprimirse en carta completa.
-const UMBRAL_MEDIA_CARTA = 10
+const UMBRAL_MEDIA_CARTA = 8
 
 // ── Guía de envío: etiqueta con los datos del destinatario, para pegar en el paquete ──
 // Se genera directamente desde la nota de entrega (botón 📍), sin pasar por el modal de impresión.
@@ -24,17 +24,17 @@ export function generarGuiaEnvio({ nroDoc, cliente, cliTxt, cedula }) {
     <html><head><title>Guía de envío ${nroDoc}</title>
     <style>
       * { margin:0; padding:0; box-sizing:border-box; }
-      body { font-family: Arial, sans-serif; font-size: 13px; color:#111; padding: 16px 20px; }
-      .caja { border: 2px solid #1a3a6b; border-radius: 6px; padding: 14px 18px; }
-      .rmte { font-size: 11px; color:#333; border-bottom: 2px solid #1a3a6b; padding-bottom: 8px; margin-bottom: 16px; }
-      .rmte-nombre { font-weight:900; font-size:14px; color:#1a3a6b; }
+      body { font-family: Arial, sans-serif; font-size: 20px; color:#111; padding: 28px 32px; }
+      .caja { border: 3px solid #1a3a6b; border-radius: 8px; padding: 30px 34px; height: 100%; }
+      .rmte { font-size: 17px; color:#333; border-bottom: 3px solid #1a3a6b; padding-bottom: 16px; margin-bottom: 30px; }
+      .rmte-nombre { font-weight:900; font-size:21px; color:#1a3a6b; }
       .fila { display:flex; justify-content:space-between; }
-      .dest-nombre { font-weight:900; font-size:20px; color:#111; margin-bottom:4px; }
-      .dest-empresa { font-size:13px; color:#333; margin-bottom:10px; }
-      .campo { font-size:13px; margin-bottom:8px; }
+      .dest-nombre { font-weight:900; font-size:38px; color:#111; margin-bottom:12px; line-height:1.15; }
+      .dest-empresa { font-size:21px; color:#333; margin-bottom:22px; }
+      .campo { font-size:20px; margin-bottom:20px; }
       .campo b { color:#1a3a6b; }
-      .nota-ref { text-align:right; font-size:10px; color:#888; margin-top:18px; }
-      @page { size: 5.5in 8.5in; margin: 8mm; }
+      .nota-ref { text-align:right; font-size:14px; color:#888; margin-top:40px; }
+      @page { size: 5.5in 8.5in; margin: 10mm; }
     </style></head><body>
       <div class="caja">
         <div class="rmte">
@@ -135,7 +135,7 @@ export default function PrintNota({ datos, onClose }) {
       <div class="sep"></div>
       <div class="centro">Gracias por su compra</div>
       <div class="centro">A TU MEDIDA</div>
-      <br/><br/><br/>
+      <div style="height:6mm;"></div>
       </body></html>
     `)
     w.document.close(); w.focus()
@@ -150,12 +150,12 @@ export default function PrintNota({ datos, onClose }) {
     const nItems  = (lineas||[]).length
     const esMedia = nItems <= UMBRAL_MEDIA_CARTA
     const pageSize  = esMedia ? '5.5in 8.5in' : '8.5in 11in'
-    const pageMargin= esMedia ? '6mm' : '10mm'
-    const bodyPad   = esMedia ? '10px 16px' : '18px 28px'
-    const logoAlto  = esMedia ? 56 : 74
-    const fuenteBase= esMedia ? 10 : 11
-    const descMaxW  = esMedia ? '95px' : '190px'
-    const firmaTop  = esMedia ? 14 : 30
+    const pageMargin= esMedia ? '8mm' : '10mm'
+    const bodyPad   = esMedia ? '12px 18px' : '18px 28px'
+    const logoAlto  = esMedia ? 62 : 74
+    const fuenteBase= esMedia ? 11 : 12
+    const descMaxW  = esMedia ? '105px' : '190px'
+    const firmaTop  = esMedia ? 20 : 34
 
     const w = window.open('','_blank','width=800,height=600')
     w.document.write(`
@@ -163,18 +163,17 @@ export default function PrintNota({ datos, onClose }) {
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family: Arial, sans-serif; font-size: ${fuenteBase}px; padding: ${bodyPad}; color: #111; }
-        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; border-bottom:2px solid #1a3a6b; padding-bottom:8px; }
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:2px solid #1a3a6b; padding-bottom:8px; }
         .logo-txt { font-size:26px; font-weight:900; color:#1a3a6b; letter-spacing:3px; }
         .subtitulo { font-size:10px; color:#5577aa; letter-spacing:2px; text-transform:uppercase; }
-        .doc-info { text-align:right; }
-        .doc-titulo { font-size:16px; font-weight:800; color:#1a3a6b; }
-        .doc-nro { font-size:22px; font-weight:900; color:#c0392b; }
+        .doc-titulo { font-size:18px; font-weight:800; color:#1a3a6b; }
         .seccion { background:#f5f7fb; border:1px solid #c8d5ea; border-radius:4px; padding:6px 10px; margin-bottom:8px; }
         .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
         .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+        .grid4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; }
         .campo { display:flex; flex-direction:column; }
-        .campo-lbl { font-size:9px; font-weight:700; color:#5577aa; text-transform:uppercase; }
-        .campo-val { font-size:11px; font-weight:600; border-bottom:1px solid #ddd; padding-bottom:1px; min-height:14px; }
+        .campo-lbl { font-size:10px; font-weight:700; color:#5577aa; text-transform:uppercase; }
+        .campo-val { font-size:12px; font-weight:600; border-bottom:1px solid #ddd; padding-bottom:2px; min-height:16px; }
         table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:${fuenteBase-1}px; page-break-inside:avoid; }
         th { background:#1a3a6b; color:#fff; padding:4px 5px; text-align:center; font-size:${fuenteBase-1}px; }
         td { padding:3px 5px; border-bottom:1px solid #eee; }
@@ -196,15 +195,12 @@ export default function PrintNota({ datos, onClose }) {
           <img src="${LOGO}" alt="ATM" style="height:${logoAlto}px;object-fit:contain;"/>
           <div class="subtitulo" style="font-size:11px;">A TU MEDIDA<br/>Control de Inventarios</div>
         </div>
-        <div class="doc-info">
-          <div class="doc-titulo">NOTA DE ENTREGA</div>
-          <div class="doc-nro">N° ${nroDoc}</div>
-          <div style="font-size:10px;color:#555;">Fecha: ${fecha}</div>
-        </div>
+        <div class="doc-titulo">NOTA DE ENTREGA</div>
       </div>
 
       <div class="seccion">
-        <div class="grid2" style="margin-bottom:6px;">
+        <div class="grid3" style="margin-bottom:6px;">
+          <div class="campo"><span class="campo-lbl">N° Nota</span><span class="campo-val" style="color:#c0392b;font-weight:900;">${nroDoc}</span></div>
           <div class="campo"><span class="campo-lbl">Cédula / NIT</span><span class="campo-val">${cedula||'99'}</span></div>
           <div class="campo"><span class="campo-lbl">Cliente</span><span class="campo-val">${cliente?.nombre||cliTxt}</span></div>
         </div>
@@ -215,7 +211,8 @@ export default function PrintNota({ datos, onClose }) {
         </div>
       </div>
 
-      <div class="grid3" style="margin-bottom:8px;gap:6px;display:grid;">
+      <div class="grid4" style="margin-bottom:8px;">
+        <div class="campo"><span class="campo-lbl">Fecha</span><span class="campo-val">${fecha}</span></div>
         <div class="campo"><span class="campo-lbl">Forma de pago</span><span class="campo-val">${plazo}</span></div>
         <div class="campo"><span class="campo-lbl">Fecha de pago</span><span class="campo-val">${fechaPago}</span></div>
         <div class="campo"><span class="campo-lbl">Vendedor</span><span class="campo-val">${vendedor?.nombre||cedVend||''}</span></div>
