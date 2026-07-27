@@ -1,6 +1,7 @@
 // src/components/ModalAbonos.jsx
 import { useState, useEffect } from 'react'
 import ModalPin from './ModalPin'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -130,7 +131,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
         <ModalPin
           supabase={supabase}
           titulo="Revertir Abono Total"
-          descripcion={`¿Revertir el abono de $${fmt(pinAccion.abono.valabono)} del ${pinAccion.abono.fechaabono}? Esta acción requiere autorización.`}
+          descripcion={`¿Revertir el abono de $${fmt(pinAccion.abono.valabono)} del ${fmtFecha(pinAccion.abono.fechaabono)}? Esta acción requiere autorización.`}
           onConfirm={() => ejecutarReversion(pinAccion.abono)}
           onClose={() => setPinAccion(null)}
         />
@@ -139,7 +140,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
         <ModalPin
           supabase={supabase}
           titulo="Revertir Abono Parcial"
-          descripcion={`¿Revertir $${fmt(pinAccion.valor)} del abono de $${fmt(pinAccion.abono.valabono)} del ${pinAccion.abono.fechaabono}? Esta acción requiere autorización.`}
+          descripcion={`¿Revertir $${fmt(pinAccion.valor)} del abono de $${fmt(pinAccion.abono.valabono)} del ${fmtFecha(pinAccion.abono.fechaabono)}? Esta acción requiere autorización.`}
           onConfirm={() => ejecutarReversionParcial(pinAccion.abono, pinAccion.valor)}
           onClose={() => setPinAccion(null)}
         />
@@ -177,7 +178,7 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
             <tbody>
               {abonos.map((a, i) => (
                 <tr key={a.id} style={{ background: i % 2 === 0 ? '#fff' : '#f5f7fc' }}>
-                  <td style={S.td}>{a.fechaabono}</td>
+                  <td style={S.td}>{fmtFecha(a.fechaabono)}</td>
                   <td style={{ ...S.td, textAlign:'right', fontWeight:600, color:'#27ae60' }}>${fmt(a.valabono)}</td>
                   <td style={S.td}>{a.mediopago}</td>
                   <td style={S.td}>{a.observacio}</td>

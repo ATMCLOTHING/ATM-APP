@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { WZCLOSE, WZPRINT, WZLOCATE } from '../lib/assets'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 
@@ -321,7 +322,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     const w = window.open('','_blank','width=1000,height=700')
     w.document.write(`<html><head><title>Consolidado</title><style>${estilosImp}</style></head><body>
     <h2>ATM — CONSOLIDADO DE MOVIMIENTOS</h2>
-    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <table>
       <tbody>
         ${cabeceraTabla('VENTAS POR VENDEDORA DE MOSTRADOR')}
@@ -353,7 +354,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     const w = window.open('','_blank','width=700,height=500')
     w.document.write(`<html><head><title>Marcas</title><style>${estilosImp}</style></head><body>
     <h2>ATM — VENTAS POR MARCA</h2>
-    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <table><thead><tr><th style="text-align:left">Marca</th><th>Unidades</th><th>$ Promedio</th><th>$ Total</th></tr></thead><tbody>
     ${Object.entries(marcas).sort((a,b)=>b[1].total-a[1].total).map(([m,v])=>`
       <tr><td>${m}</td><td>${v.unidades}</td><td>$${fmt(v.unidades>0?v.total/v.unidades:0)}</td><td>$${fmt(v.total)}</td></tr>`).join('')}
@@ -367,7 +368,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     const w = window.open('','_blank','width=700,height=500')
     w.document.write(`<html><head><title>Top</title><style>${estilosImp}</style></head><body>
     <h2>ATM — TOP 10 ARTÍCULOS</h2>
-    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <table><thead><tr><th style="text-align:left">#</th><th style="text-align:left">Código</th><th style="text-align:left">Descripción</th><th>Unidades</th><th>$ Total</th></tr></thead><tbody>
     ${topArts.map((a,i)=>`<tr><td>${i+1}</td><td>${a.codartic}</td><td>${a.descartic}</td><td>${a.unidades}</td><td>$${fmt(a.total)}</td></tr>`).join('')}
     </tbody></table></body></html>`)
@@ -378,13 +379,13 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     const w = window.open('','_blank','width=900,height=600')
     w.document.write(`<html><head><title>Cartera</title><style>${estilosImp}.mora{color:#c62828;font-weight:700;}</style></head><body>
     <h2>ATM — CARTERA PENDIENTE POR VENDEDOR</h2>
-    <div class="sub">Corte al ${hoy()} (cartera completa, no depende del rango de fechas)</div>
+    <div class="sub">Corte al ${fmtFecha(hoy())} (cartera completa, no depende del rango de fechas)</div>
     <table><thead><tr>
       <th style="text-align:left">Vendedor</th><th style="text-align:left">Última nota</th>
       <th>Total adeudado</th><th>Abonado</th><th>Saldo</th><th>Prom. días</th>
     </tr></thead><tbody>
     ${carteraPorVend.map(v=>`<tr>
-      <td>${v.nombre}</td><td>${v.ultimaFecha||''}</td>
+      <td>${v.nombre}</td><td>${v.ultimaFecha?fmtFecha(v.ultimaFecha):''}</td>
       <td>$${fmt(v.totalFacturado)}</td><td>$${fmt(v.totalAbonado)}</td>
       <td style="color:#c62828;font-weight:700">$${fmt(v.totalSaldo)}</td>
       <td class="${v.promedioDias>30?'mora':''}">${v.promedioDias}d</td></tr>`).join('')}
@@ -399,7 +400,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     const w = window.open('','_blank','width=900,height=600')
     w.document.write(`<html><head><title>Anuladas</title><style>${estilosImp}</style></head><body>
     <h2>ATM — NOTAS ANULADAS</h2>
-    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta} &nbsp;&nbsp; Total: ${an.length} notas</div>
+    <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)} &nbsp;&nbsp; Total: ${an.length} notas</div>
     <table><thead><tr>
       <th style="text-align:left">Nota</th><th style="text-align:left">Fecha</th>
       <th style="text-align:left">Cliente</th><th>Total</th>
@@ -407,9 +408,9 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     </tr></thead><tbody>
     ${an.map((n,i)=>`<tr style="background:${i%2===0?'#fff':'#fdecea'}">
       <td style="color:#c62828;font-weight:700">${n.numnotaent}</td>
-      <td>${n.fechanotae}</td><td>${n.nombreclie}</td>
+      <td>${fmtFecha(n.fechanotae)}</td><td>${n.nombreclie}</td>
       <td style="text-align:right">$${fmt(n.valtotal)}</td>
-      <td>${n.motivoanula||'—'}</td><td>${n.fechaanula||'—'}</td>
+      <td>${n.motivoanula||'—'}</td><td>${n.fechaanula?fmtFecha(n.fechaanula):'—'}</td>
     </tr>`).join('')}
     <tr class="tot"><td colspan="3">TOTAL ANULADO</td>
     <td style="text-align:right;color:#c62828">$${fmt(an.reduce((s,n)=>s+(n.valtotal||0),0))}</td>
@@ -495,7 +496,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     .usu{background:#1a3a6b;color:#fff;font-size:13px;font-weight:900;padding:8px 10px;margin:16px 0 6px;}
     @media print{body{margin:6px;}}</style></head><body>
     <h2>ATM — CONSOLIDADO POR USUARIO</h2>
-    <div class="sub">DESDE ${desde} | HASTA ${hasta}</div>
+    <div class="sub">DESDE ${fmtFecha(desde)} | HASTA ${fmtFecha(hasta)}</div>
     ${Object.entries(pu).sort((a,b)=>a[0].localeCompare(b[0])).map(([usu,u])=>`
       <div class="usu">👤 ${usu}</div>
       <table><thead><tr>
@@ -526,7 +527,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     const w = window.open('','_blank','width=900,height=600')
     w.document.write(`<html><head><title>Clientes</title><style>${estilosImp}</style></head><body>
     <h2>ATM — VENTAS POR CLIENTE</h2>
-    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <div class="sec" style="padding:5px 8px;margin-bottom:4px">VENTAS MOSTRADOR — $${fmt(ventasCli.totMostrador)} (${ventasCli.mostrador.length} notas)</div>
     <div class="sec" style="padding:5px 8px;margin-bottom:4px;margin-top:12px">VENTAS A CLIENTES ESPECÍFICOS</div>
     <table><thead><tr><th style="text-align:left">Cédula</th><th style="text-align:left">Cliente</th><th>Notas</th><th>Total</th><th>Abonado</th><th>Saldo</th></tr></thead><tbody>
@@ -551,7 +552,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     .lbl{color:#333;}.val{color:#1a3a6b;font-weight:700;}
     @media print{body{padding:8px;}}</style></head><body>
     <h2>RESUMEN DE VENTAS DIARIAS</h2>
-    <div class="sub">DESDE ${desde} &nbsp;&nbsp; HASTA ${hasta}</div>
+    <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <div class="f"><span class="lbl">Notas generadas</span><span class="val">${resumen.cantNotas}</span></div>
     <div class="f tot"><span class="lbl">VENTAS TOTALES</span><span class="val">$${fmt(resumen.totalVentas)}</span></div>
     <div class="f"><span class="lbl">Ventas a crédito</span><span class="val">$${fmt(resumen.totalCredito)}</span></div>
@@ -586,7 +587,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
   const TablaConsolidado = ({ titulo, datos: filas, icono }) => (
     <div style={{marginBottom:24}}>
-      <div style={P.secTit}><span style={{fontSize:18}}>{icono}</span> {titulo} — {desde} al {hasta}</div>
+      <div style={P.secTit}><span style={{fontSize:18}}>{icono}</span> {titulo} — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
       <table style={P.tabla}>
         <thead>
           <tr style={P.thead}>
@@ -706,7 +707,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── VENTAS POR MARCA ── */}
               {tab==='marcas' && marcas && (
                 <div>
-                  <div style={P.secTit}><span style={{fontSize:18}}>🏷️</span> Ventas por Marca — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>🏷️</span> Ventas por Marca — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
                   <table style={P.tabla}>
                     <thead>
                       <tr style={P.thead}>
@@ -741,7 +742,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── RESUMEN DEL DÍA ── */}
               {tab==='resumen' && resumen && (
                 <div style={{maxWidth:600}}>
-                  <div style={P.secTit}><span style={{fontSize:18}}>💰</span> Resumen del Día — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>💰</span> Resumen del Día — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
                   {[
                     {lbl:'Notas generadas',                          val:resumen.cantNotas},
                     {lbl:'Ventas totales (contado + crédito)',        val:`$${fmt(resumen.totalVentas)}`,        grande:true},
@@ -776,7 +777,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── TOP ARTÍCULOS ── */}
               {tab==='top' && (
                 <div>
-                  <div style={P.secTit}><span style={{fontSize:18}}>🏆</span> Top 10 Artículos — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>🏆</span> Top 10 Artículos — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
                   <table style={P.tabla}>
                     <thead>
                       <tr style={P.thead}>
@@ -804,7 +805,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── VENTAS POR CLIENTE ── */}
               {tab==='clientes' && ventasCli && (
                 <div>
-                  <div style={P.secTit}><span style={{fontSize:18}}>👥</span> Ventas por Cliente — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>👥</span> Ventas por Cliente — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
                   <div style={{background:'#1a3a6b',color:'#fff',padding:'6px 12px',borderRadius:5,marginBottom:8,fontWeight:700,fontSize:13}}>
                     VENTAS MOSTRADOR (CLIENTE GENERAL) — ${fmt(ventasCli.totMostrador)}
                     <span style={{marginLeft:16,fontSize:11,fontWeight:400,opacity:0.8}}>{ventasCli.mostrador.length} notas</span>
@@ -864,7 +865,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                       {carteraPorVend.map((v,i)=>(
                         <tr key={v.nombre} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
                           <td style={{...P.td,fontWeight:700,color:'#1a3a6b'}}>{v.nombre}</td>
-                          <td style={P.td}>{v.ultimaFecha}</td>
+                          <td style={P.td}>{fmtFecha(v.ultimaFecha)}</td>
                           <td style={{...P.td,textAlign:'right'}}>${fmt(v.totalFacturado)}</td>
                           <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(v.totalAbonado)}</td>
                           <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#c62828'}}>${fmt(v.totalSaldo)}</td>
@@ -890,7 +891,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                 if (!pu) return <div style={{textAlign:'center',padding:30,color:'#aaa'}}>Sin datos.</div>
                 return (
                   <div>
-                    <div style={P.secTit}><span style={{fontSize:18}}>👤</span> Consolidado por Usuario — {desde} al {hasta}</div>
+                    <div style={P.secTit}><span style={{fontSize:18}}>👤</span> Consolidado por Usuario — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
                     {Object.entries(pu).sort((a,b)=>a[0].localeCompare(b[0])).map(([usu,u])=>(
                       <div key={usu} style={{marginBottom:24,border:'1px solid #e0e7f0',borderRadius:8,overflow:'hidden'}}>
                         {/* Header usuario */}
@@ -964,7 +965,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── NOTAS ANULADAS ── */}
               {tab==='anuladas' && (
                 <div>
-                  <div style={P.secTit}><span style={{fontSize:18}}>🗑</span> Notas Anuladas — {desde} al {hasta}</div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>🗑</span> Notas Anuladas — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
                   {(datos.notasAnuladas||[]).length === 0
                     ? <div style={{textAlign:'center',padding:30,color:'#2e7d32',fontWeight:700}}><span style={{fontSize:16}}>✅</span> No hay notas anuladas en este período.</div>
                     : (
@@ -980,11 +981,11 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                           {(datos.notasAnuladas||[]).map((n,i)=>(
                             <tr key={n.numnotaent} style={{background:i%2===0?'#fff':'#fdecea'}}>
                               <td style={{...P.td,fontWeight:700,color:'#c62828'}}>{n.numnotaent}</td>
-                              <td style={P.td}>{n.fechanotae}</td>
+                              <td style={P.td}>{fmtFecha(n.fechanotae)}</td>
                               <td style={P.td}>{n.nombreclie}</td>
                               <td style={{...P.td,textAlign:'right'}}>${fmt(n.valtotal)}</td>
                               <td style={P.td}>{n.motivoanula||'—'}</td>
-                              <td style={P.td}>{n.fechaanula||'—'}</td>
+                              <td style={P.td}>{n.fechaanula?fmtFecha(n.fechaanula):'—'}</td>
                               <td style={P.td}>{n.usuario||'—'}</td>
                             </tr>
                           ))}

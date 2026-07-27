@@ -2,6 +2,7 @@
 // Formatos de impresión: Ticket (80mm) y Factura (Media Carta / Carta, según cantidad de ítems)
 
 import { LOGO } from '../lib/assets'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 
@@ -114,8 +115,8 @@ export default function PrintNota({ datos, onClose }) {
       <div class="fila"><span>Cliente:</span><span>${cliente?.nombre||cliTxt}</span></div>
       <div class="fila"><span>Ciudad:</span><span>${cliente?.ciudad||''}</span></div>
       <div class="fila"><span>Celular:</span><span>${cliente?.celular||''}</span></div>
-      <div class="fila"><span>Fecha:</span><span>${fecha}</span></div>
-      <div class="fila"><span>Vence:</span><span>${fechaPago}</span></div>
+      <div class="fila"><span>Fecha:</span><span>${fmtFecha(fecha)}</span></div>
+      <div class="fila"><span>Vence:</span><span>${fmtFecha(fechaPago)}</span></div>
       <div class="fila"><span>Vendió:</span><span>${vendedor?.nombre||''}</span></div>
       <div class="sep"></div>
       <div class="fila bold"><span>IT.</span><span style="flex:1;padding-left:6px;">CODIGO / ARTICULO</span></div>
@@ -233,9 +234,9 @@ export default function PrintNota({ datos, onClose }) {
           </div>
 
           <div class="grid4" style="margin-bottom:8px;">
-            <div class="campo"><span class="campo-lbl">Fecha</span><span class="campo-val">${fecha}</span></div>
+            <div class="campo"><span class="campo-lbl">Fecha</span><span class="campo-val">${fmtFecha(fecha)}</span></div>
             <div class="campo"><span class="campo-lbl">Forma de pago</span><span class="campo-val">${plazo}</span></div>
-            <div class="campo"><span class="campo-lbl">Fecha de pago</span><span class="campo-val">${fechaPago}</span></div>
+            <div class="campo"><span class="campo-lbl">Fecha de pago</span><span class="campo-val">${fmtFecha(fechaPago)}</span></div>
             <div class="campo"><span class="campo-lbl">Vendedor</span><span class="campo-val">${vendedor?.nombre||cedVend||''}</span></div>
           </div>
         </div>

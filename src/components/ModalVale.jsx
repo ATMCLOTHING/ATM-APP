@@ -3,6 +3,7 @@
 // como parte de pago de la Nota de Entrega actual.
 
 import { useState } from 'react'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 
@@ -87,7 +88,7 @@ export default function ModalVale({ supabase, saldoNota, onAplicar, onClose }) {
             <div style={S.info}>
               <div style={{fontWeight:800,color:'#1a3a6b'}}>{vale.codigo}</div>
               <div style={{fontSize:12,color:'#666'}}>
-                Cliente: {vale.cliente_nombre || 'No especificado'} · Emitido: {String(vale.fecregistr||'').slice(0,10)}
+                Cliente: {vale.cliente_nombre || 'No especificado'} · Emitido: {fmtFecha(vale.fecregistr)}
               </div>
               <div style={{fontSize:13,marginTop:4}}>
                 Saldo disponible: <strong style={{color:'#2e7d32'}}>${fmt(vale.saldo)}</strong>

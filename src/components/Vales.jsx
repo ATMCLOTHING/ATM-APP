@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { LOGO } from '../lib/assets'
 import ModalPin from './ModalPin'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
@@ -86,7 +87,7 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
       <div class="centro">REIMPRESIÓN DE VALE</div>
       <div class="sep"></div>
       <div class="fila"><span>Cliente:</span><span>${(v.cliente_nombre||'').substring(0,20)}</span></div>
-      <div class="fila"><span>Emitido:</span><span>${String(v.fecregistr||'').slice(0,10)}</span></div>
+      <div class="fila"><span>Emitido:</span><span>${fmtFecha(v.fecregistr)}</span></div>
       <div class="fila"><span>Nota origen:</span><span>${v.numnotaent_origen||''}</span></div>
       <div class="sep"></div>
       <div class="centro bold">🎫 CÓDIGO</div>
@@ -172,7 +173,7 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
                         style={{cursor:'pointer',background:sel?'#e3f2fd':i%2===0?'#fff':'#f8faff'}}>
                         <td style={{...P.td,fontWeight:700,color:'#1a3a6b',textAlign:'center'}}>{v.codigo}</td>
                         <td style={P.td}>{v.cliente_nombre}</td>
-                        <td style={{...P.td,textAlign:'center'}}>{String(v.fecregistr||'').slice(0,10)}</td>
+                        <td style={{...P.td,textAlign:'center'}}>{fmtFecha(v.fecregistr)}</td>
                         <td style={{...P.td,textAlign:'right'}}>{fmtM(v.valor_original)}</td>
                         <td style={{...P.td,textAlign:'right',fontWeight:700,color:v.saldo>0?'#2e7d32':'#888'}}>{fmtM(v.saldo)}</td>
                         <td style={{...P.td,textAlign:'center'}}>
@@ -201,7 +202,7 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
               {movimientos.map(m=>(
                 <div key={m.id} style={P.movFila}>
                   <span style={{fontWeight:700,color:m.tipo==='EMISION'?'#2e7d32':m.tipo==='CONSUMO'?'#1565c0':'#c62828'}}>{m.tipo}</span>
-                  <span>{String(m.fecregistr||'').slice(0,10)}</span>
+                  <span>{fmtFecha(m.fecregistr)}</span>
                   <span>{m.numnotaent?`Nota ${m.numnotaent}`:''}</span>
                   <span style={{fontWeight:700}}>${fmt(m.valor)}</span>
                 </div>

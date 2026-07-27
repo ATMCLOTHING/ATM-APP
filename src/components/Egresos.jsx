@@ -1,5 +1,6 @@
 // src/components/Egresos.jsx
 import { useState, useEffect, useRef } from 'react'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
 const fmtM = n => '$'+fmt(n)
@@ -141,13 +142,13 @@ export default function Egresos({ supabase, usuario, onClose }) {
     .tot{font-weight:900;background:#dde3ee;}
     @media print{body{margin:8px;}}</style></head><body>
     <h2>ATM — EGRESOS</h2>
-    <div class="sub">Del ${filtDesde} al ${filtHasta}</div>
+    <div class="sub">Del ${fmtFecha(filtDesde)} al ${fmtFecha(filtHasta)}</div>
     <table><thead><tr>
       <th>Fecha</th><th>Tipo</th><th>Beneficiario</th><th>Subdetalle</th>
       <th style="text-align:right">Total</th><th>Medio</th>
     </tr></thead><tbody>
     ${egresos.map(e=>`<tr>
-      <td>${e.fecha_pago}</td>
+      <td>${fmtFecha(e.fecha_pago)}</td>
       <td>${grupos.find(g=>g.id===e.grupo_id)?.nombre||e.grupo_id}</td>
       <td>${e.nombre_benef||''}</td>
       <td>${e.subdetalle||''}</td>
@@ -328,7 +329,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
                 <tbody>
                   {egresos.map((e,i)=>(
                     <tr key={e.id} style={{background:i%2===0?'#fff':'#f5f7fc',fontSize:12}}>
-                      <td style={S.td}>{e.fecha_pago}</td>
+                      <td style={S.td}>{fmtFecha(e.fecha_pago)}</td>
                       <td style={S.td}>{grupos.find(g=>g.id===e.grupo_id)?.nombre||e.grupo_id}</td>
                       <td style={S.td}>{detalles.find(d=>d.id===e.egr_detalle_id)?.nombre||e.subdetalle||''}</td>
                       <td style={S.td}>{e.nombre_benef}</td>

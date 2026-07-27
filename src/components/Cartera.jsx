@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import ModalAbonos from './ModalAbonos'
+import { fmtFecha } from '../lib/fecha'
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -10,8 +11,6 @@ const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
 const hoy  = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
-// Formato DD/MM/AAAA (igual al sistema Fox viejo) — la fecha llega de Supabase en formato AAAA-MM-DD
-const fmtFecha = f => { if (!f) return ''; const [y,m,d] = f.slice(0,10).split('-'); return `${d}/${m}/${y}` }
 const normaliza   = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase()
 const diasDesde   = f => f ? Math.floor((new Date()-new Date(f))/(1000*60*60*24)) : 0
 const colorMora   = d => d >= 90 ? '#c62828' : d >= 60 ? '#e65100' : d >= 30 ? '#f9a825' : '#2e7d32'
@@ -347,6 +346,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
         var SUPA_URL = ${JSON.stringify(SUPA_URL)};
         var SUPA_KEY = ${JSON.stringify(SUPA_KEY)};
         function fmtN(n){ return Math.round(Number(n)||0).toLocaleString('es-CO'); }
+        function fmtD(f){ if(!f) return ''; var p=String(f).slice(0,10).split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:String(f); }
         function cerrarAbonos(){ document.getElementById('abonoOverlay').style.display='none'; }
         function verAbonos(num){
           var info = NOTAS_INFO[num] || {};
@@ -366,7 +366,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
             if (!rows || !rows.length) { el.innerHTML = '<p style="color:#888;text-align:center">Sin abonos registrados.</p>'; return; }
             var html = '<table><thead><tr style="background:#dde3ee"><th style="text-align:left">Fecha</th><th style="text-align:right">Valor</th><th style="text-align:left">Medio</th><th style="text-align:left">Obs.</th></tr></thead><tbody>';
             rows.forEach(function(a){
-              html += '<tr><td style="text-align:left">'+(a.fechaabono||'')+'</td><td style="text-align:right;color:#2e7d32;font-weight:700">$'+fmtN(a.valabono)+'</td><td style="text-align:left">'+(a.mediopago||'')+'</td><td style="text-align:left">'+(a.observacio||'')+'</td></tr>';
+              html += '<tr><td style="text-align:left">'+fmtD(a.fechaabono)+'</td><td style="text-align:right;color:#2e7d32;font-weight:700">$'+fmtN(a.valabono)+'</td><td style="text-align:left">'+(a.mediopago||'')+'</td><td style="text-align:left">'+(a.observacio||'')+'</td></tr>';
             });
             html += '</tbody></table>';
             el.innerHTML = html;

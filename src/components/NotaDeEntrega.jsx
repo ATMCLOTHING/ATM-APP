@@ -4,6 +4,7 @@ import ModalAbonos        from './ModalAbonos'
 import ModalBuscarNota    from './ModalBuscarNota'
 import ModalDetalle       from './ModalDetalle'
 import PrintNota, { generarGuiaEnvio } from './PrintNota'
+import { fmtFecha } from '../lib/fecha'
 import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
 import ModalNuevoCliente  from './ModalNuevoCliente'
@@ -1026,7 +1027,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
                     <div class="centro">COMPROBANTE DE DEVOLUCIÓN</div>
                     <div class="sep"></div>
                     <div class="fila"><span>Nota origen:</span><span>${r.nota}</span></div>
-                    <div class="fila"><span>Fecha:</span><span>${r.fecha}</span></div>
+                    <div class="fila"><span>Fecha:</span><span>${fmtFecha(r.fecha)}</span></div>
                     <div class="fila"><span>Cliente:</span><span>${(r.cliente||'').substring(0,20)}</span></div>
                     <div class="sep"></div>
                     <div class="fila bold"><span>Artículo</span><span>Cód. ${r.codartic}</span></div>

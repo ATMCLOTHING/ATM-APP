@@ -1,5 +1,6 @@
 // src/components/ModalBuscarNota.jsx
 import { useState } from 'react'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
@@ -155,8 +156,8 @@ export default function ModalBuscarNota({ supabase, onSelect, onClose }) {
                         onClick={()=>setSeleccion(n)}
                         onDoubleClick={()=>elegir(n)}>
                         <td style={{...S.td,fontWeight:700,color:'#1a3a6b',textAlign:'center'}}>{n.numnotaent}</td>
-                        <td style={{...S.td,textAlign:'center'}}>{n.fechanotae?.slice(0,10)||''}</td>
-                        <td style={{...S.td,textAlign:'center'}}>{n.fechavence?.slice(0,10)||''}</td>
+                        <td style={{...S.td,textAlign:'center'}}>{fmtFecha(n.fechanotae)}</td>
+                        <td style={{...S.td,textAlign:'center'}}>{fmtFecha(n.fechavence)}</td>
                         <td style={{...S.td,maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{n.nombreclie}</td>
                         <td style={{...S.td,textAlign:'center'}}>{n.cantotal||0}</td>
                         <td style={{...S.td,textAlign:'right'}}>{fmtM(n.valtotal)}</td>

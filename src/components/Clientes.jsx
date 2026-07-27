@@ -3,8 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { LOGO, WZNEW, WZSAVE, WZDELETE, WZCLOSE, WZLOCATE, WZPRINT } from '../lib/assets'
-
-const fmt = d => d ? new Date(d).toLocaleDateString('es-CO') : ''
+import { fmtFecha } from '../lib/fecha'
 
 const S = {
   wrap:    { position:'fixed',inset:0,background:'#f0f2f5',zIndex:1000,display:'flex',flexDirection:'column',fontFamily:'Arial,sans-serif' },
@@ -343,7 +342,7 @@ export default function Clientes({ supabase, onClose, onAyuda }) {
               </button>
               {!esNuevo && form.fecha_registro && (
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: '#999', alignSelf: 'center' }}>
-                  Registro: {fmt(form.fecha_registro)}
+                  Registro: {fmtFecha(form.fecha_registro)}
                 </span>
               )}
             </div>

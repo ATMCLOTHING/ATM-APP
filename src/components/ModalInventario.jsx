@@ -3,6 +3,7 @@
 // Se puede filtrar por marca y exportar a impresión.
 
 import { useState, useEffect } from 'react'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
@@ -65,7 +66,7 @@ export default function ModalInventario({ supabase, onClose }) {
     .tot{background:#1a3a6b;color:#fff;font-weight:900;}
     @media print{body{margin:8px;}}</style></head><body>
     <h2>ATM — RESUMEN DE INVENTARIO</h2>
-    <div class="sub">Agrupado por ${grupoPor.toUpperCase()} — ${new Date().toLocaleDateString('es-CO')} — ${filtrados.length} artículos activos</div>
+    <div class="sub">Agrupado por ${grupoPor.toUpperCase()} — ${fmtFecha(new Date().toISOString())} — ${filtrados.length} artículos activos</div>
     ${Object.entries(grupos).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,g])=>`
       <table><thead>
         <tr class="grp"><td colspan="5">${k} — ${g.items.length} refs | ${fmt(g.unidades)} uds | Costo: ${fmtM(g.costoTotal)} | Venta: ${fmtM(g.valorVenta)}</td></tr>

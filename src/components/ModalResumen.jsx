@@ -2,6 +2,7 @@
 // Resumen de ventas: listado de notas con filtros por fecha y vendedor.
 
 import { useState, useEffect } from 'react'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -85,7 +86,7 @@ export default function ModalResumen({ supabase, onClose, onSelect }) {
               {notas.map((n, i) => (
                 <tr key={n.numnotaent} style={{ background: i % 2 === 0 ? '#fff' : '#f5f7fc', fontSize: 12 }}>
                   <td style={{ ...S.td, fontWeight: 700, color: '#1a3a6b' }}>{n.numnotaent}</td>
-                  <td style={S.td}>{n.fechanotae}</td>
+                  <td style={S.td}>{fmtFecha(n.fechanotae)}</td>
                   <td style={S.td}>{n.nombreclie}</td>
                   <td style={{ ...S.td, textAlign: 'center' }}>{n.cantotal || 0}</td>
                   <td style={{ ...S.td, textAlign: 'right', fontWeight: 600 }}>${fmt(n.valtotal)}</td>

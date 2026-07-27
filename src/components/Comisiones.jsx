@@ -2,6 +2,7 @@
 // Módulo de liquidación de comisiones por vendedor
 
 import React, { useState, useEffect } from 'react'
+import { fmtFecha } from '../lib/fecha'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
@@ -200,7 +201,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
     .tot{font-weight:900;background:#e8eaf6;}
     @media print{body{margin:8px;}}</style></head><body>
     <h2>ATM — LIQUIDACIÓN DE COMISIÓN</h2>
-    <h3>${h.nomvended} — ${h.fecha_liquidacion}</h3>
+    <h3>${h.nomvended} — ${fmtFecha(h.fecha_liquidacion)}</h3>
     <p style="text-align:center;color:#555;">
       Total ventas: <b>$${fmt(h.total_ventas)}</b> &nbsp;|&nbsp;
       Porcentaje: <b>${Number(h.porcentaje||0).toFixed(1)}%</b> &nbsp;|&nbsp;
@@ -211,7 +212,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
       <th>$ Venta</th><th>$ Comisión</th>
     </tr></thead><tbody>
     ${detalle.map((d,i)=>`<tr style="background:${i%2===0?'#fff':'#f5f7fc'}">
-      <td>${d.numnotaent}</td><td>${d.fechanotae}</td>
+      <td>${d.numnotaent}</td><td>${fmtFecha(d.fechanotae)}</td>
       <td>${d.nombreclie}</td>
       <td>$${fmt(d.valtotal)}</td>
       <td><b>$${fmt(d.valor_comision)}</b></td>
@@ -240,7 +241,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
     <h2>ATM CLOTHING — LIQUIDACIÓN DE COMISIÓN</h2>
     <div class="resumen">
       <p><strong>Vendedor:</strong> ${vendedor?.nombre} (${filtVend})</p>
-      <p><strong>Fecha liquidación:</strong> ${hoy()}</p>
+      <p><strong>Fecha liquidación:</strong> ${fmtFecha(hoy())}</p>
       <p><strong>Notas liquidadas:</strong> ${notasSelArr.length}</p>
       <p><strong>Total ventas:</strong> ${fmtM(totalVentas)}</p>
       <p><strong>% Comisión:</strong> ${fmtP(porcComision)}</p>
@@ -248,7 +249,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
     </div>
     <button onclick="window.print()" style="margin-bottom:12px;padding:6px 18px;background:#1a3a6b;color:#fff;border:none;cursor:pointer">🖨 Imprimir</button>
     <table><thead><tr><th>Nota</th><th>Fecha</th><th>Cliente</th><th>Forma Pago</th><th style="text-align:right">$ Total</th></tr></thead><tbody>
-    ${notasSelArr.map(n=>`<tr><td>${n.numnotaent}</td><td>${n.fechanotae?.slice(0,10)||''}</td><td>${n.nombreclie||''}</td><td>${n.formapago||''}</td><td style="text-align:right">${fmtM(n.valtotal)}</td></tr>`).join('')}
+    ${notasSelArr.map(n=>`<tr><td>${n.numnotaent}</td><td>${fmtFecha(n.fechanotae)}</td><td>${n.nombreclie||''}</td><td>${n.formapago||''}</td><td style="text-align:right">${fmtM(n.valtotal)}</td></tr>`).join('')}
     <tr class="tot"><td colspan="4">TOTALES — ${notasSelArr.length} notas</td><td style="text-align:right">${fmtM(totalVentas)}</td></tr>
     </tbody></table></body></html>`)
     w.document.close()
@@ -370,7 +371,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
                               onClick={e=>e.stopPropagation()}/>
                           </td>
                           <td style={{...S.td,fontWeight:700,color:'#1a3a6b'}}>{n.numnotaent}</td>
-                          <td style={S.td}>{n.fechanotae?.slice(0,10)||''}</td>
+                          <td style={S.td}>{fmtFecha(n.fechanotae)}</td>
                           <td style={{...S.td,maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{n.nombreclie}</td>
                           <td style={{...S.td,textAlign:'center'}}>{n.formapago}</td>
                           <td style={{...S.td,textAlign:'center',color:'#888',fontSize:11}}>{n.usuario||''}</td>
@@ -416,7 +417,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
                     <tr key={h.id}
                       onClick={()=>verDetalle(h)}
                       style={{background:histSel?.id===h.id?'#e3f2fd':i%2===0?'#fff':'#f8faff',cursor:'pointer'}}>
-                      <td style={S.td}>{h.fecha_liquidacion}</td>
+                      <td style={S.td}>{fmtFecha(h.fecha_liquidacion)}</td>
                       <td style={{...S.td,fontWeight:600}}>{h.nomvended}</td>
                       <td style={S.td}>{h.observacion}</td>
                       <td style={{...S.td,textAlign:'right'}}>{fmtM(h.total_ventas)}</td>
@@ -448,7 +449,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
                                     {histDetalle.map((d,j)=>(
                                       <tr key={d.id} style={{background:j%2===0?'#f0f7ff':'#e8f0ff'}}>
                                         <td style={{...S.td,fontWeight:700,color:'#1a3a6b'}}>{d.numnotaent}</td>
-                                        <td style={S.td}>{d.fechanotae}</td>
+                                        <td style={S.td}>{fmtFecha(d.fechanotae)}</td>
                                         <td style={{...S.td,maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.nombreclie}</td>
                                         <td style={{...S.td,textAlign:'right'}}>{fmtM(d.valtotal)}</td>
                                         <td style={{...S.td,textAlign:'right',fontWeight:700,color:'#2e7d32'}}>{fmtM(d.valor_comision)}</td>
