@@ -1,9 +1,72 @@
 // src/components/PrintNota.jsx
-// Dos formatos de impresión: Ticket (80mm) y Media Carta
+// Formatos de impresión: Ticket (80mm) y Factura (Media Carta / Carta, según cantidad de ítems)
 
 import { LOGO } from '../lib/assets'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
+
+// Umbral de ítems a partir del cual la factura ya no cabe completa (tabla + totales + firmas)
+// en una hoja media carta (5.5in x 8.5in) y debe imprimirse en carta completa.
+const UMBRAL_MEDIA_CARTA = 10
+
+// ── Guía de envío: etiqueta con los datos del destinatario, para pegar en el paquete ──
+// Se genera directamente desde la nota de entrega (botón 📍), sin pasar por el modal de impresión.
+export function generarGuiaEnvio({ nroDoc, cliente, cliTxt, cedula }) {
+  const w = window.open('','_blank','width=650,height=500')
+  const nombre    = cliente?.nombre || cliTxt || ''
+  const empresa   = cliente?.nom_empresa || ''
+  const direccion = cliente?.direccion || ''
+  const ciudad    = cliente?.ciudad || ''
+  const depto     = cliente?.departamento || ''
+  const celular   = cliente?.celular || ''
+  const cedCli    = cliente?.cedula || cedula || ''
+  w.document.write(`
+    <html><head><title>Guía de envío ${nroDoc}</title>
+    <style>
+      * { margin:0; padding:0; box-sizing:border-box; }
+      body { font-family: Arial, sans-serif; font-size: 13px; color:#111; padding: 16px 20px; }
+      .caja { border: 2px solid #1a3a6b; border-radius: 6px; padding: 14px 18px; }
+      .rmte { font-size: 11px; color:#333; border-bottom: 2px solid #1a3a6b; padding-bottom: 8px; margin-bottom: 16px; }
+      .rmte-nombre { font-weight:900; font-size:14px; color:#1a3a6b; }
+      .fila { display:flex; justify-content:space-between; }
+      .dest-nombre { font-weight:900; font-size:20px; color:#111; margin-bottom:4px; }
+      .dest-empresa { font-size:13px; color:#333; margin-bottom:10px; }
+      .campo { font-size:13px; margin-bottom:8px; }
+      .campo b { color:#1a3a6b; }
+      .nota-ref { text-align:right; font-size:10px; color:#888; margin-top:18px; }
+      @page { size: 5.5in 8.5in; margin: 8mm; }
+    </style></head><body>
+      <div class="caja">
+        <div class="rmte">
+          <div class="fila">
+            <span>RMTE: <span class="rmte-nombre">A TU MEDIDA SAS</span></span>
+            <span>NIT: 901.575-082-1</span>
+          </div>
+          <div>CALLE 49 # 53-79 C.C. LOS PANCHES Local 313</div>
+          <div class="fila">
+            <span>CEL: 322 5309608</span>
+            <span style="font-weight:700;">MEDELLÍN</span>
+          </div>
+        </div>
+
+        <div class="dest-nombre">${nombre}</div>
+        ${empresa?`<div class="dest-empresa">${empresa}</div>`:''}
+        <div class="fila campo">
+          <span><b>C.C.</b> ${cedCli}</span>
+          <span><b>CEL:</b> ${celular}</span>
+        </div>
+        <div class="campo"><b>DIR:</b> ${direccion}</div>
+        <div class="fila campo">
+          <span><b>CIUDAD:</b> ${ciudad}</span>
+          <span><b>DEPTO:</b> ${depto}</span>
+        </div>
+        <div class="nota-ref">Nota de entrega N° ${nroDoc}</div>
+      </div>
+    </body></html>
+  `)
+  w.document.close(); w.focus()
+  setTimeout(()=>{ w.print(); w.close() }, 400)
+}
 
 export default function PrintNota({ datos, onClose }) {
   const {
@@ -25,6 +88,9 @@ export default function PrintNota({ datos, onClose }) {
         .sep { border-top: 1px dashed #000; margin: 4px 0; }
         .fila { display: flex; justify-content: space-between; }
         .total-fila { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; }
+        .item-box { display: flex; gap: 6px; margin-bottom: 3px; }
+        .item-num { width: 14px; flex-shrink: 0; font-weight: bold; }
+        .item-body { flex: 1; min-width: 0; }
         @page { size: 80mm auto; margin: 0; }
         @media print { body { width: 72mm; margin: 0 auto; } }
       </style></head><body>
@@ -40,17 +106,22 @@ export default function PrintNota({ datos, onClose }) {
       <div class="fila"><span>Vence:</span><span>${fechaPago}</span></div>
       <div class="fila"><span>Vendió:</span><span>${vendedor?.nombre||''}</span></div>
       <div class="sep"></div>
-      <div class="fila bold"><span>ITEM CODIGO</span><span>ARTICULO</span></div>
+      <div class="fila bold"><span>IT.</span><span style="flex:1;padding-left:6px;">CODIGO / ARTICULO</span></div>
       <div class="sep"></div>
       ${(lineas||[]).map((l,i)=>`
-        <div class="fila">
-          <span>${i+1}    ${l.codartic}</span>
-          <span>${(l.descartic||'').substring(0,18)} - ${l.talla||''}</span>
-        </div>
-        <div class="fila">
-          <span>    ${l.cantidad}</span>
-          <span>${fmt(l.valunit)}</span>
-          <span class="bold">${fmt(l.valtotal)}</span>
+        <div class="item-box">
+          <div class="item-num">${i+1}</div>
+          <div class="item-body">
+            <div class="fila">
+              <span>${l.codartic}</span>
+              <span>${(l.descartic||'').substring(0,18)} - ${l.talla||''}</span>
+            </div>
+            <div class="fila">
+              <span>${l.cantidad} u.</span>
+              <span>${fmt(l.valunit)}</span>
+              <span class="bold">${fmt(l.valtotal)}</span>
+            </div>
+          </div>
         </div>
       `).join('')}
       <div class="sep"></div>
@@ -71,41 +142,58 @@ export default function PrintNota({ datos, onClose }) {
     setTimeout(()=>{ w.print(); w.close() }, 400)
   }
 
-  function imprimirMediaCarta() {
+  // El sistema decide el tamaño de hoja según la cantidad de ítems: si todo (tabla + totales +
+  // firmas) cabe en media carta, imprime media carta; si no, usa carta completa. Siempre en una
+  // sola hoja: se fija el tamaño de página (@page) explícitamente y se evita el salto de página
+  // dentro de la tabla/totales/firmas, que era la causa de que antes siempre salieran 2 hojas.
+  function imprimirFactura() {
+    const nItems  = (lineas||[]).length
+    const esMedia = nItems <= UMBRAL_MEDIA_CARTA
+    const pageSize  = esMedia ? '5.5in 8.5in' : '8.5in 11in'
+    const pageMargin= esMedia ? '6mm' : '10mm'
+    const bodyPad   = esMedia ? '10px 16px' : '18px 28px'
+    const logoAlto  = esMedia ? 56 : 74
+    const fuenteBase= esMedia ? 10 : 11
+    const descMaxW  = esMedia ? '95px' : '190px'
+    const firmaTop  = esMedia ? 14 : 30
+
     const w = window.open('','_blank','width=800,height=600')
     w.document.write(`
       <html><head><title>Nota ${nroDoc}</title>
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px 30px; color: #111; }
-        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; border-bottom:2px solid #1a3a6b; padding-bottom:10px; }
+        body { font-family: Arial, sans-serif; font-size: ${fuenteBase}px; padding: ${bodyPad}; color: #111; }
+        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; border-bottom:2px solid #1a3a6b; padding-bottom:8px; }
         .logo-txt { font-size:26px; font-weight:900; color:#1a3a6b; letter-spacing:3px; }
         .subtitulo { font-size:10px; color:#5577aa; letter-spacing:2px; text-transform:uppercase; }
         .doc-info { text-align:right; }
         .doc-titulo { font-size:16px; font-weight:800; color:#1a3a6b; }
         .doc-nro { font-size:22px; font-weight:900; color:#c0392b; }
-        .seccion { background:#f5f7fb; border:1px solid #c8d5ea; border-radius:4px; padding:8px 12px; margin-bottom:10px; }
+        .seccion { background:#f5f7fb; border:1px solid #c8d5ea; border-radius:4px; padding:6px 10px; margin-bottom:8px; }
         .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
         .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
         .campo { display:flex; flex-direction:column; }
         .campo-lbl { font-size:9px; font-weight:700; color:#5577aa; text-transform:uppercase; }
         .campo-val { font-size:11px; font-weight:600; border-bottom:1px solid #ddd; padding-bottom:1px; min-height:14px; }
-        table { width:100%; border-collapse:collapse; margin-bottom:10px; font-size:10px; }
-        th { background:#1a3a6b; color:#fff; padding:5px 6px; text-align:center; font-size:10px; }
-        td { padding:4px 5px; border-bottom:1px solid #eee; }
+        table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:${fuenteBase-1}px; page-break-inside:avoid; }
+        th { background:#1a3a6b; color:#fff; padding:4px 5px; text-align:center; font-size:${fuenteBase-1}px; }
+        td { padding:3px 5px; border-bottom:1px solid #eee; }
+        td.item-n { text-align:center; background:#eef2ff; font-weight:700; color:#1a3a6b; }
+        td.desc { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:${descMaxW}; }
         tr:nth-child(even) { background:#f5f7fc; }
-        .totales { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; background:#f0f4ff; border:1px solid #c8d5ea; border-radius:4px; padding:8px 14px; }
+        .totales { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; background:#f0f4ff; border:1px solid #c8d5ea; border-radius:4px; padding:6px 12px; page-break-inside:avoid; }
         .tot-lbl { font-size:10px; color:#5577aa; font-weight:700; text-align:center; text-transform:uppercase; }
         .tot-val { font-size:12px; text-align:right; font-weight:700; color:#1a3a6b; }
         .tot-saldo { color:#c0392b; font-size:14px; }
-        .firma { display:flex; justify-content:space-around; margin-top:40px; }
-        .linea-firma { border-top:1px solid #333; width:160px; padding-top:4px; text-align:center; font-size:9px; color:#555; }
-        @media print { body { padding:10px 20px; } }
+        .firma { display:flex; justify-content:space-around; margin-top:${firmaTop}px; page-break-inside:avoid; }
+        .linea-firma { border-top:1px solid #333; width:150px; padding-top:4px; text-align:center; font-size:9px; color:#555; }
+        @page { size: ${pageSize}; margin: ${pageMargin}; }
+        @media print { body { padding: ${bodyPad}; } }
       </style></head><body>
 
       <div class="header">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <img src="${LOGO}" alt="ATM" style="height:78px;object-fit:contain;"/>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <img src="${LOGO}" alt="ATM" style="height:${logoAlto}px;object-fit:contain;"/>
           <div class="subtitulo" style="font-size:11px;">A TU MEDIDA<br/>Control de Inventarios</div>
         </div>
         <div class="doc-info">
@@ -127,7 +215,7 @@ export default function PrintNota({ datos, onClose }) {
         </div>
       </div>
 
-      <div class="grid3" style="margin-bottom:10px;gap:6px;display:grid;">
+      <div class="grid3" style="margin-bottom:8px;gap:6px;display:grid;">
         <div class="campo"><span class="campo-lbl">Forma de pago</span><span class="campo-val">${plazo}</span></div>
         <div class="campo"><span class="campo-lbl">Fecha de pago</span><span class="campo-val">${fechaPago}</span></div>
         <div class="campo"><span class="campo-lbl">Vendedor</span><span class="campo-val">${vendedor?.nombre||cedVend||''}</span></div>
@@ -136,16 +224,16 @@ export default function PrintNota({ datos, onClose }) {
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Código</th><th>Descripción</th><th>Marca</th><th>Género</th>
+            <th>Ítem</th><th>Código</th><th>Descripción</th><th>Marca</th><th>Género</th>
             <th>Talla</th><th>Cant.</th><th>$ Unidad</th><th>%Dto</th><th>$Dto</th><th>$ Total</th>
           </tr>
         </thead>
         <tbody>
           ${(lineas||[]).map((l,i)=>`
             <tr>
-              <td style="text-align:center">${i+1}</td>
+              <td class="item-n">${i+1}</td>
               <td>${l.codartic}</td>
-              <td>${l.descartic}</td>
+              <td class="desc" title="${l.descartic}">${l.descartic}</td>
               <td>${l.marca||''}</td>
               <td>${l.genero||''}</td>
               <td style="text-align:center">${l.talla}</td>
@@ -202,10 +290,10 @@ export default function PrintNota({ datos, onClose }) {
             <strong style={{fontSize:28}}>Ticket</strong><br/>
             <span style={{fontSize:11}}>Impresora térmica 80mm</span>
           </button>
-          <button onClick={imprimirMediaCarta} style={S.btnCarta}>
+          <button onClick={imprimirFactura} style={S.btnCarta}>
             <span style={{fontSize:36}}>📄</span><br/>
-            <strong style={{fontSize:28}}>Media Carta</strong><br/>
-            <span style={{fontSize:11}}>Impresora normal / PDF</span>
+            <strong style={{fontSize:24}}>Carta / Media Carta</strong><br/>
+            <span style={{fontSize:11}}>Impresora normal / PDF — el tamaño se ajusta solo</span>
           </button>
         </div>
         <div style={{textAlign:'right',marginTop:20}}>

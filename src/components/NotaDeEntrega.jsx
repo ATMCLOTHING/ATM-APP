@@ -3,7 +3,7 @@ import { LOGO, WZNEW, WZSAVE, WZDELETE, WZPRINT, WZCLOSE, WZTOP, WZBACK, WZNEXT,
 import ModalAbonos        from './ModalAbonos'
 import ModalBuscarNota    from './ModalBuscarNota'
 import ModalDetalle       from './ModalDetalle'
-import PrintNota          from './PrintNota'
+import PrintNota, { generarGuiaEnvio } from './PrintNota'
 import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
 import ModalNuevoCliente  from './ModalNuevoCliente'
@@ -641,6 +641,12 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
 
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
 
+  // ── GUÍA DE ENVÍO: etiqueta con los datos del destinatario, para pegar en el paquete ──
+  function imprimirGuia() {
+    if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de generar la guía de envío.'}); return }
+    generarGuiaEnvio(dataNota)
+  }
+
   // ── DEVOLUCIÓN DE MERCANCÍA (Caso A: sobre nota ya guardada) ──────────
   function abrirDevolucion(idx) {
     const l = lineas[idx]
@@ -1222,6 +1228,10 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
               )}
               <IBtn src={WZDELETE} onClick={anularNota}    title={usuario?.rol==='admin' ? "Anular" : "Solo un administrador puede anular"} disabled={anulada||modoNueva||usuario?.rol!=='admin'}/>
               <IBtn src={WZPRINT}  onClick={()=>setModal('print')} title="Imprimir"/>
+              <button onClick={imprimirGuia} title="Generar guía de envío"
+                style={{background:'#e8f5e9',border:'1px solid #2e7d32',borderRadius:6,padding:0,cursor:'pointer',fontSize:24,width:57,height:52,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                📍
+              </button>
               <IBtn src={WZCLOSE}  onClick={onClose}       title="Volver al menú"/>
             </div>
           </div>
