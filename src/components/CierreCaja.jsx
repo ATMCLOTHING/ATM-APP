@@ -299,7 +299,12 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   const ventasCli = calcVentasCliente()
 
   // ── HELPERS IMPRESIÓN ─────────────────────────────────────────────────────
-  const estilosImp = `
+  // @page con orientación explícita: sin esto, el navegador puede reusar la orientación de la
+  // última impresión (p.ej. si el usuario imprimió antes un reporte ancho en horizontal), y estos
+  // reportes saldrían volteados aunque el preview se vea bien. "landscape" para las tablas de
+  // muchas columnas, "portrait" para las más angostas.
+  const estilosImp = (orientacion='portrait') => `
+    @page { size: letter ${orientacion}; margin: 10mm; }
     body{font-family:Arial,sans-serif;font-size:11px;padding:20px;}
     h2,h3{color:#1a3a6b;text-align:center;margin:8px 0;}
     .sub{text-align:center;color:#555;margin-bottom:12px;}
@@ -348,7 +353,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   function imprimirConsolidado() {
     if (!cons) return
     const w = window.open('','_blank','width=1000,height=700')
-    w.document.write(`<html><head><title>Consolidado</title><style>${estilosImp}</style></head><body>
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Consolidado</title><style>${estilosImp('landscape')}</style></head><body>
     <h2>ATM — CONSOLIDADO DE MOVIMIENTOS</h2>
     <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <table>
@@ -390,7 +395,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   function imprimirMarcas() {
     if (!marcas) return
     const w = window.open('','_blank','width=700,height=500')
-    w.document.write(`<html><head><title>Marcas</title><style>${estilosImp}</style></head><body>
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Marcas</title><style>${estilosImp('portrait')}</style></head><body>
     <h2>ATM — VENTAS POR MARCA</h2>
     <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <table><thead><tr><th style="text-align:left">Marca</th><th>Unidades</th><th>$ Promedio</th><th>$ Total</th></tr></thead><tbody>
@@ -404,7 +409,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
   function imprimirTop() {
     const w = window.open('','_blank','width=700,height=500')
-    w.document.write(`<html><head><title>Top</title><style>${estilosImp}</style></head><body>
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Top</title><style>${estilosImp('portrait')}</style></head><body>
     <h2>ATM — TOP 10 ARTÍCULOS</h2>
     <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <table><thead><tr><th style="text-align:left">#</th><th style="text-align:left">Código</th><th style="text-align:left">Descripción</th><th>Unidades</th><th>$ Total</th></tr></thead><tbody>
@@ -415,7 +420,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
   function imprimirCartera() {
     const w = window.open('','_blank','width=900,height=600')
-    w.document.write(`<html><head><title>Cartera</title><style>${estilosImp}.mora{color:#c62828;font-weight:700;}</style></head><body>
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Cartera</title><style>${estilosImp('landscape')}.mora{color:#c62828;font-weight:700;}</style></head><body>
     <h2>ATM — CARTERA PENDIENTE POR VENDEDOR</h2>
     <div class="sub">Corte al ${fmtFecha(hoy())} (cartera completa, no depende del rango de fechas)</div>
     <table><thead><tr>
@@ -436,7 +441,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   function imprimirAnuladas() {
     const an = datos?.notasAnuladas||[]
     const w = window.open('','_blank','width=900,height=600')
-    w.document.write(`<html><head><title>Anuladas</title><style>${estilosImp}</style></head><body>
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Anuladas</title><style>${estilosImp('landscape')}</style></head><body>
     <h2>ATM — NOTAS ANULADAS</h2>
     <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)} &nbsp;&nbsp; Total: ${an.length} notas</div>
     <table><thead><tr>
@@ -521,8 +526,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     const pu = calcPorUsuario()
     if (!pu) return
     const w = window.open('','_blank','width=1000,height=700')
-    w.document.write(`<html><head><title>Por Usuario</title>
-    <style>body{font-family:Arial,sans-serif;font-size:11px;margin:16px;}
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Por Usuario</title>
+    <style>@page{size:letter portrait;margin:10mm;}body{font-family:Arial,sans-serif;font-size:11px;margin:16px;}
     h2{color:#1a3a6b;text-align:center;margin-bottom:4px;}
     .sub{text-align:center;color:#555;margin-bottom:14px;}
     table{width:100%;border-collapse:collapse;margin-bottom:8px;}
@@ -563,7 +568,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
   function imprimirVentasCliente() {
     const w = window.open('','_blank','width=900,height=600')
-    w.document.write(`<html><head><title>Clientes</title><style>${estilosImp}</style></head><body>
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Clientes</title><style>${estilosImp('landscape')}</style></head><body>
     <h2>ATM — VENTAS POR CLIENTE</h2>
     <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <div class="sec" style="padding:5px 8px;margin-bottom:4px">VENTAS MOSTRADOR — $${fmt(ventasCli.totMostrador)} (${ventasCli.mostrador.length} notas)</div>
@@ -582,8 +587,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   function imprimirResumen() {
     if (!resumen) return
     const w = window.open('','_blank','width=700,height=600')
-    w.document.write(`<html><head><title>Resumen</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Resumen</title>
+    <style>@page{size:letter portrait;margin:10mm;}body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}
     h2{color:#1a3a6b;text-align:center;}.sub{text-align:center;color:#555;margin-bottom:16px;}
     .f{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #eee;}
     .f.tot{font-weight:900;font-size:14px;background:#dde3ee;border-top:2px solid #1a3a6b;}

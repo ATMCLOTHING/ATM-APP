@@ -234,8 +234,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
     })
     const clientes = Object.values(porCliente).sort((a,b) => a.nombre.localeCompare(b.nombre))
 
-    w.document.write(`<html><head><title>Cartera Vigente</title>
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Cartera Vigente</title>
     <style>
+      @page{size:letter landscape;margin:10mm;}
       body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}
       h2{color:#1a3a6b;text-align:center;margin:4px 0;}
       .sub{text-align:center;color:#555;margin-bottom:12px;font-size:11px;}
@@ -488,8 +489,8 @@ export default function Cartera({ supabase, usuario, onClose }) {
       : notas.map(n => `${n.numnotaent}\t${fmtFecha(n.fechanotae)}\t${n.nombreclie}\t${fmtM(n.valtotal)}\t${fmtM(n.valabono)}\t${fmtM(n.saldo)}\t${n.diasVencido} días`).join('\n')
 
     const w = window.open('','_blank','width=900,height=700')
-    w.document.write(`<html><head><title>${titulo}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}
+    w.document.write(`<html><head><meta charset="UTF-8"><title>${titulo}</title>
+    <style>@page{size:letter landscape;margin:10mm;}body{font-family:Arial,sans-serif;font-size:12px;margin:20px}
     h2{color:#1a3a6b}table{width:100%;border-collapse:collapse}
     th{background:#1a3a6b;color:#fff;padding:6px 8px;text-align:left}
     td{padding:5px 8px;border-bottom:1px solid #eee}

@@ -69,7 +69,7 @@ export default function Vales({ supabase, usuario, onClose, onAyuda }) {
   function reimprimir(v) {
     const w = window.open('','_blank','width=320,height=500')
     w.document.write(`
-      <html><head><title>Vale ${v.codigo}</title>
+      <html><head><meta charset="UTF-8"><title>Vale ${v.codigo}</title>
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Courier New', monospace; font-size:11px; width:280px; padding:8px; }

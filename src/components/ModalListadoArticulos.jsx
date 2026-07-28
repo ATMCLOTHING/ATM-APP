@@ -36,8 +36,9 @@ export default function ModalListadoArticulos({ supabase, onSelect, onClose }) {
   function imprimir() {
     const w = window.open('','_blank','width=900,height=600')
     w.document.write(`
-      <html><head><title>Listado de Artículos</title>
+      <html><head><meta charset="UTF-8"><title>Listado de Artículos</title>
       <style>
+        @page{size:letter landscape;margin:10mm;}
         body{font-family:Arial,sans-serif;font-size:11px;padding:20px;}
         h2{color:#1a3a6b;margin-bottom:4px;}
         .filtros{font-size:10px;color:#888;margin-bottom:10px;}

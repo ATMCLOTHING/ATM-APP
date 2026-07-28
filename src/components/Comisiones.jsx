@@ -190,8 +190,8 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
 
   function imprimirLiquidacion(h, detalle) {
     const w = window.open('','_blank','width=800,height=600')
-    w.document.write(`<html><head><title>Liquidación ${h.id}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;}
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Liquidación ${h.id}</title>
+    <style>@page{size:letter portrait;margin:10mm;}body{font-family:Arial,sans-serif;font-size:12px;margin:20px;}
     h2,h3{color:#1a3a6b;text-align:center;}
     table{width:100%;border-collapse:collapse;margin-bottom:14px;}
     th{background:#1a3a6b;color:#fff;padding:6px 8px;text-align:right;font-size:11px;}
@@ -229,8 +229,8 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
 
   function imprimir() {
     const w = window.open('','_blank','width=800,height=600')
-    w.document.write(`<html><head><title>Liquidación Comisión</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Liquidación Comisión</title>
+    <style>@page{size:letter portrait;margin:10mm;}body{font-family:Arial,sans-serif;font-size:12px;margin:20px}
     h2{color:#1a3a6b}table{width:100%;border-collapse:collapse}
     th{background:#1a3a6b;color:#fff;padding:6px 8px}
     td{padding:5px 8px;border-bottom:1px solid #eee}

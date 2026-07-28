@@ -53,8 +53,8 @@ export default function ModalInventario({ supabase, onClose }) {
 
   function imprimir() {
     const w = window.open('','_blank','width=900,height=700')
-    w.document.write(`<html><head><title>Inventario</title>
-    <style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Inventario</title>
+    <style>@page{size:letter portrait;margin:10mm;}body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}
     h2{color:#1a3a6b;text-align:center;}
     .sub{text-align:center;color:#555;margin-bottom:12px;}
     table{width:100%;border-collapse:collapse;margin-bottom:16px;}

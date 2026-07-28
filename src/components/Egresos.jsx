@@ -133,8 +133,8 @@ export default function Egresos({ supabase, usuario, onClose }) {
 
   function imprimirEgresos() {
     const w = window.open('','_blank','width=1000,height=700')
-    w.document.write(`<html><head><title>Egresos</title>
-    <style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Egresos</title>
+    <style>@page{size:letter landscape;margin:10mm;}body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}
     h2{color:#1a3a6b;text-align:center;}.sub{text-align:center;color:#555;margin-bottom:12px;}
     table{width:100%;border-collapse:collapse;margin-bottom:18px;}
     th{background:#1a3a6b;color:#fff;padding:5px 8px;font-size:10px;}
