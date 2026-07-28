@@ -20,6 +20,18 @@ const esVendedorExterno = cedv => {
   return n > 1000
 }
 
+// Suma todas las filas de un bloque (vendMostrador, vendExterno, porCaja) para obtener su subtotal
+const sumarBloque = filas => Object.values(filas).reduce((s,v) => ({
+  notas:        s.notas + v.notas,
+  efectivo:     s.efectivo + v.efectivo,
+  transferencia:s.transferencia + v.transferencia,
+  mixto:        s.mixto + v.mixto,
+  credito:      s.credito + v.credito,
+  noAbonado:    s.noAbonado + v.noAbonado,
+  total:        s.total + v.total,
+  digital:      s.digital + (v.digital||0),
+}), {notas:0,efectivo:0,transferencia:0,mixto:0,credito:0,noAbonado:0,total:0,digital:0})
+
 const LABEL_CAJA = {
   'caja1': 'Caja 1', 'caja2': 'Caja 2', 'caja3': 'Caja 3',
   'admin': 'Admin',  'laura': 'Laura (vendedora)', 'prendas': 'Bodega',
@@ -163,7 +175,11 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       else vendMostrador[nom] = v
     })
 
-    return { porVendedor, vendMostrador, vendExterno, porCaja, totales }
+    return {
+      porVendedor, vendMostrador, vendExterno, porCaja, totales,
+      subtotalMostrador: sumarBloque(vendMostrador),
+      subtotalExterno:   sumarBloque(vendExterno),
+    }
   }
 
   // ── VENTAS POR MARCA ──────────────────────────────────────────────────────
@@ -317,6 +333,18 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       <th>TRANSF.</th><th>MIXTO</th><th>CRÉDITO</th><th>NO ABONADO</th><th>TOTAL</th>
     </tr>`
 
+  const filaSubtotal = (etiqueta, v) => `
+    <tr style="background:#eef2ff;font-style:italic;font-weight:800">
+      <td>Subtotal ${etiqueta}</td>
+      <td>${v.notas}</td>
+      <td>${v.efectivo?'$'+fmt(v.efectivo):''}</td>
+      <td>${v.transferencia?'$'+fmt(v.transferencia):''}</td>
+      <td>${v.mixto?'$'+fmt(v.mixto):''}</td>
+      <td>${v.credito?'$'+fmt(v.credito):''}</td>
+      <td style="color:#c62828">${v.noAbonado?'$'+fmt(v.noAbonado):''}</td>
+      <td><b>$${fmt(v.total)}</b></td>
+    </tr>`
+
   function imprimirConsolidado() {
     if (!cons) return
     const w = window.open('','_blank','width=1000,height=700')
@@ -327,9 +355,11 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       <tbody>
         ${cabeceraTabla('VENTAS POR VENDEDORA DE MOSTRADOR')}
         ${Object.entries(cons.vendMostrador).sort((a,b)=>b[1].total-a[1].total).map(([n,v])=>filaTabla(n,v)).join('')}
-        ${Object.keys(cons.vendExterno).length ? cabeceraTabla('VENTAS POR VENDEDOR EXTERNO') + Object.entries(cons.vendExterno).map(([n,v])=>filaTabla(n,v)).join('') : ''}
+        ${Object.keys(cons.vendMostrador).length ? filaSubtotal('mostrador', cons.subtotalMostrador) : ''}
+        ${Object.keys(cons.vendExterno).length ? cabeceraTabla('VENTAS POR VENDEDOR EXTERNO') + Object.entries(cons.vendExterno).map(([n,v])=>filaTabla(n,v)).join('') + filaSubtotal('vendedores externos', cons.subtotalExterno) : ''}
         ${cabeceraTabla('TOTALES POR CAJA')}
         ${Object.entries(cons.porCaja).map(([n,v])=>filaTabla(n,v)).join('')}
+        ${Object.keys(cons.porCaja).length ? filaSubtotal('por caja', sumarBloque(cons.porCaja)) : ''}
         <tr class="tot">
           <td>TOTALES GENERALES</td>
           <td>${cons.totales.notas}</td>
@@ -342,6 +372,14 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
         </tr>
       </tbody>
     </table>
+    <div style="display:flex;gap:12px;margin-bottom:14px;">
+      <div style="flex:1;background:#e8f5e9;border:1px dashed #2e7d32;border-radius:6px;padding:10px 14px;font-weight:700;color:#1b5e20;display:flex;justify-content:space-between;">
+        <span>👗 TOTAL VENTAS MOSTRADOR</span><span>$${fmt(cons.subtotalMostrador.total)}</span>
+      </div>
+      ${Object.keys(cons.vendExterno).length ? `<div style="flex:1;background:#e3f2fd;border:1px dashed #1565c0;border-radius:6px;padding:10px 14px;font-weight:700;color:#0d47a1;display:flex;justify-content:space-between;">
+        <span>👤 TOTAL VENTAS VENDEDORES EXTERNOS</span><span>$${fmt(cons.subtotalExterno.total)}</span>
+      </div>` : ''}
+    </div>
     <div style="background:#ede7f6;border:1px dashed #7e57c2;border-radius:6px;padding:10px 14px;font-weight:700;color:#4527a0;display:flex;justify-content:space-between;">
       <span>📲 MARCA DIGITAL (no incluida en el cierre de caja)</span><span>$${fmt(cons.totales.digital)}</span>
     </div>
@@ -585,37 +623,53 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     {id:'porusuario',  icon:'👤', label:'Por Usuario'},
   ]
 
-  const TablaConsolidado = ({ titulo, datos: filas, icono }) => (
-    <div style={{marginBottom:24}}>
-      <div style={P.secTit}><span style={{fontSize:18}}>{icono}</span> {titulo} — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
-      <table style={P.tabla}>
-        <thead>
-          <tr style={P.thead}>
-            {['Nombre','Notas','Efectivo','Transferencia','Mixto','Crédito','No Abonado','Total'].map(h=>(
-              <th key={h} style={{...P.th, textAlign:h==='Nombre'?'left':'right'}}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {Object.entries(filas).sort((a,b)=>b[1].total-a[1].total).map(([nom,v],i)=>(
-            <tr key={nom} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
-              <td style={{...P.td,fontWeight:600}}>{nom}</td>
-              <td style={{...P.td,textAlign:'right',color:'#555'}}>{v.notas}</td>
-              <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>{v.efectivo?`$${fmt(v.efectivo)}`:''}</td>
-              <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>{v.transferencia?`$${fmt(v.transferencia)}`:''}</td>
-              <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>{v.mixto?`$${fmt(v.mixto)}`:''}</td>
-              <td style={{...P.td,textAlign:'right',color:'#e65100'}}>{v.credito?`$${fmt(v.credito)}`:''}</td>
-              <td style={{...P.td,textAlign:'right',color:'#c62828'}}>{v.noAbonado?`$${fmt(v.noAbonado)}`:''}</td>
-              <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#1a3a6b'}}>${fmt(v.total)}</td>
+  const TablaConsolidado = ({ titulo, datos: filas, icono }) => {
+    const hayFilas = Object.keys(filas).length > 0
+    const sub = sumarBloque(filas)
+    return (
+      <div style={{marginBottom:24}}>
+        <div style={P.secTit}><span style={{fontSize:18}}>{icono}</span> {titulo} — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
+        <table style={P.tabla}>
+          <thead>
+            <tr style={P.thead}>
+              {['Nombre','Notas','Efectivo','Transferencia','Mixto','Crédito','No Abonado','Total'].map(h=>(
+                <th key={h} style={{...P.th, textAlign:h==='Nombre'?'left':'right'}}>{h}</th>
+              ))}
             </tr>
-          ))}
-          {Object.keys(filas).length===0 && (
-            <tr><td colSpan={8} style={{textAlign:'center',padding:16,color:'#aaa'}}>Sin datos en este período.</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  )
+          </thead>
+          <tbody>
+            {Object.entries(filas).sort((a,b)=>b[1].total-a[1].total).map(([nom,v],i)=>(
+              <tr key={nom} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
+                <td style={{...P.td,fontWeight:600}}>{nom}</td>
+                <td style={{...P.td,textAlign:'right',color:'#555'}}>{v.notas}</td>
+                <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>{v.efectivo?`$${fmt(v.efectivo)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>{v.transferencia?`$${fmt(v.transferencia)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>{v.mixto?`$${fmt(v.mixto)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',color:'#e65100'}}>{v.credito?`$${fmt(v.credito)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',color:'#c62828'}}>{v.noAbonado?`$${fmt(v.noAbonado)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#1a3a6b'}}>${fmt(v.total)}</td>
+              </tr>
+            ))}
+            {hayFilas && (
+              <tr style={{...P.totRow,background:'#eef2ff',fontStyle:'italic'}}>
+                <td style={P.td}>Subtotal {titulo.toLowerCase()}</td>
+                <td style={{...P.td,textAlign:'right'}}>{sub.notas}</td>
+                <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>{sub.efectivo?`$${fmt(sub.efectivo)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>{sub.transferencia?`$${fmt(sub.transferencia)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>{sub.mixto?`$${fmt(sub.mixto)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',color:'#e65100'}}>{sub.credito?`$${fmt(sub.credito)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',color:'#c62828'}}>{sub.noAbonado?`$${fmt(sub.noAbonado)}`:''}</td>
+                <td style={{...P.td,textAlign:'right',fontWeight:800,color:'#1a3a6b'}}>${fmt(sub.total)}</td>
+              </tr>
+            )}
+            {!hayFilas && (
+              <tr><td colSpan={8} style={{textAlign:'center',padding:16,color:'#aaa'}}>Sin datos en este período.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   return (
     <div style={P.pagina}>
@@ -677,6 +731,21 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                   {Object.keys(cons.vendExterno).length > 0 && (
                     <TablaConsolidado titulo="Ventas por Vendedor Externo" icono="👤" datos={cons.vendExterno} />
                   )}
+
+                  {/* Comparación total mostrador vs externos */}
+                  <div style={{display:'flex',gap:12,marginBottom:24}}>
+                    <div style={{...P.digitalBox,flex:1,background:'#e8f5e9',border:'1px dashed #2e7d32',color:'#1b5e20'}}>
+                      <span><span style={{fontSize:17}}>👗</span> TOTAL VENTAS MOSTRADOR</span>
+                      <strong>${fmt(cons.subtotalMostrador.total)}</strong>
+                    </div>
+                    {Object.keys(cons.vendExterno).length > 0 && (
+                      <div style={{...P.digitalBox,flex:1,background:'#e3f2fd',border:'1px dashed #1565c0',color:'#0d47a1'}}>
+                        <span><span style={{fontSize:17}}>👤</span> TOTAL VENTAS VENDEDORES EXTERNOS</span>
+                        <strong>${fmt(cons.subtotalExterno.total)}</strong>
+                      </div>
+                    )}
+                  </div>
+
                   <TablaConsolidado titulo="Totales por Caja" icono="🏧" datos={cons.porCaja} />
 
                   {/* Fila de totales generales */}
