@@ -46,7 +46,7 @@ export function generarGuiaEnvio({ nroDoc, cliente, cliTxt, cedula }) {
       .campo { font-size:21px; }
       .campo b { color:#1a3a6b; }
       .nota-ref { text-align:right; font-size:14px; color:#888; }
-      @page { size: 8.5in 11in; margin: 0; }
+      @page { size: letter portrait; margin: 0; }
     </style></head><body>
       <div class="caja">
         <div class="rmte">
@@ -208,7 +208,7 @@ export default function PrintNota({ datos, onClose }) {
         .tot-saldo { color:#c0392b; font-size:14px; }
         .firma { display:flex; justify-content:space-around; margin-top:${firmaTop}px; page-break-inside:avoid; }
         .linea-firma { border-top:1px solid #333; width:150px; padding-top:4px; text-align:center; font-size:9px; color:#555; }
-        @page { size: 8.5in 11in; margin: 0; }
+        @page { size: letter portrait; margin: 0; }
       </style></head><body>
 
       <div class="doc-wrap ${esMedia?'media':''}">
