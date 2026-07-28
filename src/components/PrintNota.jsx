@@ -5,6 +5,8 @@ import { LOGO } from '../lib/assets'
 import { fmtFecha } from '../lib/fecha'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
+// El ticket replica el formato del sistema anterior: separador de miles con coma y sin decimales.
+const fmtInt = n => Number(n||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})
 
 // Umbral de ítems a partir del cual la factura ya no cabe completa (tabla + totales + firmas)
 // en una hoja media carta (5.5in x 8.5in) y debe imprimirse en carta completa.
@@ -28,7 +30,7 @@ export function generarGuiaEnvio({ nroDoc, cliente, cliTxt, cedula }) {
   const celular   = cliente?.celular || ''
   const cedCli    = cliente?.cedula || cedula || ''
   w.document.write(`
-    <html><head><title>Guía de envío ${nroDoc}</title>
+    <html><head><meta charset="UTF-8"><title>Guía de envío ${nroDoc}</title>
     <style>
       * { margin:0; padding:0; box-sizing:border-box; }
       html, body { height: 100%; }
@@ -88,67 +90,63 @@ export default function PrintNota({ datos, onClose }) {
     lineas, subtotal, totDcto, totIva, total, saldo, prendas, abonos,
   } = datos
 
+  // Réplica exacta del ticket del sistema anterior (misma información, misma distribución,
+  // misma tipografía): sin logo ni mensajes de cortesía que ese ticket no tenía, con las
+  // mismas etiquetas de campo (incluida su puntuación tal cual, p.ej. "Nit.:" vs "Ciudad" sin
+  // dos puntos) y números con coma de miles y sin decimales.
   function imprimirTicket() {
     const w = window.open('','_blank','width=320,height=600')
     w.document.write(`
-      <html><head><title>Ticket ${nroDoc}</title>
+      <html><head><meta charset="UTF-8"><title>Ticket ${nroDoc}</title>
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: 'Courier New', monospace; font-size: 11px; width: 280px; padding: 8px; }
-        .centro { text-align: center; }
-        .bold { font-weight: bold; }
-        .grande { font-size: 14px; }
-        .sep { border-top: 1px dashed #000; margin: 4px 0; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; width: 280px; padding: 8px; color:#000; }
         .fila { display: flex; justify-content: space-between; }
+        .bold { font-weight: bold; }
+        .titulo-row { font-size: 16px; margin-bottom: 6px; }
+        .campo { display: flex; margin-bottom: 2px; }
+        .campo .lbl { width: 64px; flex-shrink: 0; font-weight: bold; }
+        .campo .val { flex: 1; }
+        .header-tabla { margin: 8px 0 3px; }
         .total-fila { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; }
-        .item-box { display: flex; gap: 6px; margin-bottom: 3px; }
-        .item-num { width: 14px; flex-shrink: 0; font-weight: bold; }
+        .item-box { display: flex; gap: 6px; margin-bottom: 4px; }
+        .item-num { width: 14px; flex-shrink: 0; }
         .item-body { flex: 1; min-width: 0; }
+        .item-desc { margin-bottom: 1px; }
         @page { size: 80mm auto; margin: 0; }
         @media print { body { width: 72mm; margin: 0 auto; } }
       </style></head><body>
-      <div class="centro bold grande">A TU MEDIDA</div>
-      <div class="centro">NOTA DE ENTREGA</div>
-      <div class="centro bold">N° ${nroDoc}</div>
-      <div class="sep"></div>
-      <div class="fila"><span>Nit:</span><span>${cedula||'99'}</span></div>
-      <div class="fila"><span>Cliente:</span><span>${cliente?.nombre||cliTxt}</span></div>
-      <div class="fila"><span>Ciudad:</span><span>${cliente?.ciudad||''}</span></div>
-      <div class="fila"><span>Celular:</span><span>${cliente?.celular||''}</span></div>
-      <div class="fila"><span>Fecha:</span><span>${fmtFecha(fecha)}</span></div>
-      <div class="fila"><span>Vence:</span><span>${fmtFecha(fechaPago)}</span></div>
-      <div class="fila"><span>Vendió:</span><span>${vendedor?.nombre||''}</span></div>
-      <div class="sep"></div>
-      <div class="fila bold"><span>IT.</span><span style="flex:1;padding-left:6px;">CODIGO / ARTICULO</span></div>
-      <div class="sep"></div>
+      <div class="fila bold titulo-row"><span>NOTA ENTREGA</span><span>${fmtInt(nroDoc)}</span></div>
+      <div class="campo"><span class="lbl">Nit.:</span><span class="val">${cedula||'99'}</span></div>
+      <div class="campo"><span class="lbl">Cliente:</span><span class="val">${cliente?.nombre||cliTxt}</span></div>
+      <div class="campo"><span class="lbl">Dirección:</span><span class="val">${cliente?.direccion||''}</span></div>
+      <div class="campo"><span class="lbl">Ciudad</span><span class="val">${cliente?.ciudad||''}</span></div>
+      <div class="campo"><span class="lbl">Celular</span><span class="val">${cliente?.celular||''}</span></div>
+      <div class="campo"><span class="lbl">Fecha</span><span class="val">${fmtFecha(fecha)}</span></div>
+      <div class="campo"><span class="lbl">Vence:</span><span class="val">${fmtFecha(fechaPago)}</span></div>
+      <div class="campo"><span class="lbl">Vendió:</span><span class="val">${vendedor?.nombre||''}</span></div>
+      <div class="fila bold header-tabla"><span>TEM CODIGO</span><span>ARTICULO</span></div>
       ${(lineas||[]).map((l,i)=>`
         <div class="item-box">
           <div class="item-num">${i+1}</div>
           <div class="item-body">
+            <div class="item-desc">${l.codartic} ${l.descartic||''}${l.marca?' - '+l.marca:''}</div>
             <div class="fila">
-              <span>${l.codartic}</span>
-              <span>${(l.descartic||'').substring(0,18)} - ${l.talla||''}</span>
-            </div>
-            <div class="fila">
-              <span>${l.cantidad} u.</span>
-              <span>${fmt(l.valunit)}</span>
-              <span class="bold">${fmt(l.valtotal)}</span>
+              <span>${l.cantidad}</span>
+              <span>${fmtInt(l.valunit)}</span>
+              <span class="bold">${fmtInt(l.valtotal)}</span>
             </div>
           </div>
         </div>
       `).join('')}
-      <div class="sep"></div>
-      <div class="fila"><span>Sub-Total $</span><span>${fmt(subtotal)}</span></div>
-      <div class="fila"><span>Dscto $</span><span>${fmt(totDcto)}</span></div>
-      <div class="fila"><span>Iva $</span><span>${fmt(totIva)}</span></div>
-      <div class="sep"></div>
-      <div class="total-fila"><span>TOTAL</span><span>$${fmt(total)}</span></div>
-      ${abonos>0?`<div class="fila"><span>Abonado $</span><span>${fmt(abonos)}</span></div>`:''}
-      ${saldo>0?`<div class="total-fila"><span>SALDO</span><span>$${fmt(saldo)}</span></div>`:''}
-      <div class="sep"></div>
-      <div class="centro">Gracias por su compra</div>
-      <div class="centro">A TU MEDIDA</div>
-      <div style="height:6mm;"></div>
+      <div style="margin-top:6px;">
+        <div class="fila"><span>Sub-Total $</span><span>${fmtInt(subtotal)}</span></div>
+        <div class="fila"><span>Dscto $</span><span>${fmtInt(totDcto)}</span></div>
+        <div class="fila"><span>Iva $</span><span>${fmtInt(totIva)}</span></div>
+        <div class="total-fila"><span>TOTAL</span><span>$${fmtInt(total)}</span></div>
+        ${abonos>0?`<div class="fila"><span>Abonado $</span><span>${fmtInt(abonos)}</span></div>`:''}
+        ${saldo>0?`<div class="total-fila"><span>SALDO</span><span>$${fmtInt(saldo)}</span></div>`:''}
+      </div>
       </body></html>
     `)
     w.document.close(); w.focus()
@@ -170,27 +168,27 @@ export default function PrintNota({ datos, onClose }) {
   function imprimirFactura() {
     const nItems  = (lineas||[]).length
     const esMedia = nItems <= UMBRAL_MEDIA_CARTA
-    const logoAlto  = 72
+    const logoAlto  = 56
     const fuenteBase= 12
-    const firmaTop  = 30
+    const firmaTop  = 18
 
     const w = window.open('','_blank','width=800,height=600')
     w.document.write(`
-      <html><head><title>Nota ${nroDoc}</title>
+      <html><head><meta charset="UTF-8"><title>Nota ${nroDoc}</title>
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         html, body { height: 100%; }
-        body { font-family: Arial, sans-serif; font-size: ${fuenteBase}px; padding: 16mm 14mm; color: #111; }
+        body { font-family: Arial, sans-serif; font-size: ${fuenteBase}px; padding: 8mm 10mm; color: #111; }
         .doc-wrap { display:flex; flex-direction:column; }
         .doc-wrap.media { min-height: 4.5in; justify-content:space-between; }
-        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:2px solid #1a3a6b; padding-bottom:8px; }
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; border-bottom:2px solid #1a3a6b; padding-bottom:5px; }
         .logo-txt { font-size:26px; font-weight:900; color:#1a3a6b; letter-spacing:3px; }
         .subtitulo { font-size:10px; color:#5577aa; letter-spacing:2px; text-transform:uppercase; }
         .doc-titulo { font-size:18px; font-weight:800; color:#1a3a6b; }
-        .seccion { background:#f5f7fb; border:1px solid #c8d5ea; border-radius:4px; padding:6px 10px; margin-bottom:8px; }
-        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-        .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
-        .grid4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; }
+        .seccion { background:#f5f7fb; border:1px solid #c8d5ea; border-radius:4px; padding:5px 10px; margin-bottom:6px; }
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+        .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; }
+        .grid4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:5px; }
         .campo { display:flex; flex-direction:column; }
         .campo-lbl { font-size:10px; font-weight:700; color:#5577aa; text-transform:uppercase; }
         .campo-val { font-size:12px; font-weight:600; border-bottom:1px solid #ddd; padding-bottom:2px; min-height:16px; overflow-wrap:break-word; }
@@ -199,7 +197,7 @@ export default function PrintNota({ datos, onClose }) {
         /* table-layout fijo + colgroup: los anchos de columna quedan iguales en cualquier
            navegador/impresora — con layout automático el ancho se recalcula según el
            contenido y la fuente instalada en cada equipo, que es lo que rompía el cuadro. */
-        table { width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:8px; font-size:${fuenteBase-1}px; page-break-inside:avoid; }
+        table { width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:6px; font-size:${fuenteBase-1}px; page-break-inside:avoid; }
         th { background:#1a3a6b; color:#fff; padding:4px 5px; text-align:center; font-size:${fuenteBase-1}px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         td { padding:3px 5px; border-bottom:1px solid #eee; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         td.item-n { text-align:center; background:#eef2ff; font-weight:700; color:#1a3a6b; }
@@ -224,11 +222,11 @@ export default function PrintNota({ datos, onClose }) {
           </div>
 
           <div class="seccion">
-            <div class="grid2" style="margin-bottom:6px;">
+            <div class="grid2" style="margin-bottom:4px;">
               <div class="campo"><span class="campo-lbl">N° Nota</span><span class="campo-val nota-num">${nroDoc}</span></div>
               <div class="campo"><span class="campo-lbl">Cédula / NIT</span><span class="campo-val">${cedula||'99'}</span></div>
             </div>
-            <div class="campo" style="margin-bottom:6px;">
+            <div class="campo" style="margin-bottom:4px;">
               <span class="campo-lbl">Cliente</span><span class="campo-val cliente-nombre">${cliente?.nombre||cliTxt}</span>
             </div>
             <div class="grid3">
@@ -238,7 +236,7 @@ export default function PrintNota({ datos, onClose }) {
             </div>
           </div>
 
-          <div class="grid4" style="margin-bottom:8px;">
+          <div class="grid4" style="margin-bottom:6px;">
             <div class="campo"><span class="campo-lbl">Fecha</span><span class="campo-val">${fmtFecha(fecha)}</span></div>
             <div class="campo"><span class="campo-lbl">Forma de pago</span><span class="campo-val">${plazo}</span></div>
             <div class="campo"><span class="campo-lbl">Fecha de pago</span><span class="campo-val">${fmtFecha(fechaPago)}</span></div>
