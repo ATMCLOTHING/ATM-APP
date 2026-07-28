@@ -172,7 +172,6 @@ export default function PrintNota({ datos, onClose }) {
     const esMedia = nItems <= UMBRAL_MEDIA_CARTA
     const logoAlto  = 72
     const fuenteBase= 12
-    const descMaxW  = '220px'
     const firmaTop  = 30
 
     const w = window.open('','_blank','width=800,height=600')
@@ -194,12 +193,16 @@ export default function PrintNota({ datos, onClose }) {
         .grid4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; }
         .campo { display:flex; flex-direction:column; }
         .campo-lbl { font-size:10px; font-weight:700; color:#5577aa; text-transform:uppercase; }
-        .campo-val { font-size:12px; font-weight:600; border-bottom:1px solid #ddd; padding-bottom:2px; min-height:16px; }
-        table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:${fuenteBase-1}px; page-break-inside:avoid; }
-        th { background:#1a3a6b; color:#fff; padding:4px 5px; text-align:center; font-size:${fuenteBase-1}px; }
-        td { padding:3px 5px; border-bottom:1px solid #eee; }
+        .campo-val { font-size:12px; font-weight:600; border-bottom:1px solid #ddd; padding-bottom:2px; min-height:16px; overflow-wrap:break-word; }
+        .campo-val.nota-num { font-size:26px; font-weight:900; color:#c0392b; }
+        .campo-val.cliente-nombre { font-size:21px; font-weight:800; color:#111; }
+        /* table-layout fijo + colgroup: los anchos de columna quedan iguales en cualquier
+           navegador/impresora — con layout automático el ancho se recalcula según el
+           contenido y la fuente instalada en cada equipo, que es lo que rompía el cuadro. */
+        table { width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:8px; font-size:${fuenteBase-1}px; page-break-inside:avoid; }
+        th { background:#1a3a6b; color:#fff; padding:4px 5px; text-align:center; font-size:${fuenteBase-1}px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        td { padding:3px 5px; border-bottom:1px solid #eee; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         td.item-n { text-align:center; background:#eef2ff; font-weight:700; color:#1a3a6b; }
-        td.desc { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:${descMaxW}; }
         tr:nth-child(even) { background:#f5f7fc; }
         .totales { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; background:#f0f4ff; border:1px solid #c8d5ea; border-radius:4px; padding:6px 12px; page-break-inside:avoid; }
         .tot-lbl { font-size:10px; color:#5577aa; font-weight:700; text-align:center; text-transform:uppercase; }
@@ -221,10 +224,12 @@ export default function PrintNota({ datos, onClose }) {
           </div>
 
           <div class="seccion">
-            <div class="grid3" style="margin-bottom:6px;">
-              <div class="campo"><span class="campo-lbl">N° Nota</span><span class="campo-val" style="color:#c0392b;font-weight:900;">${nroDoc}</span></div>
+            <div class="grid2" style="margin-bottom:6px;">
+              <div class="campo"><span class="campo-lbl">N° Nota</span><span class="campo-val nota-num">${nroDoc}</span></div>
               <div class="campo"><span class="campo-lbl">Cédula / NIT</span><span class="campo-val">${cedula||'99'}</span></div>
-              <div class="campo"><span class="campo-lbl">Cliente</span><span class="campo-val">${cliente?.nombre||cliTxt}</span></div>
+            </div>
+            <div class="campo" style="margin-bottom:6px;">
+              <span class="campo-lbl">Cliente</span><span class="campo-val cliente-nombre">${cliente?.nombre||cliTxt}</span>
             </div>
             <div class="grid3">
               <div class="campo"><span class="campo-lbl">Dirección</span><span class="campo-val">${cliente?.direccion||''}</span></div>
@@ -243,6 +248,11 @@ export default function PrintNota({ datos, onClose }) {
 
         <div class="bloque-tabla">
           <table>
+            <colgroup>
+              <col style="width:5%"><col style="width:8%"><col style="width:27%"><col style="width:9%">
+              <col style="width:8%"><col style="width:6%"><col style="width:6%"><col style="width:9%">
+              <col style="width:6%"><col style="width:7%"><col style="width:9%">
+            </colgroup>
             <thead>
               <tr>
                 <th>Ítem</th><th>Código</th><th>Descripción</th><th>Marca</th><th>Género</th>
@@ -254,7 +264,7 @@ export default function PrintNota({ datos, onClose }) {
                 <tr>
                   <td class="item-n">${i+1}</td>
                   <td>${l.codartic}</td>
-                  <td class="desc" title="${l.descartic}">${l.descartic}</td>
+                  <td title="${l.descartic}">${l.descartic}</td>
                   <td>${l.marca||''}</td>
                   <td>${l.genero||''}</td>
                   <td style="text-align:center">${l.talla}</td>
