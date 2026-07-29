@@ -27,6 +27,12 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
     const totalAbonos  = notasActivas.reduce((s,n)=>s+(n.valabono||0),0)
     const totalPrendas = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
 
+    // cedvended con cédula larga (>1000) = vendedor externo; el resto son ventas de mostrador
+    const totalVentasMostrador = notasActivas
+      .filter(n => Number(n.cedvended) <= 1000)
+      .reduce((s,n)=>s+(n.valtotal||0),0)
+    const totalVentasVendedor = totalVentas - totalVentasMostrador
+
     // Vales emitidos en el período
     const {data:valesEmitidos} = await supabase.from('vales')
       .select('valor_original').gte('fecregistr', d).lte('fecregistr', h+'T23:59:59')
@@ -56,7 +62,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
     const topVend = Object.values(porVend).sort((a,b)=>b.total-a.total).slice(0,5)
 
     setMetricas({
-      totalVentas, totalAbonos, totalPrendas, totalVales,
+      totalVentas, totalVentasMostrador, totalVentasVendedor, totalAbonos, totalPrendas, totalVales,
       cantNotas: notasActivas.length,
       cantAnuladas: notasAnuladas.length,
       totalCartera, bajos:bajos||[], topVend,
@@ -143,6 +149,8 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
             ) : metricas && (
               <>
                 <div style={S.metricasGrid}>
+                  <Metrica label="Ventas mostrador"      val={`$${fmt(metricas.totalVentasMostrador)}`} color="#6a1b9a" icon="👗"/>
+                  <Metrica label="Ventas vendedor"       val={`$${fmt(metricas.totalVentasVendedor)}`}  color="#0d47a1" icon="👤"/>
                   <Metrica label="Ventas del período"    val={`$${fmt(metricas.totalVentas)}`}  color="#1a3a6b" icon="💰"/>
                   <Metrica label="Notas creadas"         val={metricas.cantNotas}               color="#2e7d32" icon="📋"/>
                   <Metrica label="Prendas vendidas"      val={metricas.totalPrendas}            color="#e65100" icon="📦"/>
