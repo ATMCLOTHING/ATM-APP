@@ -1,9 +1,9 @@
-name: Respaldo semanal de la base de datos
+name: Respaldo automático de la base de datos
 
 on:
   schedule:
-    # Domingo 8:00 UTC = 3:00 am hora Colombia
-    - cron: '0 8 * * 0'
+    # Miércoles y domingo, 8:00 UTC = 3:00 am hora Colombia
+    - cron: '0 8 * * 0,3'
   workflow_dispatch: {}  # permite ejecutarlo manualmente desde GitHub para probar
 
 jobs:
