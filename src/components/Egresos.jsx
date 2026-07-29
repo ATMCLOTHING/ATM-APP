@@ -101,7 +101,6 @@ export default function Egresos({ supabase, usuario, onClose }) {
       medio_pago:     form.mediopago,
       observaciones:  form.observacio || null,
       usuario:        usuario?.usuario || 'admin',
-      fecregistr:     new Date().toISOString(),
     }
     const { error } = await supabase.from('egresos').insert(reg)
     if (error) { setMsg({ ok:false, txt:'Error: ' + error.message }) }
