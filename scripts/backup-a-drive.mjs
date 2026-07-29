@@ -1,10 +1,17 @@
-// Sube un archivo de respaldo a una carpeta de Google Drive usando una cuenta
-// de servicio de Google. Se usa desde el workflow de GitHub Actions
-// .github/workflows/backup-semanal.yml — no se ejecuta desde la app.
+// Sube un archivo de respaldo a una carpeta de Google Drive, autorizado como
+// la cuenta atmjeans.app@gmail.com (las cuentas de servicio de Google no
+// tienen cupo de almacenamiento propio en Drive personal, por eso se usa
+// autorización OAuth de la cuenta real en vez de una cuenta de servicio).
+// Se usa desde el workflow de GitHub Actions .github/workflows/backup-semanal.yml
+// — no se ejecuta desde la app.
+//
+// El refresh token se genera una sola vez con scripts/setup-google-oauth.mjs.
 //
 // Variables de entorno requeridas:
-//   GOOGLE_SERVICE_ACCOUNT_JSON  -> contenido del JSON de la cuenta de servicio
-//   GDRIVE_FOLDER_ID             -> ID de la carpeta de Drive destino
+//   GDRIVE_CLIENT_ID     -> Client ID de la credencial OAuth "Desktop app"
+//   GDRIVE_CLIENT_SECRET -> Client Secret de esa misma credencial
+//   GDRIVE_REFRESH_TOKEN -> token generado por setup-google-oauth.mjs
+//   GDRIVE_FOLDER_ID     -> ID de la carpeta de Drive destino
 //
 // Uso: node scripts/backup-a-drive.mjs <ruta-del-archivo>
 
@@ -22,19 +29,22 @@ if (!fs.existsSync(filePath)) {
   process.exit(1)
 }
 
-const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+const clientId = process.env.GDRIVE_CLIENT_ID
+const clientSecret = process.env.GDRIVE_CLIENT_SECRET
+const refreshToken = process.env.GDRIVE_REFRESH_TOKEN
 const folderId = process.env.GDRIVE_FOLDER_ID
-if (!folderId) {
-  console.error('Falta la variable de entorno GDRIVE_FOLDER_ID')
-  process.exit(1)
+
+for (const [nombre, valor] of Object.entries({
+  GDRIVE_CLIENT_ID: clientId, GDRIVE_CLIENT_SECRET: clientSecret,
+  GDRIVE_REFRESH_TOKEN: refreshToken, GDRIVE_FOLDER_ID: folderId,
+})) {
+  if (!valor) { console.error(`Falta la variable de entorno ${nombre}`); process.exit(1) }
 }
 
-const auth = new google.auth.GoogleAuth({
-  credentials,
-  scopes: ['https://www.googleapis.com/auth/drive.file'],
-})
+const oauth2Client = new google.auth.OAuth2(clientId, clientSecret)
+oauth2Client.setCredentials({ refresh_token: refreshToken })
 
-const drive = google.drive({ version: 'v3', auth })
+const drive = google.drive({ version: 'v3', auth: oauth2Client })
 
 const nombreArchivo = path.basename(filePath)
 
