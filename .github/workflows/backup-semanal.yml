@@ -1,0 +1,36 @@
+name: Respaldo semanal de la base de datos
+
+on:
+  schedule:
+    # Domingo 8:00 UTC = 3:00 am hora Colombia
+    - cron: '0 8 * * 0'
+  workflow_dispatch: {}  # permite ejecutarlo manualmente desde GitHub para probar
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generar respaldo de la base de datos (pg_dump)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          FECHA=$(date +%Y-%m-%d)
+          echo "FECHA=$FECHA" >> "$GITHUB_ENV"
+          docker run --rm postgres:17 pg_dump "$DATABASE_URL" --no-owner --no-privileges \
+            > "respaldo_atm_${FECHA}.sql"
+          gzip "respaldo_atm_${FECHA}.sql"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias del script de subida
+        run: npm install googleapis
+
+      - name: Subir respaldo a Google Drive
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: node scripts/backup-a-drive.mjs "respaldo_atm_${FECHA}.sql.gz"
