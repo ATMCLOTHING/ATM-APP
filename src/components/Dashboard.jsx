@@ -149,7 +149,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
             ) : metricas && (
               <>
                 <div style={S.metricasGrid}>
-                  <Metrica label="Ventas mostrador"      val={`$${fmt(metricas.totalVentasMostrador)}`} color="#6a1b9a" icon="👗"/>
+                  <Metrica label="Ventas mostrador"      val={`$${fmt(metricas.totalVentasMostrador)}`} color="#6a1b9a" icon="👖"/>
                   <Metrica label="Ventas vendedor"       val={`$${fmt(metricas.totalVentasVendedor)}`}  color="#0d47a1" icon="👤"/>
                   <Metrica label="Ventas del período"    val={`$${fmt(metricas.totalVentas)}`}  color="#1a3a6b" icon="💰"/>
                   <Metrica label="Notas creadas"         val={metricas.cantNotas}               color="#2e7d32" icon="📋"/>
