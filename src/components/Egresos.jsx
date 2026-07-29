@@ -474,7 +474,7 @@ function GestionTipos({ supabase, grupos, detalles, onRecargar }) {
 // ── Gestión de Terceros ───────────────────────────────────────────────────
 function GestionTerceros({ supabase, terceros, onRecargar }) {
   const [sel,   setSel]   = useState(null)
-  const [form,  setForm]  = useState({cedrif:'',nomtercero:'',tipo_tercero:'GENERAL',ciudad:'',telefono:'',celular:'',email:''})
+  const [form,  setForm]  = useState({cedrif:'',nombre:'',tipo_tercero:'GENERAL',ciudad:'',direccion:'',telefono:'',celular:'',email:''})
   const [nuevo, setNuevo] = useState(false)
   const [busy,  setBusy]  = useState(false)
   const [msg,   setMsg]   = useState(null)
@@ -482,17 +482,17 @@ function GestionTerceros({ supabase, terceros, onRecargar }) {
   const S = estilos
 
   const filtrados = terceros.filter(t=>
-    !busq || (t.nomtercero||'').toLowerCase().includes(busq.toLowerCase()) || (t.cedrif||'').includes(busq)
+    !busq || (t.nombre||'').toLowerCase().includes(busq.toLowerCase()) || (t.cedrif||'').includes(busq)
   )
 
   function seleccionar(t) { setSel(t); setForm({...t}); setNuevo(false); setMsg(null) }
-  function limpiar() { setSel(null); setForm({cedrif:'',nomtercero:'',tipo_tercero:'GENERAL',ciudad:'',telefono:'',celular:'',email:''}); setNuevo(true); setMsg(null) }
+  function limpiar() { setSel(null); setForm({cedrif:'',nombre:'',tipo_tercero:'GENERAL',ciudad:'',direccion:'',telefono:'',celular:'',email:''}); setNuevo(true); setMsg(null) }
 
   async function guardar() {
-    if (!form.nomtercero?.trim()) { setMsg({ok:false,txt:'El nombre es obligatorio.'}); return }
+    if (!form.nombre?.trim()) { setMsg({ok:false,txt:'El nombre es obligatorio.'}); return }
     setBusy(true)
-    const payload = { cedrif:form.cedrif||null, nomtercero:form.nomtercero.trim(),
-      tipo_tercero:form.tipo_tercero, ciudad:form.ciudad||null,
+    const payload = { cedrif:form.cedrif||null, nombre:form.nombre.trim(),
+      tipo_tercero:form.tipo_tercero, ciudad:form.ciudad||null, direccion:form.direccion||null,
       telefono:form.telefono||null, celular:form.celular||null,
       email:form.email||null, activo:true }
     const { error } = nuevo
@@ -520,7 +520,7 @@ function GestionTerceros({ supabase, terceros, onRecargar }) {
           {filtrados.map(t=>(
             <div key={t.id} onClick={()=>seleccionar(t)}
               style={{...S.dropItem,background:sel?.id===t.id?'#e3f2fd':'#fff',display:'flex',flexDirection:'column',gap:2}}>
-              <strong style={{fontSize:13}}>{t.nomtercero}</strong>
+              <strong style={{fontSize:13}}>{t.nombre}</strong>
               <span style={{fontSize:11,color:'#888'}}>{t.tipo_tercero}{t.cedrif?` · ${t.cedrif}`:''}</span>
             </div>
           ))}
@@ -529,7 +529,7 @@ function GestionTerceros({ supabase, terceros, onRecargar }) {
 
       {(sel||nuevo) && (
         <div style={{...S.tarjeta,flex:1}}>
-          <div style={S.secTit}>{nuevo?<><span style={{fontSize:18}}>➕</span> Nuevo Tercero</>:<><span style={{fontSize:18}}>✏️</span> Editar — {sel?.nomtercero}</>}</div>
+          <div style={S.secTit}>{nuevo?<><span style={{fontSize:18}}>➕</span> Nuevo Tercero</>:<><span style={{fontSize:18}}>✏️</span> Editar — {sel?.nombre}</>}</div>
           {msg&&<div style={{...S.alerta,background:msg.ok?'#e8f5e9':'#ffebee',color:msg.ok?'#2e7d32':'#c62828',marginBottom:10}}>{msg.txt}</div>}
           <div style={S.fila}>
             <Campo label="Cédula / NIT" w={180}>
@@ -542,7 +542,10 @@ function GestionTerceros({ supabase, terceros, onRecargar }) {
             </Campo>
           </div>
           <Campo label="Nombre / Razón Social *">
-            <input style={S.inp} value={form.nomtercero||''} onChange={e=>setForm(p=>({...p,nomtercero:e.target.value}))} placeholder="Nombre completo…"/>
+            <input style={S.inp} value={form.nombre||''} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Nombre completo…"/>
+          </Campo>
+          <Campo label="Dirección">
+            <input style={S.inp} value={form.direccion||''} onChange={e=>setForm(p=>({...p,direccion:e.target.value}))} placeholder="Dirección completa"/>
           </Campo>
           <div style={S.fila}>
             <Campo label="Ciudad"><input style={S.inp} value={form.ciudad||''} onChange={e=>setForm(p=>({...p,ciudad:e.target.value}))}/></Campo>
