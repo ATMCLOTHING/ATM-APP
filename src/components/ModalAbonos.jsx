@@ -1,6 +1,6 @@
 // src/components/ModalAbonos.jsx
 import { useState, useEffect } from 'react'
-import ModalPin from './ModalPin'
+import ModalAutorizarUsuario from './ModalAutorizarUsuario'
 import { fmtFecha } from '../lib/fecha'
 import { tienePermiso } from '../lib/auth'
 
@@ -88,18 +88,24 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
     setCargando(false)
   }
 
-  // Pide PIN antes de revertir el abono completo
+  // Si quien está en sesión ya está autorizado, se confirma y se ejecuta directo.
+  // Si no, se pide el usuario y contraseña de alguien autorizado para poder continuar.
   function pedirRevertir(abono) {
-    if (!puedeRevertir) { setMsg({ tipo:'err', texto:'❌ No tienes autorización para revertir abonos. Pide a un administrador que te autorice desde Gestión de Usuarios.' }); return }
+    if (puedeRevertir) {
+      if (window.confirm(`¿Revertir el abono de $${fmt(abono.valabono)} del ${fmtFecha(abono.fechaabono)}?`)) ejecutarReversion(abono)
+      return
+    }
     setPinAccion({ tipo: 'revertir', abono })
   }
 
-  // Pide PIN antes de revertir solo una parte del abono
   function pedirRevertirParcial(abono) {
-    if (!puedeRevertir) { setMsg({ tipo:'err', texto:'❌ No tienes autorización para revertir abonos. Pide a un administrador que te autorice desde Gestión de Usuarios.' }); return }
     const valor = Number(valoresRev[abono.id] || 0)
     if (!valor || valor <= 0) { setMsg({ tipo:'err', texto:'Ingresa el valor a revertir.' }); return }
     if (valor >= abono.valabono) { pedirRevertir(abono); return } // si es el total o más, se trata como total
+    if (puedeRevertir) {
+      if (window.confirm(`¿Revertir $${fmt(valor)} del abono de $${fmt(abono.valabono)} del ${fmtFecha(abono.fechaabono)}?`)) ejecutarReversionParcial(abono, valor)
+      return
+    }
     setPinAccion({ tipo: 'revertirParcial', abono, valor })
   }
 
@@ -132,19 +138,23 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
   return (
     <div style={S.fondo}>
       {pinAccion && pinAccion.tipo === 'revertir' && (
-        <ModalPin
+        <ModalAutorizarUsuario
           supabase={supabase}
+          modulo="nota"
+          accion="puede_revertir_abono"
           titulo="Revertir Abono Total"
-          descripcion={`¿Revertir el abono de $${fmt(pinAccion.abono.valabono)} del ${fmtFecha(pinAccion.abono.fechaabono)}? Esta acción requiere autorización.`}
+          descripcion={`¿Revertir el abono de $${fmt(pinAccion.abono.valabono)} del ${fmtFecha(pinAccion.abono.fechaabono)}? Se necesita el usuario y contraseña de una persona autorizada.`}
           onConfirm={() => ejecutarReversion(pinAccion.abono)}
           onClose={() => setPinAccion(null)}
         />
       )}
       {pinAccion && pinAccion.tipo === 'revertirParcial' && (
-        <ModalPin
+        <ModalAutorizarUsuario
           supabase={supabase}
+          modulo="nota"
+          accion="puede_revertir_abono"
           titulo="Revertir Abono Parcial"
-          descripcion={`¿Revertir $${fmt(pinAccion.valor)} del abono de $${fmt(pinAccion.abono.valabono)} del ${fmtFecha(pinAccion.abono.fechaabono)}? Esta acción requiere autorización.`}
+          descripcion={`¿Revertir $${fmt(pinAccion.valor)} del abono de $${fmt(pinAccion.abono.valabono)} del ${fmtFecha(pinAccion.abono.fechaabono)}? Se necesita el usuario y contraseña de una persona autorizada.`}
           onConfirm={() => ejecutarReversionParcial(pinAccion.abono, pinAccion.valor)}
           onClose={() => setPinAccion(null)}
         />
@@ -192,17 +202,14 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
                         style={S.inpRev}
                         value={valoresRev[a.id]||''}
                         onChange={e=>setValoresRev(prev=>({...prev,[a.id]:e.target.value}))}/>
-                      <button onClick={()=>pedirRevertirParcial(a)} disabled={!puedeRevertir}
-                        title={puedeRevertir?'Revertir solo una parte':'No autorizado para revertir abonos'}
-                        style={{...S.btnRevertirParcial, ...(puedeRevertir?{}:S.btnDeshabilitado)}}><span style={{fontSize:14}}>↩</span> Parcial</button>
+                      <button onClick={()=>pedirRevertirParcial(a)} title="Revertir solo una parte" style={S.btnRevertirParcial}><span style={{fontSize:14}}>↩</span> Parcial</button>
                     </div>
                   </td>
                   <td style={{...S.td,textAlign:'center'}}>
                     <button
                       onClick={() => pedirRevertir(a)}
-                      disabled={!puedeRevertir}
-                      title={puedeRevertir?'Revertir este abono por completo':'No autorizado para revertir abonos'}
-                      style={{...S.btnRevertir, ...(puedeRevertir?{}:S.btnDeshabilitado)}}>
+                      title="Revertir este abono por completo"
+                      style={S.btnRevertir}>
                       <span style={{fontSize:14}}>↩</span> Total
                     </button>
                   </td>
@@ -294,7 +301,6 @@ const S = {
   td:         { padding:'5px 8px',borderBottom:'1px solid #eee',fontSize:12 },
   btnRevertir:{ background:'#fff3cd',border:'1px solid #ffc107',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#856404',whiteSpace:'nowrap' },
   btnRevertirParcial:{ background:'#e3f2fd',border:'1px solid #90caf9',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#1565c0',whiteSpace:'nowrap' },
-  btnDeshabilitado:{ background:'#eee',border:'1px solid #ccc',color:'#aaa',cursor:'not-allowed' },
   inpRev:     { width:70,height:24,border:'1px solid #aab8d4',borderRadius:3,padding:'0 4px',fontSize:11,outline:'none' },
   sinAbonos:  { textAlign:'center',color:'#888',padding:'12px 0',fontSize:12 },
   formAbono:  { display:'flex',flexDirection:'column',gap:10,background:'#f8f9ff',borderRadius:6,padding:14,border:'1px solid #c8d5ea',marginTop:10 },
