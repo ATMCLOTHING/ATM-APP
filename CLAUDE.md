@@ -70,17 +70,51 @@ Esto NO cambia el resto de las reglas de cuidado (rol de usuario, revertir si al
 
 \## Estructura del proyecto
 
-\- \[Pendiente: pídele a Claude Code que lo complete leyendo el proyecto — ver instrucciones abajo]
+\- `src/components/` — una vista/modal por archivo (React, sin router): `Dashboard.jsx` es el menú principal; `NotaDeEntrega.jsx`, `Cartera.jsx`, `Articulos.jsx`, `Clientes.jsx`, `Proveedores.jsx`, `CierreCaja.jsx`, `Egresos.jsx`, `Comisiones.jsx`, `Vales.jsx`, `Vendedores.jsx`, `ControlDocumentos.jsx`, `GestionUsuarios.jsx` son los módulos; los `Modal*.jsx` son diálogos que se abren desde esos módulos (ej. `ModalAbonos.jsx`, `ModalAutorizarUsuario.jsx`, `ModalPin.jsx`, `ModalDevolucion.jsx`).
+
+\- `src/lib/` — utilidades compartidas: `auth.js` (sesión en localStorage + `tienePermiso()`), `fecha.js` (`fmtFecha` para DD/MM/AAAA), `supabase.js` (cliente Supabase), `assets.js` (íconos/logo).
+
+\- `App.jsx` — controla login y qué se muestra según `usuario.rol` (algunos roles redirigen directo a un módulo, ver "Roles de usuario" abajo).
+
+\- `supabase/migrations/` — migraciones SQL para `supabase db push` (carpeta nueva, no todo el historial de cambios de BD pasó por aquí — antes se corrían sueltas).
+
+\- `sql/` — respaldos/export de esquema y datos (`backup_esquema.sql`, `backup_datos.sql`), no son migraciones a aplicar.
+
+\- `docs/` — capturas de pantalla y archivos de referencia que la usuaria va dejando para explicarle tareas a Claude Code; algunos son grandes o sensibles y no están en git (ver `.gitignore`).
+
+\- `.github/workflows/backup-automatico.yml` — respaldo semanal automático de la base de datos hacia Google Drive.
 
 
 
 \## Entorno de pruebas vs. producción
 
-\- \[Pendiente: indicar si existe un proyecto de Supabase de pruebas separado, o si todo se trabaja directo sobre el real]
+\- No existe un proyecto de Supabase de pruebas separado: solo está linkeado el proyecto real de ATM-APP (ref `snyaahynqqeotsdvsenw`). Todo cambio de base de datos (migraciones, `db push`, SQL directo) se aplica directo sobre producción — no hay ambiente intermedio donde probar primero.
 
 
 
 \## Roles de usuario
 
-\- \[Pendiente: pídele a Claude Code que liste los roles que encuentre en el código de login/permisos]
+Columna `usuarios.rol` (texto libre, sin restricción en la base de datos). El código de `src/lib/auth.js`, `App.jsx` y `Dashboard.jsx` trata distinto cada valor:
+
+\- \*\*admin\*\*: acceso total sin restricciones (`tienePermiso()` siempre devuelve `true`).
+
+\- \*\*cajera\*\* / \*\*vendedor\*\*: al iniciar sesión entran derecho a "Nota de Entrega" (nunca ven el menú/Dashboard), y ya traen acceso por defecto a varios módulos sin necesidad de marcarlos en Gestión de Usuarios.
+
+\- \*\*bodega\*\*: al iniciar sesión entra derecho a "Artículos", mismo comportamiento que cajera/vendedor.
+
+\- \*\*consulta\*\*: rol "en blanco" a propósito — sin redirección fija ni módulos por defecto. Es el que hay que usar si se necesita un usuario restringido a un solo módulo puntual (marcando solo ese módulo en "Permisos por módulo" desde Gestión de Usuarios).
+
+\- Los permisos granulares por módulo (`usuario_permisos`: puede\_ver/crear/editar/eliminar/anular) se gestionan desde Gestión de Usuarios. Hay además un permiso especial fuera de esa tabla-por-módulo: \*\*puede\_revertir\_abono\*\* (ligado al módulo "nota"), que controla quién puede revertir abonos en el modal de Abonos sin necesitar autorización de otra persona (ver flujo de autorización más abajo).
+
+
+
+\## Autorización de acciones sensibles (step-up auth)
+
+Para acciones sensibles con permiso granular (por ahora: revertir abonos), el botón queda siempre visible para cualquier usuario logueado — no se oculta ni se deshabilita por rol/permiso. La validación ocurre al momento de ejecutar la acción:
+
+\- Si quien tiene la sesión abierta ya está autorizado (admin, o tiene el permiso específico) → solo se pide una confirmación simple y se ejecuta.
+
+\- Si no está autorizado → se abre `ModalAutorizarUsuario.jsx`, que pide usuario y contraseña de una persona que sí esté autorizada, valida contra la tabla `usuarios` y el permiso en `usuario_permisos`, y solo entonces ejecuta la acción.
+
+Este patrón (no el PIN genérico compartido de `ModalPin.jsx`, que sigue usándose sin cambios para anular notas y en Vales) es el que se debe seguir si se agrega autorización a otras acciones sensibles en el futuro.
 
