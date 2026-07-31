@@ -609,9 +609,11 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         })
         if (eComp) throw eComp
       }
-      // Kardex de salida
-      await registrarKardex(datos.codartic, datos.descartic, 'U', 'SALIDA',
-        `Venta nota ${nroDoc} (artículo creado desde nota)`, datos.cantidad, nroDoc)
+      // No se registra Kardex aquí: eso queda para cuando la nota se guarde de
+      // verdad (guardar(), más abajo, ya compara cantidades y registra el
+      // movimiento). Hacerlo en este punto (al solo agregar la línea al borrador)
+      // dejaba movimientos de inventario "fantasma" apuntando a notas que el
+      // usuario podía terminar sin guardar — pasó con las notas 50951/50952/50953.
       // Poner en la línea de la nota
       setLineas(prev => {
         const sig = [...prev]
