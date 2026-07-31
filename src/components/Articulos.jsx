@@ -24,6 +24,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
   const [msg,        setMsg]        = useState(null)
   const [modoNueva,  setModoNueva]  = useState(true)
   const [guardado,   setGuardado]   = useState(false)
+  const [editando,   setEditando]   = useState(false)
   const [marcas,     setMarcas]     = useState([])
   const [provSugg,   setProvSugg]   = useState([])
   const [modal,      setModal]      = useState(null)
@@ -57,7 +58,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
     const ids=idsParam||allIdsRef.current
     const pos=ids.indexOf(id)
     navPosRef.current=pos
-    setModoNueva(false); setGuardado(true)
+    setModoNueva(false); setGuardado(true); setEditando(false)
     setBusy(false)
   }
 
@@ -73,14 +74,14 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
 
   async function nuevoArt(){
     if(modoNueva&&form.descartic){if(!window.confirm('¿Descartar cambios sin guardar?'))return}
-    setForm({...VACIO}); setModoNueva(true); setGuardado(false)
+    setForm({...VACIO}); setModoNueva(true); setGuardado(false); setEditando(false)
     setMsg(null); navPosRef.current=null
     setTimeout(()=>codRef.current?.focus(),100)
   }
 
   function duplicar(){
     const nuevo={...form,codartic:'',existencia:0,cantactual:0,cantfisico:0}
-    setForm(nuevo); setModoNueva(true); setGuardado(false)
+    setForm(nuevo); setModoNueva(true); setGuardado(false); setEditando(false)
     setMsg(null); navPosRef.current=null
     setTimeout(()=>codRef.current?.focus(),100)
   }
@@ -127,7 +128,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
         })
         if (eIns) throw eIns
       }
-      setGuardado(true); setModoNueva(false)
+      setGuardado(true); setModoNueva(false); setEditando(false)
       setMsg({tipo:'ok',texto:`✅ Artículo ${form.codartic} guardado.`})
       const ids=await recargarIds()
       const pos=ids.indexOf(form.codartic)
@@ -172,6 +173,10 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
   }
 
   const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
+  // Al abrir un artículo ya guardado, los campos quedan bloqueados por defecto
+  // (para no alterarlos sin querer mientras se navega entre referencias);
+  // hay que presionar el lápiz para habilitar la edición.
+  const bloqueado = !modoNueva && !editando
 
   return(
     <div style={P.pagina}>
@@ -200,6 +205,18 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
               ? <strong style={{fontSize:18}}>{form.codartic}</strong>
               : <span style={{fontSize:12,opacity:0.7}}>NUEVO</span>}
             {modoNueva&&!guardado&&<span style={P.badgeN}>NUEVO</span>}
+            {!modoNueva&&guardado&&!editando&&(
+              <button onClick={()=>setEditando(true)} title="Editar información del artículo"
+                style={{background:'#ffc107',border:'1px solid #e0a800',borderRadius:5,padding:'3px 9px',cursor:'pointer',fontSize:13,fontWeight:800,color:'#3a2f00'}}>
+                ✏️ Editar
+              </button>
+            )}
+            {!modoNueva&&editando&&(
+              <button onClick={()=>{setEditando(false);cargarDoc(form.codartic)}} title="Bloquear (descarta cambios sin guardar)"
+                style={{background:'rgba(255,255,255,0.25)',border:'1px solid rgba(255,255,255,0.5)',borderRadius:5,padding:'3px 9px',cursor:'pointer',fontSize:13,fontWeight:800,color:'#fff'}}>
+                🔒 Bloquear
+              </button>
+            )}
           </div>
         </div>
 
@@ -230,32 +247,34 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
                 disabled={guardado&&!modoNueva} placeholder="Código"/>
             </Campo>
             <Campo label="DESCRIPCIÓN" w={300}>
-              <input style={P.inp} value={form.descartic} onChange={e=>upd('descartic',e.target.value.toUpperCase())} placeholder="Descripción"/>
+              <input style={P.inp} value={form.descartic} onChange={e=>upd('descartic',e.target.value.toUpperCase())} placeholder="Descripción" disabled={bloqueado}/>
             </Campo>
             <Campo label="TIPO" w={140}>
-              <select style={P.inp} value={form.tipo} onChange={e=>upd('tipo',e.target.value)}>
+              <select style={P.inp} value={form.tipo} onChange={e=>upd('tipo',e.target.value)} disabled={bloqueado}>
                 <option value="">--</option>
                 {TIPOS.map(t=><option key={t}>{t}</option>)}
               </select>
             </Campo>
             <Campo label="GÉNERO" w={130}>
-              <select style={P.inp} value={form.genero} onChange={e=>upd('genero',e.target.value)}>
+              <select style={P.inp} value={form.genero} onChange={e=>upd('genero',e.target.value)} disabled={bloqueado}>
                 <option value="">--</option>
                 {GENEROS.map(g=><option key={g}>{g}</option>)}
               </select>
             </Campo>
             <Campo label="MARCA" w={160}>
               <div style={{display:'flex',gap:3}}>
-                <select style={{...P.inp,flex:1}} value={form.marca} onChange={e=>upd('marca',e.target.value)}>
+                <select style={{...P.inp,flex:1}} value={form.marca} onChange={e=>upd('marca',e.target.value)} disabled={bloqueado}>
                   <option value="">--</option>
                   {marcas.map(m=><option key={m.id} value={m.descmarca}>{m.descmarca}</option>)}
                 </select>
-                <button onClick={()=>setModal('marca')} title="Nueva marca"
-                  style={{...P.inp,width:28,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,background:'#e8f5e9',fontWeight:900,fontSize:14}}>+</button>
+                {!bloqueado && (
+                  <button onClick={()=>setModal('marca')} title="Nueva marca"
+                    style={{...P.inp,width:28,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,background:'#e8f5e9',fontWeight:900,fontSize:14}}>+</button>
+                )}
               </div>
             </Campo>
             <Campo label="ESTADO" w={90}>
-              <select style={P.inp} value={form.estado} onChange={e=>upd('estado',e.target.value)}>
+              <select style={P.inp} value={form.estado} onChange={e=>upd('estado',e.target.value)} disabled={bloqueado}>
                 <option value="A">Activo</option>
                 <option value="I">Inactivo</option>
               </select>
@@ -265,13 +284,13 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
           {/* FILA 2 — proveedor */}
           <div style={P.fila}>
             <Campo label="COD. PROVEEDOR" w={130}>
-              <input style={P.inp} value={form.codproveed} onChange={e=>upd('codproveed',e.target.value)} placeholder="NIT"/>
+              <input style={P.inp} value={form.codproveed} onChange={e=>upd('codproveed',e.target.value)} placeholder="NIT" disabled={bloqueado}/>
             </Campo>
             <Campo label="PROVEEDOR" w={320} rel>
               <div style={{display:'flex',gap:3}}>
                 <div style={{flex:1,position:'relative'}}>
                   <input style={{...P.inp,width:'100%'}} value={form.nomproveed}
-                    onChange={e=>buscarProv(e.target.value)} placeholder="Buscar proveedor…"/>
+                    onChange={e=>buscarProv(e.target.value)} placeholder="Buscar proveedor…" disabled={bloqueado}/>
                   {provSugg.length>0&&(
                     <ul style={P.drop}>
                       {provSugg.map(p=>(
@@ -284,8 +303,10 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
                     </ul>
                   )}
                 </div>
-                <button onClick={()=>setModal('prov')} title="Nuevo proveedor"
-                  style={{...P.inp,width:28,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,background:'#e8f5e9',fontWeight:900,fontSize:14}}>+</button>
+                {!bloqueado && (
+                  <button onClick={()=>setModal('prov')} title="Nuevo proveedor"
+                    style={{...P.inp,width:28,padding:0,cursor:'pointer',textAlign:'center',flexShrink:0,background:'#e8f5e9',fontWeight:900,fontSize:14}}>+</button>
+                )}
               </div>
             </Campo>
           </div>
@@ -293,23 +314,23 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
           {/* FILA 3 — precios */}
           <div style={P.fila}>
             <Campo label="$ COMPRA" w={120}>
-              <input type="number" style={P.inp} value={form.preciocomp} min={0} onChange={e=>upd('preciocomp',Number(e.target.value))}/>
+              <input type="number" style={P.inp} value={form.preciocomp} min={0} onChange={e=>upd('preciocomp',Number(e.target.value))} disabled={bloqueado}/>
             </Campo>
             <Campo label="$ V. MAYOR" w={120}>
-              <input type="number" style={P.inp} value={form.preciovent} min={0} onChange={e=>upd('preciovent',Number(e.target.value))}/>
+              <input type="number" style={P.inp} value={form.preciovent} min={0} onChange={e=>upd('preciovent',Number(e.target.value))} disabled={bloqueado}/>
             </Campo>
             <Campo label="$ V. DETAL" w={120}>
-              <input type="number" style={P.inp} value={form.preciovend} min={0} onChange={e=>upd('preciovend',Number(e.target.value))}/>
+              <input type="number" style={P.inp} value={form.preciovend} min={0} onChange={e=>upd('preciovend',Number(e.target.value))} disabled={bloqueado}/>
             </Campo>
             <Campo label="$ VENDEDOR" w={120}>
-              <input type="number" style={P.inp} value={form.preciovenv} min={0} onChange={e=>upd('preciovenv',Number(e.target.value))}/>
+              <input type="number" style={P.inp} value={form.preciovenv} min={0} onChange={e=>upd('preciovenv',Number(e.target.value))} disabled={bloqueado}/>
             </Campo>
             <Campo label="EXISTENCIAS" w={110}>
               <input type="number" style={{...P.inp,fontWeight:700,color:form.existencia<=form.existminim&&form.existminim>0?'#c62828':'#1a3a6b'}}
-                value={form.existencia} min={0} onChange={e=>upd('existencia',Number(e.target.value))}/>
+                value={form.existencia} min={0} onChange={e=>upd('existencia',Number(e.target.value))} disabled={bloqueado}/>
             </Campo>
             <Campo label="EXIST. MÍN." w={110}>
-              <input type="number" style={P.inp} value={form.existminim} min={0} onChange={e=>upd('existminim',Number(e.target.value))}/>
+              <input type="number" style={P.inp} value={form.existminim} min={0} onChange={e=>upd('existminim',Number(e.target.value))} disabled={bloqueado}/>
             </Campo>
             <Campo label="CANT. FÍSICA" w={110}>
               <input type="number" style={{...P.inp,...P.ro}} value={form.cantfisico} readOnly/>
@@ -333,7 +354,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
             </div>
             <div style={P.btnFila}>
               <IBtn src={WZNEW}      onClick={nuevoArt}             title="Nuevo artículo"/>
-              <IBtn src={WZSAVE}     onClick={guardar}              title="Guardar" disabled={busy}/>
+              <IBtn src={WZSAVE}     onClick={guardar}              title="Guardar" disabled={busy||bloqueado}/>
               <IBtn src={WZDUPLICAR} onClick={duplicar}             title="Duplicar datos"/>
               <IBtn src={WZUNDO}     onClick={()=>{if(modoNueva&&!guardado){setForm({...VACIO});setMsg(null);setTimeout(()=>codRef.current?.focus(),100)}}} title="Revertir" disabled={!modoNueva||guardado}/>
               <IBtn src={WZDELETE}   onClick={eliminar}             title="Eliminar" disabled={modoNueva&&!guardado}/>
