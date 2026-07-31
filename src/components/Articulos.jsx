@@ -92,19 +92,22 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
       const {error}=await supabase.from('articulo').upsert({...form},{onConflict:'codartic'})
       if(error)throw error
 
-      // sincronizar precios y datos en articomp
-      await supabase.from('articomp').update({
+      // sincronizar precios y datos en articomp (tabla que usa la búsqueda al vender:
+      // sin fila aquí el artículo queda invisible para la venta aunque exista en "articulo")
+      const {error:eUpd} = await supabase.from('articomp').update({
         preciocomp:form.preciocomp, preciovent:form.preciovent,
         preciovend:form.preciovend, preciovenv:form.preciovenv,
         descartic:form.descartic, marca:form.marca,
         genero:form.genero, tipo:form.tipo,
       }).eq('codartic',form.codartic)
+      if (eUpd) throw eUpd
 
       // si es artículo nuevo, crear fila en articomp si no existe
-      const {data:existe} = await supabase.from('articomp')
+      const {data:existe, error:eSel} = await supabase.from('articomp')
         .select('codartic').eq('codartic',form.codartic).limit(1)
+      if (eSel) throw eSel
       if (!existe || existe.length === 0) {
-        await supabase.from('articomp').insert({
+        const {error:eIns} = await supabase.from('articomp').insert({
           codartic:   form.codartic,
           descartic:  form.descartic,
           talla:      form.tipotalla || 'U',
@@ -121,6 +124,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
           existminim: form.existminim || 0,
           estado:     form.estado    || 'A',
         })
+        if (eIns) throw eIns
       }
       setGuardado(true); setModoNueva(false)
       setMsg({tipo:'ok',texto:`✅ Artículo ${form.codartic} guardado.`})

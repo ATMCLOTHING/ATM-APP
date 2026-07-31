@@ -588,23 +588,26 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     try {
       const idx = artNoEncontrado.idx
       // Crear en articulo
-      await supabase.from('articulo').upsert({
+      const {error:eArt} = await supabase.from('articulo').upsert({
         codartic: datos.codartic, descartic: datos.descartic,
         tipo:'', tipotalla:'U', genero:'', marca:datos.marca||'',
         preciovent: datos.valunit, preciovend: datos.valunit, preciovenv: datos.valunit,
         preciocomp: 0, existencia: datos.cantidad, existminim: 0, estado:'A',
         usuario: usuario?.usuario || 'sistema',
       }, {onConflict:'codartic'})
-      // Crear en articomp
+      if (eArt) throw eArt
+      // Crear en articomp (tabla que usa la búsqueda al vender: sin esta fila el
+      // artículo queda invisible para la venta aunque exista en "articulo")
       const {data:existeComp} = await supabase.from('articomp')
         .select('codartic').eq('codartic', datos.codartic).limit(1)
       if (!existeComp || !existeComp.length) {
-        await supabase.from('articomp').insert({
+        const {error:eComp} = await supabase.from('articomp').insert({
           codartic: datos.codartic, descartic: datos.descartic,
           talla:'U', tipotalla:'U', tipo:'', marca:datos.marca||'', genero:'',
           preciovent: datos.valunit, preciovend: datos.valunit, preciovenv: datos.valunit,
           preciocomp: 0, existencia: datos.cantidad, existminim: 0, porciva: 0,
         })
+        if (eComp) throw eComp
       }
       // Kardex de salida
       await registrarKardex(datos.codartic, datos.descartic, 'U', 'SALIDA',
