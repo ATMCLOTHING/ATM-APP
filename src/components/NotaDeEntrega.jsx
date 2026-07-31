@@ -16,6 +16,9 @@ import ModalNuevaMarca    from './ModalNuevaMarca'
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 // Redondeo de valores monetarios con decimal: >=0.5 hacia arriba, <0.5 hacia abajo (evita descuadres al aplicar % de descuento)
 const redondear = n => Math.round(Number(n)||0)
+// El descuento se redondea a la moneda física más pequeña que circula en Colombia ($50):
+// un % con decimales (ej. 3,03%) puede dar valores como $19.998 que no existen en efectivo
+const redondearDcto = n => Math.round((Number(n)||0)/50)*50
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 const VACIA = {codartic:'',descartic:'',talla:'',cantidad:0,valunit:0,porciva:0,valiva:0,porcdescue:0,valdescue:0,valtotal:0}
 const FILAS_BASE = 12
@@ -322,7 +325,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   function recalc(lin) {
     const cant = Number(lin.cantidad)||0
     const sub  = cant*(Number(lin.valunit)||0)
-    const dcto = redondear(sub*((Number(lin.porcdescue)||0)/100))
+    const dcto = redondearDcto(sub*((Number(lin.porcdescue)||0)/100))
     const base = sub-dcto
     const iva  = redondear(base*((Number(lin.porciva)||0)/100))
     return {...lin,valdescue:dcto,valiva:iva,valtotal:base+iva}
@@ -352,7 +355,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   const { subtotal, totDcto, totIva, total, saldo, prendas } = useMemo(()=>{
     const subtotal     = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
     const totDctoLinea = detValidas.reduce((s,l)=>s+(l.valdescue||0),0)
-    const dctoGlobal   = redondear(subtotal * ((Number(pDesc)||0)/100))
+    const dctoGlobal   = redondearDcto(subtotal * ((Number(pDesc)||0)/100))
     const totDcto      = totDctoLinea + dctoGlobal
     const baseIva      = subtotal - totDcto
     const totIva       = redondear(baseIva * ((Number(pIva)||0)/100))
@@ -907,44 +910,12 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     if (busy) return
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de registrar abonos.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de registrar abonos.'}); return }
-    if (!guardada) {
-      try {
-        const enc = {
-          numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
-          formapago:plazo, mediopago:medio,
-          codclient:cliente?.id||99,
-          nombreclie:cliente?.nombre||cliTxt,
-          cedrifclie:cedula||cliente?.cedula||'',
-          direcicion:cliente?.direccion||'',
-          celular:cliente?.celular||'',
-          ciudad:cliente?.ciudad||'',
-          departamen:cliente?.departamento||'',
-          nomempresa:cliente?.nom_empresa||'',
-          porcdescue:pDesc, porciva:pIva,
-          subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
-          valabono:abonos, saldo, cedvended:cedVend,
-          cantotal:prendas, anulada:'N',
-          usuario: usuario?.usuario || usuario?.nombre || 'sistema',
-        }
-        const {error:e1} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
-        if (e1) throw e1
-        await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
-        const {error:e2} = await supabase.from('detnotaen').insert(
-          detValidas.map(l=>({
-            numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
-            talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
-            subtotal:Number(l.cantidad)*Number(l.valunit),
-            porciva:l.porciva, valiva:l.valiva,
-            porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
-          }))
-        )
-        if (e2) throw e2
-        setGuardada(true); setModoNueva(false)
-        await recargarIds()
-      } catch(e) {
-        setMsg({tipo:'err',texto:`❌ Error al guardar: ${e.message}`}); return
-      }
-    }
+    // Siempre se vuelve a guardar (aunque "guardada" ya esté en true) para asegurar que
+    // la nota exista en la base antes de abrir el modal: si el estado local queda
+    // desincronizado del servidor, el insert en detabonos falla por la llave foránea
+    // detabonos_numnotaent_fkey al no encontrar la nota.
+    const ok = await guardarSilencioso()
+    if (!ok) return
     setModal('abonos')
   }
 

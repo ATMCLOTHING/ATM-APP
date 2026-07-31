@@ -47,8 +47,10 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
 
   const sumaAbonos = abonos.reduce((s, a) => s + (a.valabono || 0), 0)
   const saldoFinal = valTotalActual - sumaAbonos
+  // Redondeado a $50 (moneda física más pequeña en circulación) para que un % con
+  // decimales no deje valores de descuento que no existen en efectivo (ej. $19.998)
   const descuentoValor = valDesc && Number(valDesc) > 0
-    ? (tipoDesc === 'pct' ? Math.round(saldoFinal * Number(valDesc) / 100) : Number(valDesc))
+    ? (tipoDesc === 'pct' ? Math.round(saldoFinal * Number(valDesc) / 100 / 50) * 50 : Number(valDesc))
     : 0
 
   async function registrarAbono() {
