@@ -88,6 +88,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
     {id:'vales',      icon:'🎫', label:'Consultar Vales', color:'#856404', roles:['admin','cajera','vendedor']},
     {id:'vendedores', icon:'🙋', label:'Vendedores',      color:'#6a1b9a', roles:['admin']},
     {id:'documentos', icon:'📋', label:'Control Documentos', color:'#00838f', roles:['admin']},
+    {id:'log_errores',icon:'🔍', label:'Log de Errores',     color:'#c62828', roles:['admin']},
     {id:'egresos',    icon:'💸', label:'Egresos',            color:'#4527a0', roles:['admin']},
     {id:'comisiones', icon:'💼', label:'Comisiones',         color:'#f57c00', roles:['admin']},
     {id:'usuarios',   icon:'👥', label:'Usuarios',           color:'#c62828', roles:['admin']},

@@ -5,6 +5,7 @@ import ModalNuevoProveedor    from './ModalNuevoProveedor'
 import ModalListadoArticulos  from './ModalListadoArticulos'
 import ModalEntradaMercancia  from './ModalEntradaMercancia'
 import ModalInventario        from './ModalInventario'
+import { logError }           from '../lib/logError'
 
 const VACIO = {
   codartic:'', tipo:'', tipotalla:'U', descartic:'', genero:'', marca:'',
@@ -131,7 +132,10 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
       const ids=await recargarIds()
       const pos=ids.indexOf(form.codartic)
       navPosRef.current=pos
-    } catch(e){setMsg({tipo:'err',texto:`❌ ${e.message}`})}
+    } catch(e){
+      setMsg({tipo:'err',texto:`❌ ${e.message}`})
+      logError(supabase, {modulo:'articulos', accion:'guardar', mensaje:e.message, usuario:usuario?.usuario||usuario?.nombre, detalle:{codartic:form.codartic}})
+    }
     setBusy(false)
   }
 

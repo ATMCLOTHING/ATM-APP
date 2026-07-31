@@ -5,6 +5,7 @@ import ModalBuscarNota    from './ModalBuscarNota'
 import ModalDetalle       from './ModalDetalle'
 import PrintNota, { generarGuiaEnvio } from './PrintNota'
 import { fmtFecha } from '../lib/fecha'
+import { logError } from '../lib/logError'
 import ModalBuscarCliente from './ModalBuscarCliente'
 import ModalEditarCliente from './ModalEditarCliente'
 import ModalNuevoCliente  from './ModalNuevoCliente'
@@ -551,6 +552,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       await recargarIds()
     } catch(e){
       setMsg({tipo:'err',texto:`❌ Error: ${e.message}`})
+      logError(supabase, {modulo:'nota', accion:'guardar', mensaje:e.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
     }
     setBusy(false)
   }
@@ -568,7 +570,10 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     const {error}=await supabase.from('encnotaen').update({
       anulada:'S',fechaanula:hoy(),motivoanula:motivo||'Anulada'
     }).eq('numnotaent',nroDoc)
-    if(error){setMsg({tipo:'err',texto:`❌ ${error.message}`})}
+    if(error){
+      setMsg({tipo:'err',texto:`❌ ${error.message}`})
+      logError(supabase, {modulo:'nota', accion:'anular', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
+    }
     else {
       const {data:det} = await supabase.from('detnotaen').select('codartic,talla,cantidad,descartic').eq('numnotaent',nroDoc)
       for (const l of (det||[])) {
@@ -629,6 +634,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       setMsg({tipo:'ok', texto:`✅ Artículo ${datos.codartic} creado y agregado a la nota.`})
     } catch(e) {
       setMsg({tipo:'err', texto:`❌ Error al crear artículo: ${e.message}`})
+      logError(supabase, {modulo:'nota', accion:'crearArticuloDesdeNota', mensaje:e.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre, detalle:{codartic:datos.codartic}})
     }
     setBusy(false)
   }
@@ -770,6 +776,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       })
     } catch(e) {
       setMsg({tipo:'err', texto:`❌ Error al procesar la devolución: ${e.message}`})
+      logError(supabase, {modulo:'nota', accion:'procesarDevolucion', mensaje:e.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre, detalle:{codartic:l?.codartic}})
     }
     setBusy(false)
   }
@@ -825,6 +832,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       return true
     } catch(e) {
       setMsg({tipo:'err',texto:`❌ Error al guardar: ${e.message}`})
+      logError(supabase, {modulo:'nota', accion:'guardarSilencioso', mensaje:e.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
       return false
     }
   }
@@ -852,6 +860,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       await cargarDoc(nroDoc)
     } catch(e) {
       setMsg({tipo:'err', texto:`❌ Error al aplicar el vale: ${e.message}`})
+      logError(supabase, {modulo:'nota', accion:'aplicarVale', mensaje:e.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre, detalle:{vale:vale.codigo}})
     }
     setBusy(false)
   }
@@ -907,6 +916,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       await cargarDoc(nroDoc)
     } catch(e) {
       setMsg({tipo:'err',texto:`❌ Error: ${e.message}`})
+      logError(supabase, {modulo:'nota', accion:'pagarTodo', mensaje:e.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
     }
     setBusy(false)
   }

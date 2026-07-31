@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import ModalAutorizarUsuario from './ModalAutorizarUsuario'
 import { fmtFecha } from '../lib/fecha'
 import { tienePermiso } from '../lib/auth'
+import { logError } from '../lib/logError'
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -63,7 +64,11 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
       const { error } = await supabase.from('detabonos').insert({
         numnotaent: nroDoc, fechaabono: fecha, valabono: val, mediopago: medio, observacio: obs,
       })
-      if (error) { setMsg({ tipo: 'err', texto: error.message }); setCargando(false); return }
+      if (error) {
+        setMsg({ tipo: 'err', texto: error.message })
+        logError(supabase, {modulo:'nota', accion:'registrarAbono', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre, detalle:{valor:val}})
+        setCargando(false); return
+      }
     }
     const nuevoAbono   = sumaAbonos + val
     const nuevoValDescue = valDescueActual + desc
@@ -78,6 +83,7 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
     }).eq('numnotaent', nroDoc)
     if (eu) {
       setMsg({ tipo: 'err', texto: eu.message })
+      logError(supabase, {modulo:'nota', accion:'registrarAbono_actualizarNota', mensaje:eu.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
     } else {
       const partes = []
       if (val > 0)  partes.push(`abono de $${fmt(val)}`)
@@ -117,7 +123,11 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
     const nuevaSum = sumaAbonos - abono.valabono
     const nuevoSaldo = valTotalActual - nuevaSum
     const { error } = await supabase.from('detabonos').delete().eq('id', abono.id)
-    if (error) { setMsg({ tipo: 'err', texto: `❌ ${error.message}` }); return }
+    if (error) {
+      setMsg({ tipo: 'err', texto: `❌ ${error.message}` })
+      logError(supabase, {modulo:'nota', accion:'ejecutarReversion', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
+      return
+    }
     await supabase.from('encnotaen').update({ valabono: nuevaSum, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
     setMsg({ tipo: 'ok', texto: `✅ Abono de $${fmt(abono.valabono)} revertido en su totalidad.` })
     cargarAbonos()
@@ -130,7 +140,11 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
     const nuevaSum = sumaAbonos - valor
     const nuevoSaldo = valTotalActual - nuevaSum
     const { error } = await supabase.from('detabonos').update({ valabono: nuevoValAbono }).eq('id', abono.id)
-    if (error) { setMsg({ tipo: 'err', texto: `❌ ${error.message}` }); return }
+    if (error) {
+      setMsg({ tipo: 'err', texto: `❌ ${error.message}` })
+      logError(supabase, {modulo:'nota', accion:'ejecutarReversionParcial', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
+      return
+    }
     await supabase.from('encnotaen').update({ valabono: nuevaSum, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
     setMsg({ tipo: 'ok', texto: `✅ Se revirtieron $${fmt(valor)} del abono. Queda con $${fmt(nuevoValAbono)}.` })
     setValoresRev(prev => ({ ...prev, [abono.id]: '' }))

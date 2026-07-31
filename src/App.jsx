@@ -12,6 +12,7 @@ import Cartera         from './components/Cartera'
 import Comisiones      from './components/Comisiones'
 import Clientes        from './components/Clientes'
 import ControlDocumentos from './components/ControlDocumentos'
+import LogErrores      from './components/LogErrores'
 import Egresos         from './components/Egresos'
 import Vales           from './components/Vales'
 import Vendedores      from './components/Vendedores'
@@ -65,6 +66,7 @@ export default function App() {
   if (modulo === 'usuarios')   return <GestionUsuarios  supabase={supabase} usuario={usuario} onClose={onClose} onAyuda={onAyuda}/>
   if (modulo === 'cartera')    return <Cartera          supabase={supabase} usuario={usuario} onClose={onClose} onAyuda={onAyuda}/>
   if (modulo === 'documentos') return <ControlDocumentos supabase={supabase} usuario={usuario} onClose={onClose} onAyuda={onAyuda}/>
+  if (modulo === 'log_errores')return <LogErrores       supabase={supabase} usuario={usuario} onClose={onClose} onAyuda={onAyuda}/>
   if (modulo === 'egresos')    return <Egresos           supabase={supabase} usuario={usuario} onClose={onClose} onAyuda={onAyuda}/>
   if (modulo === 'vales')      return <Vales              supabase={supabase} usuario={usuario} onClose={onClose} onAyuda={onAyuda}/>
   if (modulo === 'vendedores') return <Vendedores          supabase={supabase} usuario={usuario} onClose={onClose} onAyuda={onAyuda}/>
