@@ -14,6 +14,8 @@ import ModalVale          from './ModalVale'
 import ModalNuevaMarca    from './ModalNuevaMarca'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
+// Redondeo de valores monetarios con decimal: >=0.5 hacia arriba, <0.5 hacia abajo (evita descuadres al aplicar % de descuento)
+const redondear = n => Math.round(Number(n)||0)
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 const VACIA = {codartic:'',descartic:'',talla:'',cantidad:0,valunit:0,porciva:0,valiva:0,porcdescue:0,valdescue:0,valtotal:0}
 const FILAS_BASE = 12
@@ -320,9 +322,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   function recalc(lin) {
     const cant = Number(lin.cantidad)||0
     const sub  = cant*(Number(lin.valunit)||0)
-    const dcto = sub*((Number(lin.porcdescue)||0)/100)
+    const dcto = redondear(sub*((Number(lin.porcdescue)||0)/100))
     const base = sub-dcto
-    const iva  = base*((Number(lin.porciva)||0)/100)
+    const iva  = redondear(base*((Number(lin.porciva)||0)/100))
     return {...lin,valdescue:dcto,valiva:iva,valtotal:base+iva}
   }
 
@@ -350,10 +352,10 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   const { subtotal, totDcto, totIva, total, saldo, prendas } = useMemo(()=>{
     const subtotal     = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0)*(Number(l.valunit)||0),0)
     const totDctoLinea = detValidas.reduce((s,l)=>s+(l.valdescue||0),0)
-    const dctoGlobal   = subtotal * ((Number(pDesc)||0)/100)
+    const dctoGlobal   = redondear(subtotal * ((Number(pDesc)||0)/100))
     const totDcto      = totDctoLinea + dctoGlobal
     const baseIva      = subtotal - totDcto
-    const totIva       = baseIva * ((Number(pIva)||0)/100)
+    const totIva       = redondear(baseIva * ((Number(pIva)||0)/100))
     const total        = baseIva + totIva
     const saldo        = total - abonos
     const prendas      = detValidas.reduce((s,l)=>s+(Number(l.cantidad)||0),0)
@@ -948,7 +950,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
 
   return (
     <div style={P.pagina}>
-      {modal==='abonos'        && <ModalAbonos        supabase={supabase} nroDoc={nroDoc} totalNota={total} totalAbonos={abonos} onClose={async()=>{setModal(null);await cargarDoc(nroDoc)}}/>}
+      {modal==='abonos'        && <ModalAbonos        supabase={supabase} usuario={usuario} nroDoc={nroDoc} totalNota={total} totalAbonos={abonos} onClose={async()=>{setModal(null);await cargarDoc(nroDoc)}}/>}
       {modal==='buscarNota'    && <ModalBuscarNota    supabase={supabase} onSelect={id=>{setModal(null);cargarDoc(id)}} onClose={()=>setModal(null)}/>}
       {modal==='detalle'       && <ModalDetalle       nroDoc={nroDoc} lineas={detValidas} onClose={()=>setModal(null)}/>}
       {modal==='print'         && <PrintNota          datos={dataNota} onClose={()=>setModal(null)}/>}

@@ -2,13 +2,15 @@
 import { useState, useEffect } from 'react'
 import ModalPin from './ModalPin'
 import { fmtFecha } from '../lib/fecha'
+import { tienePermiso } from '../lib/auth'
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
-export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, onClose }) {
+export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, totalAbonos, onClose }) {
+  const puedeRevertir = tienePermiso(usuario, 'nota', 'puede_revertir_abono')
   const [abonos,        setAbonos]        = useState([])
   const [fecha,         setFecha]         = useState(hoy())
   const [valor,         setValor]         = useState('')
@@ -88,11 +90,13 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
 
   // Pide PIN antes de revertir el abono completo
   function pedirRevertir(abono) {
+    if (!puedeRevertir) { setMsg({ tipo:'err', texto:'❌ No tienes autorización para revertir abonos. Pide a un administrador que te autorice desde Gestión de Usuarios.' }); return }
     setPinAccion({ tipo: 'revertir', abono })
   }
 
   // Pide PIN antes de revertir solo una parte del abono
   function pedirRevertirParcial(abono) {
+    if (!puedeRevertir) { setMsg({ tipo:'err', texto:'❌ No tienes autorización para revertir abonos. Pide a un administrador que te autorice desde Gestión de Usuarios.' }); return }
     const valor = Number(valoresRev[abono.id] || 0)
     if (!valor || valor <= 0) { setMsg({ tipo:'err', texto:'Ingresa el valor a revertir.' }); return }
     if (valor >= abono.valabono) { pedirRevertir(abono); return } // si es el total o más, se trata como total
@@ -188,14 +192,17 @@ export default function ModalAbonos({ supabase, nroDoc, totalNota, totalAbonos, 
                         style={S.inpRev}
                         value={valoresRev[a.id]||''}
                         onChange={e=>setValoresRev(prev=>({...prev,[a.id]:e.target.value}))}/>
-                      <button onClick={()=>pedirRevertirParcial(a)} title="Revertir solo una parte" style={S.btnRevertirParcial}><span style={{fontSize:14}}>↩</span> Parcial</button>
+                      <button onClick={()=>pedirRevertirParcial(a)} disabled={!puedeRevertir}
+                        title={puedeRevertir?'Revertir solo una parte':'No autorizado para revertir abonos'}
+                        style={{...S.btnRevertirParcial, ...(puedeRevertir?{}:S.btnDeshabilitado)}}><span style={{fontSize:14}}>↩</span> Parcial</button>
                     </div>
                   </td>
                   <td style={{...S.td,textAlign:'center'}}>
                     <button
                       onClick={() => pedirRevertir(a)}
-                      title="Revertir este abono por completo"
-                      style={S.btnRevertir}>
+                      disabled={!puedeRevertir}
+                      title={puedeRevertir?'Revertir este abono por completo':'No autorizado para revertir abonos'}
+                      style={{...S.btnRevertir, ...(puedeRevertir?{}:S.btnDeshabilitado)}}>
                       <span style={{fontSize:14}}>↩</span> Total
                     </button>
                   </td>
@@ -287,6 +294,7 @@ const S = {
   td:         { padding:'5px 8px',borderBottom:'1px solid #eee',fontSize:12 },
   btnRevertir:{ background:'#fff3cd',border:'1px solid #ffc107',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#856404',whiteSpace:'nowrap' },
   btnRevertirParcial:{ background:'#e3f2fd',border:'1px solid #90caf9',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#1565c0',whiteSpace:'nowrap' },
+  btnDeshabilitado:{ background:'#eee',border:'1px solid #ccc',color:'#aaa',cursor:'not-allowed' },
   inpRev:     { width:70,height:24,border:'1px solid #aab8d4',borderRadius:3,padding:'0 4px',fontSize:11,outline:'none' },
   sinAbonos:  { textAlign:'center',color:'#888',padding:'12px 0',fontSize:12 },
   formAbono:  { display:'flex',flexDirection:'column',gap:10,background:'#f8f9ff',borderRadius:6,padding:14,border:'1px solid #c8d5ea',marginTop:10 },

@@ -41,7 +41,7 @@ export default function GestionUsuarios({ supabase, onClose }) {
     setModoNuevo(false)
     const {data:p} = await supabase.from('usuario_permisos').select('*').eq('usuario_id',u.id)
     const map = {}
-    MODULOS.forEach(m=>{ map[m]={puede_ver:false,puede_crear:false,puede_editar:false,puede_eliminar:false,puede_anular:false} })
+    MODULOS.forEach(m=>{ map[m]={puede_ver:false,puede_crear:false,puede_editar:false,puede_eliminar:false,puede_anular:false,puede_revertir_abono:false} })
     ;(p||[]).forEach(p=>{ map[p.modulo]=p })
     setPermisos(map)
     setMsg(null)
@@ -50,7 +50,7 @@ export default function GestionUsuarios({ supabase, onClose }) {
   function nuevoUsuario() {
     setSeleccion(null); setForm({...VACIO}); setModoNuevo(true)
     const map={}
-    MODULOS.forEach(m=>{ map[m]={puede_ver:false,puede_crear:false,puede_editar:false,puede_eliminar:false,puede_anular:false} })
+    MODULOS.forEach(m=>{ map[m]={puede_ver:false,puede_crear:false,puede_editar:false,puede_eliminar:false,puede_anular:false,puede_revertir_abono:false} })
     setPermisos(map); setMsg(null)
   }
 
@@ -231,6 +231,14 @@ export default function GestionUsuarios({ supabase, onClose }) {
                       ))}
                     </tbody>
                   </table>
+                  <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8,background:'#fff8e1',border:'1px solid #ffe082',borderRadius:6,padding:'8px 12px'}}>
+                    <input type="checkbox" id="puede_revertir_abono"
+                      checked={permisos.nota?.puede_revertir_abono||false}
+                      onChange={e=>updPerm('nota','puede_revertir_abono',e.target.checked)}/>
+                    <label htmlFor="puede_revertir_abono" style={{fontSize:12,fontWeight:600,color:'#856404',cursor:'pointer'}}>
+                      Autorizado para revertir abonos (Nota de Entrega)
+                    </label>
+                  </div>
                 </div>
               )}
               {form.rol === 'admin' && (

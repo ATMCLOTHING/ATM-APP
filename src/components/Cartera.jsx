@@ -849,6 +849,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
       {notaAbonosSel && (
         <ModalAbonos
           supabase={supabase}
+          usuario={usuario}
           nroDoc={notaAbonosSel.numnotaent}
           totalNota={notaAbonosSel.valtotal}
           totalAbonos={notaAbonosSel.valabono}
