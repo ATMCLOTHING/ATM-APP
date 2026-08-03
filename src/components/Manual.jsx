@@ -20,9 +20,14 @@ const SECCIONES = [
             ['cajera', 'Cajera del punto de venta', 'Notas de entrega, abonos, vales, cierre de caja'],
             ['vendedor', 'Vendedora externa', 'Sus propias notas y su cartera'],
             ['bodega', 'Encargada de bodega', 'Artículos, proveedores y entradas de mercancía'],
+            ['consulta', 'Uso puntual', 'No trae ningún módulo por defecto — el administrador le asigna manualmente solo los módulos que necesita desde Usuarios'],
             ['PIN', 'Especial', 'Contraseña de autorización para acciones restringidas — solo el admin la conoce'],
           ]
         }
+      },
+      {
+        subtitulo: 'El panel principal',
+        texto: 'Al ingresar ves el panel principal: arriba (solo el administrador) un resumen del día con ventas, prendas vendidas, abonos, cartera pendiente y vales emitidos — puedes cambiar el rango de fechas con los campos Desde/Hasta y el botón 🔍 Consultar. Debajo están los accesos directos a cada módulo según tu rol. El administrador también ve ahí mismo el top de vendedoras del día y las referencias con existencias bajas.'
       },
       {
         subtitulo: 'Cerrar sesión',
@@ -183,18 +188,29 @@ const SECCIONES = [
         texto: 'Haz clic en el ícono 🖨️ Imprimir en la barra de botones. Se abre una vista de impresión optimizada para impresora de tickets de 80mm. Al imprimir, desactiva los encabezados y pies de página en las opciones del diálogo de impresión para que el ticket salga limpio.'
       },
       {
+        subtitulo: 'Cómo generar una guía de envío',
+        pasos: [
+          'Abre o crea la nota del cliente al que le vas a enviar el pedido',
+          'Asegúrate de que el cliente esté seleccionado (con sus datos de dirección y ciudad, si los tiene)',
+          'Haz clic en el ícono 📍 (ubicación) en la barra de botones inferior',
+          'Se genera una etiqueta con los datos del destinatario, lista para pegar en el paquete'
+        ]
+      },
+      {
         subtitulo: 'Botones de la barra inferior — referencia rápida',
         tabla: {
           headers: ['Botón', 'Qué hace'],
           filas: [
+            ['⏮ ◀ ▶ ⏭', 'Ir a la primera, anterior, siguiente o última nota'],
+            ['🔍 (binoculares)', 'Buscar nota'],
             ['📄 (hoja)', 'Nueva nota'],
-            ['Serie Caja/Vendedor', 'Elige la serie para la próxima nota nueva (solo admin)'],
-            ['🔵 (pigmento)', 'Duplicar la nota actual'],
-            ['↩ (revertir)', 'Revertir cambios no guardados a la última versión guardada'],
-            ['🔒/🔓 (candado)', 'Bloquear o desbloquear la nota para edición (requiere PIN)'],
-            ['📊 (resumen)', 'Ver el detalle completo de la nota en pantalla grande'],
-            ['⚖️ (balanza)', 'Dividir la nota entre varios pagadores'],
-            ['🏃 (correr)', 'Anular la nota actual (requiere motivo)'],
+            ['💾 Guardar', 'Guardar la nota'],
+            ['↩ (revertir)', 'Descartar los cambios sin guardar de una nota nueva'],
+            ['🔓/🔒 (candado)', 'Desbloquear una nota guardada para editarla, o bloquearla de nuevo descartando cambios (requiere PIN)'],
+            ['🗑 Anular', 'Anular la nota actual con motivo (solo administrador)'],
+            ['🖨 Imprimir', 'Imprimir el ticket de la nota'],
+            ['📍 (ubicación)', 'Generar la guía de envío del pedido'],
+            ['← Volver al menú', 'Salir de Nota de Entrega y volver al panel principal'],
             ['💵 Abonos', 'Ver historial y registrar abonos'],
             ['💰 Pagar Todo', 'Saldar la nota completa de una vez'],
             ['🎫 Aplicar Vale', 'Usar un vale como parte de pago'],
@@ -321,6 +337,27 @@ const SECCIONES = [
           'Haz clic en el artículo del listado — se carga en el formulario con todos sus datos',
           'Modifica los campos que necesites',
           'Haz clic en 💾 Guardar'
+        ]
+      },
+      {
+        subtitulo: 'Cómo editar una referencia ya guardada',
+        pasos: [
+          'Busca y abre el artículo que quieres modificar',
+          'Junto al código del artículo aparece el botón ✏️ Editar — haz clic en él',
+          'Los campos quedan disponibles para modificar',
+          'Realiza los cambios y haz clic en 💾 Guardar',
+          'Para descartar los cambios sin guardar, haz clic en 🔒 Bloquear'
+        ]
+      },
+      {
+        subtitulo: 'Cómo ver el resumen del inventario',
+        pasos: [
+          'Haz clic en el botón 🔍 (junto al buscador, arriba del listado) que abre el Resumen del inventario',
+          'Elige cómo agrupar el resumen: por Marca, Tipo o Género',
+          'Escribe en el buscador para filtrar el resumen',
+          'Activa o desactiva "Solo activos" según quieras incluir artículos inactivos',
+          'El resumen muestra, por cada grupo, las unidades en existencia, el costo total y el valor de venta',
+          'Haz clic en 🖨 Imprimir si necesitas el reporte en papel'
         ]
       },
       {
@@ -588,6 +625,66 @@ const SECCIONES = [
     ]
   },
   {
+    id: 'documentos',
+    icon: '🗂',
+    titulo: 'Control de Documentos',
+    contenido: [
+      {
+        subtitulo: '¿Qué es y para qué sirve?',
+        texto: 'Solo el administrador tiene acceso a este módulo. Permite llevar el rastro de en qué etapa física está cada nota de entrega: si el documento está en el almacén, en manos de la vendedora, en cuentas por cobrar, ya liquidada o eliminada. Es útil para saber dónde está cada papel cuando la empresa maneja los documentos físicamente además del sistema.'
+      },
+      {
+        subtitulo: 'Cómo cambiar el estado de un documento',
+        pasos: [
+          'Ubica la nota en el listado — puedes filtrar por vendedor, por estado (haciendo clic en las tarjetas de resumen de arriba) o buscar por número, cliente, cédula o vendedor',
+          'En la columna "Cambiar a", haz clic en el ícono del estado al que quieres mover el documento',
+          'El cambio se guarda de inmediato, sin necesidad de un botón adicional'
+        ]
+      },
+      {
+        subtitulo: 'Estados disponibles',
+        tabla: {
+          headers: ['Estado', 'Qué significa'],
+          filas: [
+            ['🏪 Almacén', 'El documento físico está guardado en el almacén'],
+            ['🤝 Vendedor', 'El documento está en manos de la vendedora'],
+            ['📂 Cuentas por Cobrar', 'El documento pasó al área de cartera para gestión de cobro'],
+            ['✅ Liquidada', 'El documento ya se liquidó por completo'],
+            ['🗑 Eliminada', 'El documento físico ya no existe o se descartó'],
+          ]
+        }
+      },
+      {
+        subtitulo: 'Resumen por estado',
+        texto: 'Las tarjetas en la parte superior muestran cuántos documentos hay en cada estado y la suma del saldo pendiente de cada grupo. Haz clic en una tarjeta para filtrar el listado solo por ese estado; haz clic de nuevo para quitar el filtro.'
+      }
+    ]
+  },
+  {
+    id: 'log_errores',
+    icon: '🔍',
+    titulo: 'Log de Errores',
+    contenido: [
+      {
+        subtitulo: '¿Qué es y para qué sirve?',
+        texto: 'Solo el administrador tiene acceso a este módulo. El sistema guarda automáticamente cualquier error que ocurra al intentar guardar una nota, un abono, un vale o un artículo, para que quede un rastro y no se pierda de vista si algo falló, aunque el mensaje de error ya se le haya mostrado al usuario en el momento.'
+      },
+      {
+        subtitulo: 'Cómo revisar los errores registrados',
+        pasos: [
+          'Los errores más recientes aparecen primero',
+          'Por defecto solo se muestran los pendientes — desmarca "Solo pendientes" para ver también los ya revisados',
+          'Cada fila muestra la fecha, el módulo, la acción, el número de nota si aplica, el usuario y el mensaje',
+          'Haz clic en ✓ Marcar revisado una vez hayas verificado y resuelto el caso'
+        ]
+      },
+      {
+        subtitulo: 'Verificar huecos peligrosos',
+        texto: 'El botón 🔎 Verificar ahora revisa que todos los movimientos de inventario, abonos y vales correspondan a notas que realmente existen en el sistema. Si encuentra alguno que apunta a una nota inexistente, lo muestra en una tabla con el origen, el número de nota y las fechas del primer y último registro relacionado, para poder investigarlo.'
+      }
+    ]
+  },
+  {
     id: 'usuarios',
     icon: '👥',
     titulo: 'Usuarios',
@@ -614,8 +711,21 @@ const SECCIONES = [
             ['cajera', 'Notas de entrega, abonos, vales y cierre de caja'],
             ['vendedor', 'Notas de entrega, su cartera y vales'],
             ['bodega', 'Artículos, proveedores y entradas de mercancía'],
+            ['consulta', 'Ningún módulo por defecto — se le asignan uno por uno en "Permisos por módulo"'],
           ]
         }
+      },
+      {
+        subtitulo: 'Vendedor asociado',
+        texto: 'Si el rol elegido es "vendedor", aparece el campo Vendedor asociado: ahí eliges a cuál vendedora (de las registradas en el módulo Vendedores) corresponde ese usuario. Así el sistema sabe cuáles notas y cuál cartera mostrarle cuando inicie sesión.'
+      },
+      {
+        subtitulo: 'Permisos por módulo',
+        texto: 'Para cualquier rol distinto de admin, más abajo en el formulario aparece una tabla de Permisos por módulo, con una columna Ver/Crear/Editar/Eliminar/Anular por cada módulo del sistema. Marca las casillas que necesite ese usuario específico. Los botones "Dar acceso a todos los módulos" y "Quitar acceso a todos" marcan o desmarcan de una sola vez la columna Ver de todos los módulos, para no tener que hacerlo uno por uno.'
+      },
+      {
+        subtitulo: 'Autorizar para revertir abonos',
+        texto: 'Debajo de la tabla de permisos hay una casilla aparte: "Autorizado para revertir abonos (Nota de Entrega)". Solo los usuarios con esta casilla marcada (o el administrador) pueden revertir un abono ya registrado sin necesidad de que otra persona autorizada digite su usuario y contraseña.'
       },
       {
         subtitulo: 'El PIN de administrador',
