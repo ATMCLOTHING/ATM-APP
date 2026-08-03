@@ -787,10 +787,9 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de aplicar un vale.'}); return }
     if (!detValidas.length) { setMsg({tipo:'warn',texto:'Agrega artículos antes de aplicar un vale.'}); return }
     if (saldo <= 0) { setMsg({tipo:'warn',texto:'Esta nota no tiene saldo pendiente.'}); return }
-    if (!guardada) {
-      const ok = await guardarSilencioso()
-      if (!ok) return
-    }
+    // Siempre se vuelve a guardar (aunque "guardada" ya esté en true), mismo motivo que abrirAbonos.
+    const ok = await guardarSilencioso()
+    if (!ok) return
     setModal('vale')
   }
 
@@ -816,6 +815,13 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       }
       const {error:e1} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
       if (e1) throw e1
+      // Igual que en guardar(): comparar cantidades antes/después para ajustar
+      // inventario y dejar rastro en kardex. Sin esto, las notas que se pagan
+      // directo por "Pagar Todo"/Abonos/Vale (sin pasar por el botón Guardar)
+      // nunca descontaban existencia ni quedaban en el kardex.
+      const {data:detAnt} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
+      const cantAnt = {}
+      ;(detAnt||[]).forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantAnt[k]=(cantAnt[k]||0)+Number(l.cantidad) })
       await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
       const {error:e2} = await supabase.from('detnotaen').insert(
         detValidas.map(l=>({
@@ -827,6 +833,20 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         }))
       )
       if (e2) throw e2
+      const cantNueva = {}
+      detValidas.forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantNueva[k]=(cantNueva[k]||0)+Number(l.cantidad) })
+      const todasKeys = new Set([...Object.keys(cantAnt),...Object.keys(cantNueva)])
+      for (const k of todasKeys) {
+        const [cod,tall] = k.split('|')
+        const diff = (cantNueva[k]||0) - (cantAnt[k]||0)
+        if (diff===0) continue
+        await supabase.rpc('ajustar_inventario', {p_codartic:cod, p_talla:tall, p_cantidad:diff})
+        const {data:art} = await supabase.from('articomp')
+          .select('descartic').eq('codartic',cod).eq('talla',tall).limit(1)
+        const tipo_mov = diff > 0 ? 'ENTRADA' : 'SALIDA'
+        const concepto = diff > 0 ? `Ajuste en nota ${nroDoc}` : `Venta nota ${nroDoc}`
+        await registrarKardex(cod, art?.[0]?.descartic||cod, tall, tipo_mov, concepto, diff, nroDoc)
+      }
       setGuardada(true); setModoNueva(false)
       await recargarIds()
       return true
@@ -874,39 +894,12 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     if (!window.confirm(`¿Registrar pago total de $${fmt(saldo)}?`)) return
     setBusy(true)
     try {
-      if (!guardada) {
-        const enc = {
-          numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
-          formapago:plazo, mediopago:medio,
-          codclient:cliente?.id||99,
-          nombreclie:cliente?.nombre||cliTxt,
-          cedrifclie:cedula||cliente?.cedula||'',
-          direcicion:cliente?.direccion||'',
-          celular:cliente?.celular||'',
-          ciudad:cliente?.ciudad||'',
-          departamen:cliente?.departamento||'',
-          nomempresa:cliente?.nom_empresa||'',
-          porcdescue:pDesc, porciva:pIva,
-          subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
-          valabono:abonos, saldo, cedvended:cedVend,
-          cantotal:prendas, anulada:'N',
-          usuario: usuario?.usuario || usuario?.nombre || 'sistema',
-        }
-        const {error:eg} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
-        if (eg) throw eg
-        await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
-        const {error:eg2} = await supabase.from('detnotaen').insert(
-          detValidas.map(l=>({
-            numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
-            talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
-            subtotal:Number(l.cantidad)*Number(l.valunit),
-            porciva:l.porciva, valiva:l.valiva,
-            porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
-          }))
-        )
-        if (eg2) throw eg2
-        setGuardada(true); setModoNueva(false)
-      }
+      // Siempre se vuelve a guardar (aunque "guardada" ya esté en true) para asegurar que
+      // la nota exista en la base antes de insertar el abono: si el estado local queda
+      // desincronizado del servidor, el insert en detabonos falla por la llave foránea
+      // detabonos_numnotaent_fkey al no encontrar la nota (ver abrirAbonos).
+      const ok = await guardarSilencioso()
+      if (!ok) { setBusy(false); return }
       const {error:ea} = await supabase.from('detabonos').insert({
         numnotaent:nroDoc, fechaabono:hoy(), valabono:saldo, mediopago:medio, observacio:'Pago total',
       })
