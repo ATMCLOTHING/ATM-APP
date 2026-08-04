@@ -53,12 +53,14 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
     const vendMap = {}
     ;(vends||[]).forEach(v=>{ vendMap[v.cedula]=v.nombre })
     const porVend = {}
-    notasActivas.forEach(n=>{
-      const k = n.cedvended||'SIN VENDEDOR'
-      if(!porVend[k]) porVend[k]={nombre:vendMap[k]||k,total:0,notas:0}
-      porVend[k].total += n.valtotal||0
-      porVend[k].notas++
-    })
+    notasActivas
+      .filter(n => Number(n.cedvended) <= 1000) // excluye vendedores externos (cédula > 1000) del top
+      .forEach(n=>{
+        const k = n.cedvended||'SIN VENDEDOR'
+        if(!porVend[k]) porVend[k]={nombre:vendMap[k]||k,total:0,notas:0}
+        porVend[k].total += n.valtotal||0
+        porVend[k].notas++
+      })
     const topVend = Object.values(porVend).sort((a,b)=>b.total-a.total).slice(0,5)
 
     setMetricas({
