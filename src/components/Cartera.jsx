@@ -430,34 +430,15 @@ export default function Cartera({ supabase, usuario, onClose }) {
     try {
       for (const d of distribucio) {
         if (d.aplicar <= 0 && d.descuento <= 0) continue
-        if (d.aplicar > 0) {
-          const {error:ea} = await supabase.from('detabonos').insert({
-            numnotaent: String(d.numnotaent),
-            fechaabono: hoy(),
-            valabono:   d.aplicar,
-            mediopago:  medioAbono,
-            observacio: 'Abono cartera',
-          })
-          if (ea) throw ea
-        }
-        // actualizar saldo/total en encnotaen
-        const notaActual = notas.find(n => n.numnotaent === d.numnotaent)
-        const nuevoAbono   = (notaActual?.valabono||0) + d.aplicar
-        const nuevoValTotal = (notaActual?.valtotal||0) - d.descuento
-        const nuevoValDescue = (notaActual?.valdescue||0) + d.descuento
-        const nuevoSaldo   = Math.max(0, nuevoValTotal - nuevoAbono)
-        const nuevoPorcDescue = (nuevoValTotal + nuevoValDescue) > 0
-          ? Number((nuevoValDescue / (nuevoValTotal + nuevoValDescue) * 100).toFixed(2))
-          : 0
-        const {error:eu} = await supabase.from('encnotaen').update({
-          valabono:  nuevoAbono,
-          valtotal:  nuevoValTotal,
-          valdescue: nuevoValDescue,
-          porcdescue: nuevoPorcDescue,
-          saldo:     nuevoSaldo,
-          fecultabon: hoy(),
-        }).eq('numnotaent', String(d.numnotaent))
-        if (eu) throw eu
+        // Abono + saldo de la nota, en una sola transacción (misma función que usan
+        // Nota de Entrega y Abonos, para que un abono nunca quede registrado sin que
+        // el saldo de la nota se actualice, o viceversa).
+        const {error} = await supabase.rpc('registrar_abono_nota', {
+          p_numnotaent: Number(d.numnotaent), p_valor: d.aplicar, p_mediopago: medioAbono,
+          p_observacion: 'Abono cartera', p_fecha: hoy(), p_descuento: d.descuento,
+          p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+        })
+        if (error) throw error
       }
       const totalAplicado = distribucio.reduce((s,d) => s + d.aplicar, 0)
       const totalDescontado = distribucio.reduce((s,d) => s + (d.descuento||0), 0)

@@ -1,0 +1,44 @@
+name: Verificación diaria de notas huérfanas
+
+# Corre el RPC verificar_notas_huerfanas() (ver migración control_consecutivos_notas)
+# todos los días. Si encuentra algún kardex/abono/vale que apunte a una nota de
+# entrega inexistente, dos cosas pasan automáticamente:
+#   1) queda registrado en la tabla log_errores (visible en el módulo "Log de
+#      Errores" de la app, para quien lo revise ahí).
+#   2) el workflow falla, así que GitHub envía un correo de aviso a quien tenga
+#      notificaciones de Actions activas en este repositorio — no depende de que
+#      alguien entre a la app y presione "Verificar ahora".
+# Complementa (no reemplaza) las funciones guardar_nota_completa/registrar_abono_nota/
+# aplicar_vale_nota/anular_nota_completa/revertir_abono_nota, que ya evitan que esto
+# vuelva a ocurrir por diseño (todo el guardado es atómico y artikardex tiene ahora
+# una llave foránea real hacia encnotaen). Esta verificación es la última red de
+# seguridad, por si algún día se toca la base de datos por fuera de esas funciones.
+
+on:
+  schedule:
+    - cron: '30 9 * * *'  # 9:30 UTC = 4:30 am hora Colombia, todos los días
+  workflow_dispatch: {}    # permite ejecutarlo manualmente desde GitHub para probar
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar notas huérfanas y registrar en log_errores
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          RESULTADO=$(docker run --rm -e PGPASSWORD -i postgres:17 psql "$DATABASE_URL" -X -q -t -A -F'|' -c \
+            "select origen, numnotaent, cantidad from verificar_notas_huerfanas();")
+
+          if [ -n "$RESULTADO" ]; then
+            echo "⚠️ Se encontraron notas huérfanas:"
+            echo "$RESULTADO"
+            # Deja rastro en log_errores para que quede visible dentro de la app.
+            DETALLE=$(echo "$RESULTADO" | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+            docker run --rm -i postgres:17 psql "$DATABASE_URL" -X -q -c \
+              "insert into log_errores (modulo, accion, mensaje, usuario) values ('control_consecutivos', 'verificacion_automatica', 'Se encontraron notas huérfanas: ${DETALLE}', 'github-actions');"
+            echo "::error::Se encontraron notas de entrega huérfanas. Revisar el módulo 'Log de Errores' en la app o correr verificar_notas_huerfanas() manualmente."
+            exit 1
+          fi
+
+          echo "✅ Sin notas huérfanas. Todo en orden."

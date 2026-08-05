@@ -60,37 +60,23 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
     if (val <= 0 && desc <= 0) { setMsg({ tipo: 'err', texto: 'Ingresa un valor de abono y/o de descuento.' }); return }
     if (val + desc > saldoFinal + 0.01) { setMsg({ tipo: 'err', texto: `El abono + descuento ($${fmt(val + desc)}) supera el saldo ($${fmt(saldoFinal)}).` }); return }
     setCargando(true)
-    if (val > 0) {
-      const { error } = await supabase.from('detabonos').insert({
-        numnotaent: nroDoc, fechaabono: fecha, valabono: val, mediopago: medio, observacio: obs,
-      })
-      if (error) {
-        setMsg({ tipo: 'err', texto: error.message })
-        logError(supabase, {modulo:'nota', accion:'registrarAbono', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre, detalle:{valor:val}})
-        setCargando(false); return
-      }
-    }
-    const nuevoAbono   = sumaAbonos + val
-    const nuevoValDescue = valDescueActual + desc
-    const nuevoValTotal  = valTotalActual - desc
-    const nuevoSaldo   = nuevoValTotal - nuevoAbono
-    const nuevoPorcDescue = nuevoValTotal + nuevoValDescue > 0
-      ? Number((nuevoValDescue / (nuevoValTotal + nuevoValDescue) * 100).toFixed(2))
-      : 0
-    const { error: eu } = await supabase.from('encnotaen').update({
-      valabono: nuevoAbono, saldo: nuevoSaldo, valtotal: nuevoValTotal,
-      valdescue: nuevoValDescue, porcdescue: nuevoPorcDescue,
-    }).eq('numnotaent', nroDoc)
-    if (eu) {
-      setMsg({ tipo: 'err', texto: eu.message })
-      logError(supabase, {modulo:'nota', accion:'registrarAbono_actualizarNota', mensaje:eu.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
+    // Abono + saldo de la nota, en una sola transacción (evita que quede un abono
+    // insertado sin que el saldo de la nota se actualice, o viceversa).
+    const { data: res, error } = await supabase.rpc('registrar_abono_nota', {
+      p_numnotaent: Number(nroDoc), p_valor: val, p_mediopago: medio,
+      p_observacion: obs, p_fecha: fecha, p_descuento: desc,
+      p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+    })
+    if (error) {
+      setMsg({ tipo: 'err', texto: error.message })
+      logError(supabase, {modulo:'nota', accion:'registrarAbono', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre, detalle:{valor:val}})
     } else {
       const partes = []
       if (val > 0)  partes.push(`abono de $${fmt(val)}`)
       if (desc > 0) partes.push(`descuento de $${fmt(desc)}`)
       setMsg({ tipo: 'ok', texto: `✅ Se registró ${partes.join(' y ')}.` })
       setValor(''); setObs(''); setValDesc('')
-      setValTotalActual(nuevoValTotal); setValDescueActual(nuevoValDescue)
+      setValTotalActual(res.valtotal); setValDescueActual(res.valdescue)
       cargarAbonos()
     }
     setCargando(false)
@@ -120,15 +106,16 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
   // Ejecuta la reversión total después de confirmar PIN
   async function ejecutarReversion(abono) {
     setPinAccion(null)
-    const nuevaSum = sumaAbonos - abono.valabono
-    const nuevoSaldo = valTotalActual - nuevaSum
-    const { error } = await supabase.from('detabonos').delete().eq('id', abono.id)
+    // Revertir el abono (borrar/actualizar) + recalcular el saldo de la nota, atómico.
+    const { error } = await supabase.rpc('revertir_abono_nota', {
+      p_abono_id: abono.id, p_valor_revertir: null,
+      p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+    })
     if (error) {
       setMsg({ tipo: 'err', texto: `❌ ${error.message}` })
       logError(supabase, {modulo:'nota', accion:'ejecutarReversion', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
       return
     }
-    await supabase.from('encnotaen').update({ valabono: nuevaSum, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
     setMsg({ tipo: 'ok', texto: `✅ Abono de $${fmt(abono.valabono)} revertido en su totalidad.` })
     cargarAbonos()
   }
@@ -137,15 +124,15 @@ export default function ModalAbonos({ supabase, usuario, nroDoc, totalNota, tota
   async function ejecutarReversionParcial(abono, valor) {
     setPinAccion(null)
     const nuevoValAbono = abono.valabono - valor
-    const nuevaSum = sumaAbonos - valor
-    const nuevoSaldo = valTotalActual - nuevaSum
-    const { error } = await supabase.from('detabonos').update({ valabono: nuevoValAbono }).eq('id', abono.id)
+    const { error } = await supabase.rpc('revertir_abono_nota', {
+      p_abono_id: abono.id, p_valor_revertir: valor,
+      p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+    })
     if (error) {
       setMsg({ tipo: 'err', texto: `❌ ${error.message}` })
       logError(supabase, {modulo:'nota', accion:'ejecutarReversionParcial', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
       return
     }
-    await supabase.from('encnotaen').update({ valabono: nuevaSum, saldo: nuevoSaldo }).eq('numnotaent', nroDoc)
     setMsg({ tipo: 'ok', texto: `✅ Se revirtieron $${fmt(valor)} del abono. Queda con $${fmt(nuevoValAbono)}.` })
     setValoresRev(prev => ({ ...prev, [abono.id]: '' }))
     cargarAbonos()

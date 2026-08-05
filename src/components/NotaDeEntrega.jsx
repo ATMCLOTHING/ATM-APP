@@ -461,7 +461,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       const saldoReal = Math.max(0, totalReal - abonoReal)
 
       const enc = {
-        numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
+        fechanotae:fecha, fechavence:fechaPago,
         formapago:plazo, mediopago:medio,
         codclient:cliente?.id||99,
         nombreclie:cliente?.nombre||cliTxt,
@@ -474,43 +474,24 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         porcdescue:pDesc, porciva:pIva,
         subtotal, valdescue:totDcto+extraDescue, valiva:totIva, valtotal:totalReal,
         valabono:abonoReal, saldo:saldoReal, cedvended:cedVend,
-        cantotal:prendas, anulada:'N',
-        usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+        cantotal:prendas,
       }
-      const {error:e1}=await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
-      if(e1)throw e1
-      const {data:detAnt} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
-      const cantAnt = {}
-      ;(detAnt||[]).forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantAnt[k]=(cantAnt[k]||0)+Number(l.cantidad) })
-      await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
-      const {error:e2}=await supabase.from('detnotaen').insert(
-        detValidas.map(l=>({
-          numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
+      // Encabezado + detalle + ajuste de inventario + kardex se guardan en una sola
+      // transacción en el servidor (ver migración control_consecutivos_notas): si algo
+      // falla a mitad de camino, Postgres revierte todo — nunca queda la nota a medias.
+      const {data:resGuardar, error:eGuardar} = await supabase.rpc('guardar_nota_completa', {
+        p_numnotaent: Number(nroDoc),
+        p_encabezado: enc,
+        p_detalle: detValidas.map(l=>({
+          codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
           talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
-          subtotal:Number(l.cantidad)*Number(l.valunit),
           porciva:l.porciva, valiva:l.valiva,
           porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
-        }))
-      )
-      if(e2)throw e2
-      const cantNueva = {}
-      detValidas.forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantNueva[k]=(cantNueva[k]||0)+Number(l.cantidad) })
-      const todasKeys = new Set([...Object.keys(cantAnt),...Object.keys(cantNueva)])
-      const avisos = []
-      for (const k of todasKeys) {
-        const [cod,tall] = k.split('|')
-        const diff = (cantNueva[k]||0) - (cantAnt[k]||0)
-        if (diff===0) continue
-        await supabase.rpc('ajustar_inventario', {p_codartic:cod, p_talla:tall, p_cantidad:diff})
-        const {data:art} = await supabase.from('articomp')
-          .select('existencia,descartic').eq('codartic',cod).eq('talla',tall).limit(1)
-        if (art&&art.length&&(art[0].existencia||0)<0)
-          avisos.push(`${cod} T:${tall} (existencia: ${art[0].existencia})`)
-        // Registrar en kardex
-        const tipo_mov = diff > 0 ? 'ENTRADA' : 'SALIDA'
-        const concepto = diff > 0 ? `Ajuste en nota ${nroDoc}` : `Venta nota ${nroDoc}`
-        await registrarKardex(cod, art?.[0]?.descartic||cod, tall, tipo_mov, concepto, diff, nroDoc)
-      }
+        })),
+        p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+      })
+      if (eGuardar) throw eGuardar
+      const avisos = (resGuardar?.avisos||[]).map(a=>`${a.codartic} T:${a.talla} (existencia: ${a.existencia})`)
       setGuardada(true); setModoNueva(false)
 
       // Punto 7: Si el saldo real quedó negativo (devolvió más de lo que compró),
@@ -567,19 +548,18 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   async function ejecutarAnulacion(motivo) {
     setModalAnular(false)
     setBusy(true)
-    const {error}=await supabase.from('encnotaen').update({
-      anulada:'S',fechaanula:hoy(),motivoanula:motivo||'Anulada'
-    }).eq('numnotaent',nroDoc)
+    // Anulación + restauración de inventario de todas las líneas + su kardex, en una
+    // sola transacción (antes era un update y un loop de llamadas separadas: si el
+    // navegador se cerraba a mitad del loop, algunas tallas quedaban sin restaurar).
+    const {error} = await supabase.rpc('anular_nota_completa', {
+      p_numnotaent: Number(nroDoc), p_motivo: motivo||'Anulada',
+      p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+    })
     if(error){
       setMsg({tipo:'err',texto:`❌ ${error.message}`})
       logError(supabase, {modulo:'nota', accion:'anular', mensaje:error.message, numnotaent:nroDoc, usuario:usuario?.usuario||usuario?.nombre})
     }
     else {
-      const {data:det} = await supabase.from('detnotaen').select('codartic,talla,cantidad,descartic').eq('numnotaent',nroDoc)
-      for (const l of (det||[])) {
-        await supabase.rpc('ajustar_inventario', {p_codartic:l.codartic, p_talla:l.talla, p_cantidad:-Number(l.cantidad)})
-        await registrarKardex(l.codartic, l.descartic, l.talla, 'DEVOLUCION', `Anulación nota ${nroDoc}: ${motivo}`, l.cantidad, nroDoc)
-      }
       setAnulada(true)
       setMsg({tipo:'ok',texto:`Nota ${nroDoc} anulada. Inventario restaurado.`})
     }
@@ -797,7 +777,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   async function guardarSilencioso() {
     try {
       const enc = {
-        numnotaent:nroDoc, fechanotae:fecha, fechavence:fechaPago,
+        fechanotae:fecha, fechavence:fechaPago,
         formapago:plazo, mediopago:medio,
         codclient:cliente?.id||99,
         nombreclie:cliente?.nombre||cliTxt,
@@ -810,43 +790,24 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         porcdescue:pDesc, porciva:pIva,
         subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
         valabono:abonos, saldo, cedvended:cedVend,
-        cantotal:prendas, anulada:'N',
-        usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+        cantotal:prendas,
       }
-      const {error:e1} = await supabase.from('encnotaen').upsert(enc,{onConflict:'numnotaent'})
-      if (e1) throw e1
-      // Igual que en guardar(): comparar cantidades antes/después para ajustar
-      // inventario y dejar rastro en kardex. Sin esto, las notas que se pagan
-      // directo por "Pagar Todo"/Abonos/Vale (sin pasar por el botón Guardar)
-      // nunca descontaban existencia ni quedaban en el kardex.
-      const {data:detAnt} = await supabase.from('detnotaen').select('codartic,talla,cantidad').eq('numnotaent',nroDoc)
-      const cantAnt = {}
-      ;(detAnt||[]).forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantAnt[k]=(cantAnt[k]||0)+Number(l.cantidad) })
-      await supabase.from('detnotaen').delete().eq('numnotaent',nroDoc)
-      const {error:e2} = await supabase.from('detnotaen').insert(
-        detValidas.map(l=>({
-          numnotaent:nroDoc, codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
+      // Mismo guardado atómico que guardar(): encabezado + detalle + inventario + kardex
+      // en una sola transacción. Sin esto, las notas que se pagan directo por "Pagar
+      // Todo"/Abonos/Vale (sin pasar por el botón Guardar) podían quedar a medias si el
+      // navegador se cerraba entre uno de los varios pasos que antes se hacían sueltos.
+      const {error:eGuardar} = await supabase.rpc('guardar_nota_completa', {
+        p_numnotaent: Number(nroDoc),
+        p_encabezado: enc,
+        p_detalle: detValidas.map(l=>({
+          codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
           talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
-          subtotal:Number(l.cantidad)*Number(l.valunit),
           porciva:l.porciva, valiva:l.valiva,
           porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
-        }))
-      )
-      if (e2) throw e2
-      const cantNueva = {}
-      detValidas.forEach(l=>{ const k=`${l.codartic}|${l.talla}`; cantNueva[k]=(cantNueva[k]||0)+Number(l.cantidad) })
-      const todasKeys = new Set([...Object.keys(cantAnt),...Object.keys(cantNueva)])
-      for (const k of todasKeys) {
-        const [cod,tall] = k.split('|')
-        const diff = (cantNueva[k]||0) - (cantAnt[k]||0)
-        if (diff===0) continue
-        await supabase.rpc('ajustar_inventario', {p_codartic:cod, p_talla:tall, p_cantidad:diff})
-        const {data:art} = await supabase.from('articomp')
-          .select('descartic').eq('codartic',cod).eq('talla',tall).limit(1)
-        const tipo_mov = diff > 0 ? 'ENTRADA' : 'SALIDA'
-        const concepto = diff > 0 ? `Ajuste en nota ${nroDoc}` : `Venta nota ${nroDoc}`
-        await registrarKardex(cod, art?.[0]?.descartic||cod, tall, tipo_mov, concepto, diff, nroDoc)
-      }
+        })),
+        p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+      })
+      if (eGuardar) throw eGuardar
       setGuardada(true); setModoNueva(false)
       await recargarIds()
       return true
@@ -860,21 +821,12 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   async function aplicarVale(vale, valorAplicado) {
     setBusy(true)
     try {
-      const nuevoSaldoVale = Number(vale.saldo) - valorAplicado
-      await supabase.from('vales').update({
-        saldo: nuevoSaldoVale, estado: nuevoSaldoVale<=0.01?'AGOTADO':'ACTIVO',
-      }).eq('id', vale.id)
-      await supabase.from('vale_movimientos').insert({
-        vale_id: vale.id, tipo:'CONSUMO', valor:valorAplicado, numnotaent:nroDoc,
-        usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+      // Vale + vale_movimientos + abono + saldo de la nota, en una sola transacción.
+      const {error:eVale} = await supabase.rpc('aplicar_vale_nota', {
+        p_vale_id: vale.id, p_numnotaent: Number(nroDoc), p_valor: valorAplicado,
+        p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
       })
-      await supabase.from('detabonos').insert({
-        numnotaent:nroDoc, fechaabono:hoy(), valabono:valorAplicado, mediopago:'Vale',
-        observacio:`Vale ${vale.codigo}`,
-      })
-      await supabase.from('encnotaen').update({
-        valabono: abonos+valorAplicado, saldo: Math.max(0, total-(abonos+valorAplicado)),
-      }).eq('numnotaent', nroDoc)
+      if (eVale) throw eVale
       setModal(null)
       setMsg({tipo:'ok', texto:`✅ Vale ${vale.codigo} aplicado por $${fmt(valorAplicado)}.`})
       await cargarDoc(nroDoc)
@@ -900,11 +852,13 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       // detabonos_numnotaent_fkey al no encontrar la nota (ver abrirAbonos).
       const ok = await guardarSilencioso()
       if (!ok) { setBusy(false); return }
-      const {error:ea} = await supabase.from('detabonos').insert({
-        numnotaent:nroDoc, fechaabono:hoy(), valabono:saldo, mediopago:medio, observacio:'Pago total',
+      // Abono + saldo de la nota en una sola transacción.
+      const {error:ea} = await supabase.rpc('registrar_abono_nota', {
+        p_numnotaent: Number(nroDoc), p_valor: saldo, p_mediopago: medio,
+        p_observacion: 'Pago total', p_fecha: hoy(), p_descuento: 0,
+        p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
       })
       if (ea) throw ea
-      await supabase.from('encnotaen').update({valabono:abonos+saldo, saldo:0}).eq('numnotaent',nroDoc)
       setMsg({tipo:'ok',texto:`✅ Pago total de $${fmt(saldo)} registrado.`})
       await cargarDoc(nroDoc)
     } catch(e) {
