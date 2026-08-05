@@ -620,27 +620,34 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   }
 
 
-  async function registrarKardex(codartic, descartic, talla, tipo_mov, concepto, cantidad, numnotaent) {
-    try {
-      // Leer existencia actual después del movimiento
-      const {data:art} = await supabase.from('articomp')
-        .select('existencia').eq('codartic',codartic).eq('talla',talla||'U').limit(1)
-      const existDespues = art&&art.length ? Number(art[0].existencia) : null
-      await supabase.from('artikardex').insert({
-        codartic, descartic: descartic||codartic, talla: talla||'U',
-        tipo_mov, concepto, cantidad: Math.abs(cantidad),
-        existencia_despues: existDespues,
-        numnotaent: numnotaent || null,
-        usuario: usuario?.usuario || usuario?.nombre || 'sistema',
-      })
-    } catch(e) { console.error('Error registrando kardex:', e) }
-  }
-
   const dataNota={nroDoc,fecha,fechaPago,plazo,medio,cliente,cliTxt,cedula,vendedor,cedVend,lineas:detValidas,subtotal,totDcto,totIva,total,saldo,prendas,abonos}
 
+  // ── IMPRIMIR: si hay contenido real, la nota se guarda ANTES de mostrar el ticket ──
+  // El ticket impreso es lo que el cliente firma como comprobante de la venta — no
+  // puede volver a pasar que quede firmado en papel sin existir de verdad en el
+  // sistema (así se perdieron las notas 51545/51546: se imprimieron y firmaron pero
+  // nunca llegaron a guardarse). Mismo patrón que abrirAbonos/pagarTodo/abrirVale.
+  async function abrirImprimir() {
+    if (busy) return
+    if ((cliente || cliTxt.trim()) && detValidas.length) {
+      setBusy(true)
+      const ok = await guardarSilencioso()
+      setBusy(false)
+      if (!ok) return
+    }
+    setModal('print')
+  }
+
   // ── GUÍA DE ENVÍO: etiqueta con los datos del destinatario, para pegar en el paquete ──
-  function imprimirGuia() {
+  async function imprimirGuia() {
+    if (busy) return
     if (!cliente && !cliTxt.trim()) { setMsg({tipo:'warn',texto:'Ingresa un cliente antes de generar la guía de envío.'}); return }
+    if (detValidas.length) {
+      setBusy(true)
+      const ok = await guardarSilencioso()
+      setBusy(false)
+      if (!ok) return
+    }
     generarGuiaEnvio(dataNota)
   }
 
@@ -659,100 +666,30 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     setDevolverIdx(null)
     setBusy(true)
     try {
-      const cant = Number(cantidadDevuelta)
-      const precioUnitEfectivo = Number(l.valtotal||0) / Number(l.cantidad||1)
-      const valorDevolucion = precioUnitEfectivo * cant
-
-      // 1) Restaurar inventario y registrar en kardex
-      await supabase.rpc('ajustar_inventario', {p_codartic:l.codartic, p_talla:l.talla, p_cantidad:-cant})
-      await registrarKardex(l.codartic, l.descartic, l.talla, 'DEVOLUCION', `Devolución nota ${nroDoc}`, cant, nroDoc)
-
-      // 2) Ajustar (o eliminar) la línea en detnotaen
-      const cantRestante = Number(l.cantidad) - cant
-      if (l.id) {
-        if (cantRestante <= 0) {
-          await supabase.from('detnotaen').delete().eq('id', l.id)
-        } else {
-          const factor = cantRestante / Number(l.cantidad)
-          await supabase.from('detnotaen').update({
-            cantidad: cantRestante,
-            subtotal: Number(l.subtotal||l.cantidad*l.valunit) * factor,
-            valdescue: Number(l.valdescue||0) * factor,
-            valiva: Number(l.valiva||0) * factor,
-            valtotal: Number(l.valtotal||0) * factor,
-          }).eq('id', l.id)
-        }
-      }
-
-      // 3) Recalcular totales de la nota a partir de las líneas restantes
-      const {data:detRestante} = await supabase.from('detnotaen').select('*').eq('numnotaent', nroDoc)
-      const nuevoSubtotal = (detRestante||[]).reduce((s,d)=>s+Number(d.cantidad||0)*Number(d.valunit||0),0)
-      const nuevoDcto     = (detRestante||[]).reduce((s,d)=>s+Number(d.valdescue||0),0)
-      const nuevoIva      = (detRestante||[]).reduce((s,d)=>s+Number(d.valiva||0),0)
-      const nuevoTotal    = (detRestante||[]).reduce((s,d)=>s+Number(d.valtotal||0),0)
-      const nuevaCant     = (detRestante||[]).reduce((s,d)=>s+Number(d.cantidad||0),0)
-
-      // 4) Determinar si corresponde generar vale
-      const saldoActual = saldo // total - abonos, antes de esta devolución
-      let valeMonto = 0
-      let nuevoSaldo
-      if (saldoActual <= 0.01) {
-        // Nota ya estaba totalmente pagada → toda la devolución se convierte en vale
-        valeMonto = valorDevolucion
-        nuevoSaldo = Math.max(0, nuevoTotal - abonos)
-      } else if (valorDevolucion <= saldoActual) {
-        // Reduce lo que falta por pagar, sin generar vale
-        nuevoSaldo = saldoActual - valorDevolucion
-      } else {
-        // Cubre todo el saldo pendiente y el excedente se convierte en vale
-        valeMonto = valorDevolucion - saldoActual
-        nuevoSaldo = 0
-      }
-
-      await supabase.from('encnotaen').update({
-        subtotal:nuevoSubtotal, valdescue:nuevoDcto, valiva:nuevoIva,
-        valtotal:nuevoTotal, saldo:nuevoSaldo, cantotal:nuevaCant,
-      }).eq('numnotaent', nroDoc)
-
-      let valeInfo = null
-      if (valeMonto > 0.01) {
-        const {data:codData} = await supabase.rpc('siguiente_codigo_vale')
-        const codigo = codData || `V-${Date.now()}`
-        const {data:valeIns, error:eVale} = await supabase.from('vales').insert({
-          codigo,
-          cliente_id: cliente?.id || null,
-          cliente_ced: cedula || cliente?.cedula || '',
-          cliente_nombre: cliente?.nombre || cliTxt || 'Cliente general',
-          valor_original: valeMonto,
-          saldo: valeMonto,
-          numnotaent_origen: nroDoc,
-          motivo: `Devolución de ${l.descartic} (${cant} und.)`,
-          estado: 'ACTIVO',
-          usuario: usuario?.usuario || usuario?.nombre || 'sistema',
-        }).select().single()
-        if (eVale) throw eVale
-        await supabase.from('vale_movimientos').insert({
-          vale_id: valeIns.id, tipo:'EMISION', valor:valeMonto, numnotaent:nroDoc,
-          usuario: usuario?.usuario || usuario?.nombre || 'sistema',
-        })
-        valeInfo = {codigo, valor:valeMonto}
-      }
+      if (!l.id) throw new Error('Esta línea no tiene id de detnotaen; recarga la nota e intenta de nuevo.')
+      // Inventario + kardex + línea + totales de la nota + vale (si aplica), todo en
+      // una sola transacción — antes eran varios pasos sueltos.
+      const {data:res, error} = await supabase.rpc('procesar_devolucion_nota', {
+        p_detnotaen_id: l.id, p_cantidad_devuelta: Number(cantidadDevuelta),
+        p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+      })
+      if (error) throw error
 
       setMsg(null)
       await cargarDoc(nroDoc)
       // Siempre se muestra el modal de resultado, tenga o no vale, con opción de imprimir comprobante
       setResultDevolucion({
         nota: nroDoc,
-        descripcion: l.descartic,
-        codartic: l.codartic,
-        talla: l.talla,
-        cantidad: cant,
-        valorDevolucion,
-        saldoAntes: saldoActual,
-        saldoNuevo: nuevoSaldo,
+        descripcion: res.descartic,
+        codartic: res.codartic,
+        talla: res.talla,
+        cantidad: res.cantidad,
+        valorDevolucion: res.valorDevolucion,
+        saldoAntes: res.saldoAntes,
+        saldoNuevo: res.saldoNuevo,
         cliente: cliente?.nombre || cliTxt || 'Cliente general',
         fecha: hoy(),
-        vale: valeInfo,
+        vale: res.vale,
       })
     } catch(e) {
       setMsg({tipo:'err', texto:`❌ Error al procesar la devolución: ${e.message}`})
@@ -1166,8 +1103,8 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
               <IBtn src={WZDELETE} onClick={anularNota}    title={usuario?.rol==='admin' ? "Anular" : "Solo un administrador puede anular"} disabled={anulada||modoNueva||usuario?.rol!=='admin'}/>
             </div>
             <div style={P.btnFila}>
-              <IBtn src={WZPRINT}      onClick={()=>setModal('print')} title="Imprimir"/>
-              <IBtn src={WZUBICACION}  onClick={imprimirGuia}          title="Generar guía de envío"/>
+              <IBtn src={WZPRINT}      onClick={abrirImprimir} title="Imprimir" disabled={busy}/>
+              <IBtn src={WZUBICACION}  onClick={imprimirGuia}  title="Generar guía de envío" disabled={busy}/>
               <IBtn src={WZCLOSE}      onClick={onClose}               title="Volver al menú"/>
             </div>
           </div>
