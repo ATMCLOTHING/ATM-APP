@@ -215,29 +215,41 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
   // Procesa un código ingresado (pistola o manual con Enter).
   // La pistola agrega la talla (2 dígitos) al final de la referencia; lo digitado a mano
   // trae solo la referencia. Como la referencia no tiene longitud fija, primero se busca
-  // el código tal cual, y solo si eso falla se reintenta recortando los últimos 2 dígitos.
+  // el código TAL CUAL fue ingresado (sin tocarlo: hay referencias reales con ceros a la
+  // izquierda, ej. "0301", y quitárselos antes de este primer intento hacía que nunca se
+  // encontraran — cada venta terminaba creando un artículo duplicado sin el cero, ej.
+  // "301"). Solo si ese intento directo falla se prueban variantes: sin ceros a la
+  // izquierda y/o recortando los últimos 2 dígitos (talla que agrega la pistola).
   async function procesarCodigo(txt, idx) {
     if (!txt.trim()) return
-    const cod = extraerCodigo(txt)
+    const raw = txt.trim()
 
     // 1) Intento directo, tal cual fue ingresado
-    let data = await buscarArticomp(cod)
-    let codUsado = cod
+    let data = await buscarArticomp(raw)
+    let codUsado = raw
 
-    // 2) Si no hay match, puede ser pistola con talla incluida: recortar los últimos 2 dígitos y reintentar
+    // 2) Variantes: sin ceros a la izquierda, y/o recortando los últimos 2 dígitos
     if (!data || !data.length) {
-      const recorte = txt.trim().slice(0, -2)
+      const candidatos = []
+      const sinCeros = extraerCodigo(raw)
+      if (sinCeros !== raw) candidatos.push(sinCeros)
+      const recorte = raw.slice(0, -2)
       if (recorte) {
-        const codRecortado = extraerCodigo(recorte)
-        const dataRecorte = await buscarArticomp(codRecortado)
-        if (dataRecorte && dataRecorte.length) { data = dataRecorte; codUsado = codRecortado }
+        candidatos.push(recorte)
+        const recorteSinCeros = extraerCodigo(recorte)
+        if (recorteSinCeros !== recorte) candidatos.push(recorteSinCeros)
+      }
+      for (const candidato of candidatos) {
+        const d = await buscarArticomp(candidato)
+        if (d && d.length) { data = d; codUsado = candidato; break }
       }
     }
 
     if (!data || !data.length) {
-      // No encontrado con ninguno de los dos intentos → ofrecer crear el artículo
+      // No encontrado con ningún intento → ofrecer crear el artículo, respetando
+      // exactamente lo que se escribió (para no volver a crear un duplicado sin ceros)
       setLineas(prev => { const n=[...prev]; n[idx]={...n[idx],codartic:txt}; return n })
-      setArtNoEncontrado({cod, idx})
+      setArtNoEncontrado({cod: raw, idx})
       return
     }
 
