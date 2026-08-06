@@ -236,7 +236,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
 
     w.document.write(`<html><head><meta charset="UTF-8"><title>Cartera Vigente</title>
     <style>
-      @page{size:letter landscape;margin:10mm;}
+      @page{size:letter portrait;margin:10mm;}
       body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}
       h2{color:#1a3a6b;text-align:center;margin:4px 0;}
       .sub{text-align:center;color:#555;margin-bottom:12px;font-size:11px;}
@@ -471,10 +471,11 @@ export default function Cartera({ supabase, usuario, onClose }) {
 
     const w = window.open('','_blank','width=900,height=700')
     w.document.write(`<html><head><meta charset="UTF-8"><title>${titulo}</title>
-    <style>@page{size:letter landscape;margin:10mm;}body{font-family:Arial,sans-serif;font-size:12px;margin:20px}
-    h2{color:#1a3a6b}table{width:100%;border-collapse:collapse}
-    th{background:#1a3a6b;color:#fff;padding:6px 8px;text-align:left}
-    td{padding:5px 8px;border-bottom:1px solid #eee}
+    <style>@page{size:letter portrait;margin:10mm;}body{font-family:Arial,sans-serif;font-size:11px;margin:14px}
+    h2{color:#1a3a6b;font-size:15px}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th{background:#1a3a6b;color:#fff;padding:4px 5px;text-align:left;font-size:10px;word-break:break-word}
+    td{padding:4px 5px;border-bottom:1px solid #eee;overflow-wrap:break-word}
     tr:nth-child(even){background:#f5f7ff}
     .tot{font-weight:bold;background:#e8eaf6!important}
     @media print{button{display:none}}</style></head><body>
@@ -483,13 +484,19 @@ export default function Cartera({ supabase, usuario, onClose }) {
     <button onclick="window.print()" style="margin-bottom:12px;padding:6px 18px;background:#1a3a6b;color:#fff;border:none;borderRadius:4px;cursor:pointer">🖨 Imprimir</button>`)
 
     if (tipo === 'resumen') {
-      w.document.write(`<table><thead><tr><th>Cédula</th><th>Cliente</th><th>Notas</th><th>$ Valor</th><th>$ Abonado</th><th>$ Saldo</th><th>Días mora</th></tr></thead><tbody>`)
+      w.document.write(`<table><colgroup>
+        <col style="width:13%"><col style="width:32%"><col style="width:8%">
+        <col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:5%">
+      </colgroup><thead><tr><th>Cédula</th><th>Cliente</th><th>Notas</th><th>$ Valor</th><th>$ Abonado</th><th>$ Saldo</th><th>Mora</th></tr></thead><tbody>`)
       resumen.forEach(c => {
         w.document.write(`<tr><td>${c.cedula}</td><td>${c.nombre}</td><td style="text-align:right">${c.notas}</td><td style="text-align:right">${fmtM(c.valor)}</td><td style="text-align:right">${fmtM(c.abonado)}</td><td style="text-align:right;color:#c62828;font-weight:bold">${fmtM(c.saldo)}</td><td style="text-align:right">${c.maxMora}</td></tr>`)
       })
       w.document.write(`<tr class="tot"><td colspan="2">TOTALES — ${resumen.length} clientes</td><td style="text-align:right">${notas.length}</td><td style="text-align:right">${fmtM(totales.valor)}</td><td style="text-align:right">${fmtM(totales.abonado)}</td><td style="text-align:right;color:#c62828">${fmtM(totales.saldo)}</td><td></td></tr>`)
     } else {
-      w.document.write(`<table><thead><tr><th>Nota</th><th>Fecha</th><th>Vence</th><th>Cliente</th><th>$ Valor</th><th>$ Abonado</th><th>$ Saldo</th><th>Días nota</th><th>Días vencido</th></tr></thead><tbody>`)
+      w.document.write(`<table><colgroup>
+        <col style="width:7%"><col style="width:10%"><col style="width:10%"><col style="width:26%">
+        <col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:5%"><col style="width:6%">
+      </colgroup><thead><tr><th>Nota</th><th>Fecha</th><th>Vence</th><th>Cliente</th><th>$ Valor</th><th>$ Abonado</th><th>$ Saldo</th><th>D.Nota</th><th>D.Venc</th></tr></thead><tbody>`)
       notas.forEach(n => {
         w.document.write(`<tr><td>${n.numnotaent}</td><td>${fmtFecha(n.fechanotae)}</td><td>${fmtFecha(n.fechavence)}</td><td>${n.nombreclie}</td><td style="text-align:right">${fmtM(n.valtotal)}</td><td style="text-align:right">${fmtM(n.valabono)}</td><td style="text-align:right;color:#c62828;font-weight:bold">${fmtM(n.saldo)}</td><td style="text-align:right">${n.diasNota}</td><td style="text-align:right;color:${colorMora(n.diasVencido)}">${n.diasVencido}</td></tr>`)
       })
