@@ -476,7 +476,11 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         fechanotae:fecha, fechavence:fechaPago,
         formapago:plazo, mediopago:medio,
         codclient:cliente?.id||99,
-        nombreclie:cliente?.nombre||cliTxt,
+        // El nombre visible en pantalla (cliTxt) manda sobre el de la ficha del cliente:
+        // el campo es editable a mano (ej. razón social específica para cédulas
+        // compartidas como "CLIENTE GENERAL") y debe quedar guardado tal como se ve,
+        // no el nombre desactualizado que traía la ficha al momento de buscar la cédula.
+        nombreclie:cliTxt.trim()||cliente?.nombre||'',
         cedrifclie:cedula||cliente?.cedula||'',
         direcicion:cliente?.direccion||'',
         celular:cliente?.celular||'',
@@ -516,7 +520,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
           codigo: codigoVale,
           cliente_id: cliente?.id || null,
           cliente_ced: cedula || cliente?.cedula || '',
-          cliente_nombre: cliente?.nombre || cliTxt || 'Cliente general',
+          cliente_nombre: cliTxt.trim() || cliente?.nombre || 'Cliente general',
           valor_original: montoVale, saldo: montoVale,
           numnotaent_origen: nroDoc,
           motivo: `Devolución con saldo a favor en nota ${nroDoc}`,
@@ -534,7 +538,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
             nota: nroDoc, descripcion: 'Devolución con saldo a favor',
             codartic:'', talla:'', cantidad:'', valorDevolucion: montoVale,
             saldoAntes: 0, saldoNuevo: 0,
-            cliente: cliente?.nombre||cliTxt||'Cliente general',
+            cliente: cliTxt.trim()||cliente?.nombre||'Cliente general',
             fecha: hoy(), vale: {codigo:codigoVale, valor:montoVale},
           })
         }
@@ -699,7 +703,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         valorDevolucion: res.valorDevolucion,
         saldoAntes: res.saldoAntes,
         saldoNuevo: res.saldoNuevo,
-        cliente: cliente?.nombre || cliTxt || 'Cliente general',
+        cliente: cliTxt.trim() || cliente?.nombre || 'Cliente general',
         fecha: hoy(),
         vale: res.vale,
       })
@@ -729,7 +733,7 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         fechanotae:fecha, fechavence:fechaPago,
         formapago:plazo, mediopago:medio,
         codclient:cliente?.id||99,
-        nombreclie:cliente?.nombre||cliTxt,
+        nombreclie:cliTxt.trim()||cliente?.nombre||'',
         cedrifclie:cedula||cliente?.cedula||'',
         direcicion:cliente?.direccion||'',
         celular:cliente?.celular||'',
