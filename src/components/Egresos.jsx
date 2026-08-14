@@ -27,6 +27,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
   const [guardando, setGuardando] = useState(false)
   const [msg,       setMsg]       = useState(null)
   const [form,      setForm]      = useState({...FORM_VACIO})
+  const [editId,    setEditId]    = useState(null)
   const [filtDesde, setFiltDesde] = useState(mes1())
   const [filtHasta, setFiltHasta] = useState(hoy())
   const [filtGrupo, setFiltGrupo] = useState('')
@@ -102,14 +103,49 @@ export default function Egresos({ supabase, usuario, onClose }) {
       observaciones:  form.observacio || null,
       usuario:        usuario?.usuario || 'admin',
     }
-    const { error } = await supabase.from('egresos').insert(reg)
+    let error
+    if (editId) {
+      const { usuario, ...regSinUsuario } = reg
+      ;({ error } = await supabase.from('egresos').update(regSinUsuario).eq('id', editId))
+    } else {
+      ({ error } = await supabase.from('egresos').insert(reg))
+    }
     if (error) { setMsg({ ok:false, txt:'Error: ' + error.message }) }
     else {
-      setMsg({ ok:true, txt:`✅ Egreso registrado — ${fmtM(valtotal())}` })
+      setMsg({ ok:true, txt: editId ? `✅ Egreso actualizado — ${fmtM(valtotal())}` : `✅ Egreso registrado — ${fmtM(valtotal())}` })
+      const veniaDeEditar = !!editId
       setForm({ ...FORM_VACIO })
       setBusqTerc('')
+      setEditId(null)
+      if (veniaDeEditar) { setTab('consultar'); consultar() }
     }
     setGuardando(false)
+  }
+
+  function editarEgreso(e) {
+    setEditId(e.id)
+    setForm({
+      tipoegreso:     e.grupo_id!=null ? String(e.grupo_id) : '',
+      egr_detalle_id: e.egr_detalle_id!=null ? String(e.egr_detalle_id) : '',
+      fechapag:       e.fecha_pago || hoy(),
+      tercero_id:     e.cedrif_benef || '',
+      nomrazben:      e.nombre_benef || '',
+      subdetalle:     e.subdetalle || '',
+      perdesde:       e.per_desde || '',
+      perhasta:       e.per_hasta || '',
+      valorneto:      e.subtotal!=null ? String(e.subtotal) : '',
+      valrecarg:      e.recargos!=null ? String(e.recargos) : '0',
+      valdescue:      e.descuento!=null ? String(e.descuento) : '0',
+      mediopago:      e.medio_pago || 'EFECTIVO',
+      observacio:     e.observaciones || '',
+    })
+    setBusqTerc(e.nombre_benef || '')
+    setMsg(null)
+    setTab('registrar')
+  }
+
+  function cancelarEdicion() {
+    setForm({ ...FORM_VACIO }); setBusqTerc(''); setMsg(null); setEditId(null)
   }
 
   async function consultar() {
@@ -186,7 +222,11 @@ export default function Egresos({ supabase, usuario, onClose }) {
         {/* ══ TAB REGISTRAR ══ */}
         {tab==='registrar' && (
           <div style={S.tarjeta}>
-            <div style={S.secTit}><span style={{fontSize:18}}>📝</span> Nuevo Egreso</div>
+            <div style={S.secTit}>
+              {editId
+                ? <><span style={{fontSize:18}}>✏️</span> Editar Egreso #{editId}</>
+                : <><span style={{fontSize:18}}>📝</span> Nuevo Egreso</>}
+            </div>
             <div style={S.fila}>
               <Campo label="Tipo de Egreso *" w={260}>
                 <select style={S.inp} value={form.tipoegreso} onChange={e=>setF('tipoegreso',e.target.value)}>
@@ -279,10 +319,11 @@ export default function Egresos({ supabase, usuario, onClose }) {
               <span style={{fontSize:13,fontWeight:700,color:'#333'}}>TOTAL A PAGAR</span>
               <span style={{fontSize:22,fontWeight:900,color:'#1a3a6b'}}>{fmtM(valtotal())}</span>
               <button onClick={guardar} disabled={guardando} style={S.btnGuardar}>
-                <span style={{fontSize:16}}>💾</span> {guardando?'Guardando…':'Guardar Egreso'}
+                <span style={{fontSize:16}}>💾</span> {guardando?'Guardando…':(editId?'Actualizar Egreso':'Guardar Egreso')}
               </button>
-              <button onClick={()=>{ setForm({...FORM_VACIO}); setBusqTerc(''); setMsg(null) }}
-                style={S.btnLimpiar}><span style={{fontSize:16}}>🧹</span> Limpiar</button>
+              <button onClick={cancelarEdicion} style={S.btnLimpiar}>
+                <span style={{fontSize:16}}>🧹</span> {editId?'Cancelar edición':'Limpiar'}
+              </button>
             </div>
           </div>
         )}
@@ -321,7 +362,7 @@ export default function Egresos({ supabase, usuario, onClose }) {
             <div style={{overflowX:'auto'}}>
               <table style={S.tabla}>
                 <thead><tr style={S.thead}>
-                  {['Fecha','Tipo','Detalle','Beneficiario','Observación','Total','Medio','Usuario'].map(h=>(
+                  {['Fecha','Tipo','Detalle','Beneficiario','Observación','Total','Medio','Usuario',''].map(h=>(
                     <th key={h} style={{...S.th,textAlign:h==='Total'?'right':'left'}}>{h}</th>
                   ))}
                 </tr></thead>
@@ -336,9 +377,13 @@ export default function Egresos({ supabase, usuario, onClose }) {
                       <td style={{...S.td,textAlign:'right',fontWeight:700}}>{fmtM(e.total)}</td>
                       <td style={S.td}>{e.medio_pago}</td>
                       <td style={{...S.td,color:'#888'}}>{e.usuario}</td>
+                      <td style={S.td}>
+                        <button onClick={()=>editarEgreso(e)} title="Editar egreso"
+                          style={{background:'none',border:'none',cursor:'pointer',fontSize:15}}>✏️</button>
+                      </td>
                     </tr>
                   ))}
-                  {egresos.length===0&&!cargando&&<tr><td colSpan={8} style={{textAlign:'center',padding:20,color:'#aaa'}}>Sin registros en este período.</td></tr>}
+                  {egresos.length===0&&!cargando&&<tr><td colSpan={9} style={{textAlign:'center',padding:20,color:'#aaa'}}>Sin registros en este período.</td></tr>}
                 </tbody>
               </table>
             </div>

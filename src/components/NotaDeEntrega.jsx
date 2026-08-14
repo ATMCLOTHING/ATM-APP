@@ -283,12 +283,15 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     setLineas(prev => {
       const sig = [...prev]
       const cod = art.codartic
-      const existeIdx = sig.findIndex((l,i) => l.codartic===cod && l.talla===art.talla)
+      const existeIdx = sig.findIndex((l,i) => i!==idx && l.codartic===cod && l.talla===art.talla)
       if (existeIdx >= 0) {
-        // Ya existe → sumar cantidad
+        // Ya existe → sumar cantidad y dejar el cursor al final para seguir
+        // ingresando referencias distintas (no en la línea que ya tenía cantidad,
+        // porque con el movimiento de ATM eso obligaba a bajar a mano y generaba
+        // errores por escribir en la línea equivocada)
         sig[existeIdx] = recalc({...sig[existeIdx], cantidad: Number(sig[existeIdx].cantidad||0)+1})
         sig[idx] = {...VACIA} // limpiar la fila donde se escribió si era diferente
-        targetIdx = existeIdx >= idx ? idx : existeIdx
+        targetIdx = sig.length - 1
       } else {
         // Nueva línea
         const precio = precioSegunTipo(art)
@@ -305,14 +308,17 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     setTimeout(() => focoEnCodigo(targetIdx), 80)
   }
 
-  // Elegir artículo desde dropdown (manual) → foco en cantidad
+  // Elegir artículo desde dropdown (manual) → foco en cantidad, salvo que sea una
+  // referencia repetida (ahí el foco va al final, igual que en modo pistola)
   function elegirArt(art, idx) {
+    let targetIdx = null // null = foco en cantidad de idx (comportamiento normal)
     setLineas(prev => {
       const sig = [...prev]
       const existeIdx = sig.findIndex((l,i) => i!==idx && l.codartic===art.codartic && l.talla===art.talla)
       if (existeIdx >= 0) {
         sig[existeIdx] = recalc({...sig[existeIdx], cantidad: Number(sig[existeIdx].cantidad||0)+1})
         sig[idx] = {...VACIA}
+        targetIdx = sig.length - 1
       } else {
         const precio = precioSegunTipo(art)
         sig[idx] = recalc({...sig[idx], codartic:art.codartic, descartic:art.descartic,
@@ -323,7 +329,8 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
       return sig
     })
     setArtSugg([]); setArtIdx(null)
-    focoEnCantidad(idx) // manual → va a cantidad para editar
+    if (targetIdx !== null) focoEnCodigo(targetIdx)
+    else focoEnCantidad(idx) // manual → va a cantidad para editar
   }
 
   async function buscarDesc(txt, idx) {
