@@ -18,6 +18,17 @@ const S = {
   lNom:    { fontSize:13,fontWeight:'bold',color:'#1a1a2e' },
   lSub:    { fontSize:11,color:'#666' },
   lEmpty:  { padding:40,textAlign:'center',color:'#999',fontSize:13 },
+  selBar:  { padding:'8px 12px',borderBottom:'1px solid #eee',display:'flex',flexDirection:'column',gap:6,background:'#fafafa',flexShrink:0 },
+  selRow:  { display:'flex',gap:6,alignItems:'center' },
+  selLbl:  { fontSize:10,fontWeight:'bold',color:'#555' },
+  selInp:  { width:64,border:'1px solid #ccc',borderRadius:4,padding:'4px 6px',fontSize:11 },
+  selBtn:  { background:'#1a1a2e',color:'#fff',border:'none',borderRadius:4,padding:'4px 10px',fontSize:11,cursor:'pointer',fontWeight:'bold' },
+  selBtnSec:{ background:'#eee',color:'#333',border:'none',borderRadius:4,padding:'4px 10px',fontSize:11,cursor:'pointer',fontWeight:'bold' },
+  selInfo: { fontSize:11,color:'#666',marginLeft:'auto' },
+  lFilaRow:{ display:'flex',alignItems:'flex-start',gap:8,padding:'8px 12px',borderBottom:'1px solid #f0f0f0' },
+  lFilaRowSel:{ display:'flex',alignItems:'flex-start',gap:8,padding:'8px 12px',borderBottom:'1px solid #f0f0f0',background:'#e8eaf6' },
+  lChk:    { marginTop:3,cursor:'pointer',flexShrink:0 },
+  lContenido:{ flex:1,display:'flex',flexDirection:'column',gap:2,cursor:'pointer',minWidth:0 },
   form:    { flex:1,padding:20,overflowY:'auto',display:'flex',flexDirection:'column',gap:14 },
   fTitulo: { fontSize:15,fontWeight:'bold',color:'#1a1a2e',borderBottom:'2px solid #1a1a2e',paddingBottom:8,marginBottom:4 },
   fila:    { display:'flex',gap:14 },
@@ -58,6 +69,9 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
   const [guardando,  setGuardando]  = useState(false)
   const [msg,        setMsg]        = useState(null)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [seleccionados, setSeleccionados] = useState(new Set())
+  const [cedDesde,   setCedDesde]   = useState('')
+  const [cedHasta,   setCedHasta]   = useState('')
   const busqTimer = useRef(null)
 
   useEffect(() => { cargar('') }, [])
@@ -73,6 +87,45 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
     if (error) console.error('Error cargando vendedores:', error)
     setLista(data || [])
     setTotal(count || 0)
+    setSeleccionados(new Set((data || []).map(v => v.id)))
+  }
+
+  // Cédula es texto pero se compara/ordena como número cuando es posible (evita que "9" quede después de "10")
+  const numCed = c => { const n = Number((c || '').trim()); return c && Number.isFinite(n) ? n : null }
+
+  function ordenarPorCedula(arr) {
+    return [...arr].sort((a, b) => {
+      const na = numCed(a.cedula), nb = numCed(b.cedula)
+      if (na === null && nb === null) return 0
+      if (na === null) return 1
+      if (nb === null) return -1
+      return na - nb
+    })
+  }
+
+  function toggleSel(id) {
+    setSeleccionados(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function selAll()  { setSeleccionados(new Set(lista.map(v => v.id))) }
+  function selNone() { setSeleccionados(new Set()) }
+
+  function seleccionarRango() {
+    const dTxt = cedDesde.trim(), hTxt = cedHasta.trim()
+    if (!dTxt && !hTxt) return
+    const d = numCed(dTxt), h = numCed(hTxt)
+    const enRango = lista.filter(v => {
+      const n = numCed(v.cedula)
+      if (n === null) return false
+      if (d !== null && n < d) return false
+      if (h !== null && n > h) return false
+      return true
+    })
+    setSeleccionados(new Set(enRango.map(v => v.id)))
   }
 
   function onBusqueda(v) {
@@ -135,6 +188,8 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
   }
 
   function imprimirListado() {
+    const seleccionadosList = ordenarPorCedula(lista.filter(v => seleccionados.has(v.id)))
+    if (!seleccionadosList.length) return
     const w = window.open('', '_blank', 'width=900,height=700')
     const fecha = new Date().toLocaleDateString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric' })
     w.document.write(`
@@ -152,12 +207,12 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
         @media print{body{padding:6px;}}
       </style></head><body>
       <h2>ATM CLOTHING — LISTADO DE VENDEDORES</h2>
-      <div class="sub">${busqueda.trim() ? `Filtro: "${busqueda.trim()}" | ` : ''}Fecha: ${fecha} | Total: ${lista.length} vendedor${lista.length !== 1 ? 'es' : ''}</div>
+      <div class="sub">${busqueda.trim() ? `Filtro: "${busqueda.trim()}" | ` : ''}Fecha: ${fecha} | Seleccionados: ${seleccionadosList.length} de ${lista.length} | Orden: cédula</div>
       <table>
         <colgroup><col style="width:16%"><col style="width:38%"><col style="width:18%"><col style="width:14%"><col style="width:14%"></colgroup>
         <thead><tr><th>Cédula</th><th>Nombre</th><th>Celular</th><th>% Comisión</th><th>Estado</th></tr></thead>
         <tbody>
-          ${lista.map(v => `
+          ${seleccionadosList.map(v => `
             <tr>
               <td>${v.cedula || ''}</td>
               <td>${v.nombre}</td>
@@ -191,7 +246,7 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
         <img src={LOGO} alt="ATM" style={{ height:42 }} />
         <span style={S.hTitle}>GESTIÓN DE VENDEDORES</span>
         <button style={S.hBtn} onClick={nuevo}>+ Nuevo</button>
-        <button style={S.hBtn} onClick={imprimirListado} disabled={!lista.length} title="Imprimir listado de vendedores">🖨 Listado</button>
+        <button style={S.hBtn} onClick={imprimirListado} disabled={!seleccionados.size} title="Imprimir listado de los vendedores seleccionados">🖨 Listado ({seleccionados.size})</button>
         {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18}}>❓</button>}
         <button style={S.hBtn} onClick={onClose}><span style={{fontSize:16}}>✕</span> Cerrar</button>
       </div>
@@ -203,20 +258,41 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
               value={busqueda} onChange={e => onBusqueda(e.target.value)} autoFocus />
             <span style={S.lTotal}>{total} vendedor{total !== 1 ? 'es' : ''}</span>
           </div>
+
+          <div style={S.selBar}>
+            <div style={S.selRow}>
+              <span style={S.selLbl}>Rango cédula:</span>
+              <input style={S.selInp} placeholder="Desde" value={cedDesde} onChange={e => setCedDesde(e.target.value)} />
+              <span style={{ fontSize:11, color:'#999' }}>—</span>
+              <input style={S.selInp} placeholder="Hasta" value={cedHasta} onChange={e => setCedHasta(e.target.value)} />
+              <button style={S.selBtn} onClick={seleccionarRango}>Aplicar</button>
+            </div>
+            <div style={S.selRow}>
+              <button style={S.selBtnSec} onClick={selAll}>Todos</button>
+              <button style={S.selBtnSec} onClick={selNone}>Ninguno</button>
+              <span style={S.selInfo}>{seleccionados.size} seleccionado{seleccionados.size !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
+
           <div style={S.lTabla}>
             {lista.length === 0
               ? <div style={S.lEmpty}>No hay vendedores registrados.</div>
               : lista.map(v => (
-                <div key={v.id} style={seleccion?.id === v.id ? S.lFilaSel : S.lFila}
-                  onClick={() => seleccionar(v)}>
-                  <div style={S.lNom}>
-                    {v.nombre}
-                    {v.activo === false && <span style={{ ...S.badge, ...S.badgeNo }}>Retirado</span>}
-                  </div>
-                  <div style={S.lSub}>
-                    {v.cedula ? `Céd: ${v.cedula}` : ''}
-                    {v.celular ? ` · ${v.celular}` : ''}
-                    {v.porcentaje_comision > 0 ? ` · Comisión: ${v.porcentaje_comision}%` : ''}
+                <div key={v.id} style={seleccion?.id === v.id ? S.lFilaRowSel : S.lFilaRow}>
+                  <input type="checkbox" style={S.lChk}
+                    checked={seleccionados.has(v.id)}
+                    onClick={e => e.stopPropagation()}
+                    onChange={() => toggleSel(v.id)} />
+                  <div style={S.lContenido} onClick={() => seleccionar(v)}>
+                    <div style={S.lNom}>
+                      {v.nombre}
+                      {v.activo === false && <span style={{ ...S.badge, ...S.badgeNo }}>Retirado</span>}
+                    </div>
+                    <div style={S.lSub}>
+                      {v.cedula ? `Céd: ${v.cedula}` : ''}
+                      {v.celular ? ` · ${v.celular}` : ''}
+                      {v.porcentaje_comision > 0 ? ` · Comisión: ${v.porcentaje_comision}%` : ''}
+                    </div>
                   </div>
                 </div>
               ))
