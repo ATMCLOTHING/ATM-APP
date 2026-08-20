@@ -1,16 +1,17 @@
 // src/components/PrintNota.jsx
 // Formatos de impresión: Ticket (80mm) y Factura (Media Carta / Carta, según cantidad de ítems)
 
-import { LOGO } from '../lib/assets'
 import { fmtFecha } from '../lib/fecha'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})
 // El ticket replica el formato del sistema anterior: separador de miles con coma y sin decimales.
 const fmtInt = n => Number(n||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})
 
-// Umbral de ítems a partir del cual la factura ya no cabe completa (tabla + totales + firmas)
-// en una hoja media carta (5.5in x 8.5in) y debe imprimirse en carta completa.
-const UMBRAL_MEDIA_CARTA = 8
+// Umbral de ítems a partir del cual la factura ya no cabe completa (tabla + totales + firmas
+// + observaciones/devoluciones) en una hoja media carta (5.5in x 8.5in) y debe imprimirse en
+// carta completa. Verificado a mano con el layout actual: 7 ítems llenan justo los 4.5in de
+// contenido disponibles; 8 ya se pasa.
+const UMBRAL_MEDIA_CARTA = 7
 
 // ── Guía de envío: etiqueta con los datos del destinatario, para pegar en el paquete ──
 // Se genera directamente desde la nota de entrega (botón 📍), sin pasar por el modal de impresión.
@@ -168,9 +169,8 @@ export default function PrintNota({ datos, onClose }) {
   function imprimirFactura() {
     const nItems  = (lineas||[]).length
     const esMedia = nItems <= UMBRAL_MEDIA_CARTA
-    const logoAlto  = 56
-    const fuenteBase= 12
-    const firmaTop  = 18
+    const fuenteBase= 11
+    const firmaTop  = 10
 
     const w = window.open('','_blank','width=800,height=600')
     w.document.write(`
@@ -178,34 +178,41 @@ export default function PrintNota({ datos, onClose }) {
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         html, body { height: 100%; }
-        body { font-family: Arial, sans-serif; font-size: ${fuenteBase}px; padding: 8mm 10mm; color: #111; }
+        body { font-family: Arial, sans-serif; font-size: ${fuenteBase}px; padding: 6mm 9mm; color: #111; }
         .doc-wrap { display:flex; flex-direction:column; }
         .doc-wrap.media { min-height: 4.5in; justify-content:space-between; }
-        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; border-bottom:2px solid #1a3a6b; padding-bottom:5px; }
-        .logo-txt { font-size:26px; font-weight:900; color:#1a3a6b; letter-spacing:3px; }
-        .subtitulo { font-size:10px; color:#5577aa; letter-spacing:2px; text-transform:uppercase; }
-        .doc-titulo { font-size:18px; font-weight:800; color:#1a3a6b; }
-        .seccion { background:#f5f7fb; border:1px solid #c8d5ea; border-radius:4px; padding:5px 10px; margin-bottom:6px; }
-        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+        .header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; border-bottom:2px solid #1a3a6b; padding-bottom:3px; }
+        .subtitulo { font-size:10px; color:#5577aa; letter-spacing:1px; text-transform:uppercase; font-weight:700; }
+        .doc-titulo { font-size:17px; font-weight:800; color:#1a3a6b; }
+        .doc-num { color:#c0392b; font-weight:900; }
+        .seccion { background:#f5f7fb; border:1px solid #c8d5ea; border-radius:4px; padding:4px 10px; margin-bottom:4px; }
+        .grid2 { display:grid; grid-template-columns:2fr 1fr; gap:5px; }
         .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; }
         .grid4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:5px; }
         .campo { display:flex; flex-direction:column; }
-        .campo-lbl { font-size:10px; font-weight:700; color:#5577aa; text-transform:uppercase; }
-        .campo-val { font-size:12px; font-weight:600; border-bottom:1px solid #ddd; padding-bottom:2px; min-height:16px; overflow-wrap:break-word; }
-        .campo-val.nota-num { font-size:26px; font-weight:900; color:#c0392b; }
-        .campo-val.cliente-nombre { font-size:21px; font-weight:800; color:#111; }
+        .campo-lbl { font-size:9px; font-weight:700; color:#5577aa; text-transform:uppercase; }
+        .campo-val { font-size:${fuenteBase}px; font-weight:600; border-bottom:1px solid #ddd; padding-bottom:2px; min-height:14px; overflow-wrap:break-word; }
+        .campo-val.cliente-nombre { font-size:16px; font-weight:800; color:#111; }
         /* table-layout fijo + colgroup: los anchos de columna quedan iguales en cualquier
            navegador/impresora — con layout automático el ancho se recalcula según el
            contenido y la fuente instalada en cada equipo, que es lo que rompía el cuadro. */
-        table { width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:6px; font-size:${fuenteBase-1}px; page-break-inside:avoid; }
-        th { background:#1a3a6b; color:#fff; padding:4px 5px; text-align:center; font-size:${fuenteBase-1}px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        td { padding:3px 5px; border-bottom:1px solid #eee; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        table { width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:4px; font-size:${fuenteBase-1}px; page-break-inside:avoid; }
+        th { background:#1a3a6b; color:#fff; padding:3px 5px; text-align:center; font-size:${fuenteBase-1}px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        td { padding:2px 5px; border-bottom:1px solid #eee; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         td.item-n { text-align:center; background:#eef2ff; font-weight:700; color:#1a3a6b; }
         tr:nth-child(even) { background:#f5f7fc; }
-        .totales { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; background:#f0f4ff; border:1px solid #c8d5ea; border-radius:4px; padding:6px 12px; page-break-inside:avoid; }
-        .tot-lbl { font-size:10px; color:#5577aa; font-weight:700; text-align:center; text-transform:uppercase; }
-        .tot-val { font-size:12px; text-align:right; font-weight:700; color:#1a3a6b; }
-        .tot-saldo { color:#c0392b; font-size:14px; }
+        .totales { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; background:#f0f4ff; border:1px solid #c8d5ea; border-radius:4px; padding:5px 12px; page-break-inside:avoid; }
+        .tot-lbl { font-size:9px; color:#5577aa; font-weight:700; text-align:center; text-transform:uppercase; }
+        .tot-val { font-size:${fuenteBase}px; text-align:right; font-weight:700; color:#1a3a6b; }
+        .tot-saldo { color:#c0392b; font-size:13px; }
+        .cierre-extra { display:flex; gap:8px; margin-top:6px; page-break-inside:avoid; }
+        .obs-box, .devol-box { flex:1; border:1px solid #c8d5ea; border-radius:4px; padding:3px 8px; }
+        .extra-lbl { font-size:9px; font-weight:700; color:#5577aa; text-transform:uppercase; margin-bottom:3px; }
+        .obs-lineas { display:flex; flex-direction:column; gap:6px; }
+        .obs-linea { border-bottom:1px solid #ccc; height:8px; }
+        .devol-tabla { width:100%; table-layout:fixed; border-collapse:collapse; font-size:8px; }
+        .devol-tabla th { background:#eef2ff; color:#1a3a6b; padding:2px 3px; font-size:8px; }
+        .devol-tabla td { border-bottom:1px solid #eee; padding:0 3px; height:10px; }
         .firma { display:flex; justify-content:space-around; margin-top:${firmaTop}px; page-break-inside:avoid; }
         .linea-firma { border-top:1px solid #333; width:150px; padding-top:4px; text-align:center; font-size:9px; color:#555; }
         @page { size: letter portrait; margin: 0; }
@@ -214,20 +221,14 @@ export default function PrintNota({ datos, onClose }) {
       <div class="doc-wrap ${esMedia?'media':''}">
         <div class="bloque-datos">
           <div class="header">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <img src="${LOGO}" alt="ATM" style="height:${logoAlto}px;object-fit:contain;"/>
-              <div class="subtitulo" style="font-size:11px;">A TU MEDIDA<br/>Control de Inventarios</div>
-            </div>
-            <div class="doc-titulo">NOTA DE ENTREGA</div>
+            <div class="subtitulo">A Tu Medida — Control de Inventarios</div>
+            <div class="doc-titulo">NOTA DE ENTREGA <span class="doc-num">N° ${nroDoc}</span></div>
           </div>
 
           <div class="seccion">
             <div class="grid2" style="margin-bottom:4px;">
-              <div class="campo"><span class="campo-lbl">N° Nota</span><span class="campo-val nota-num">${nroDoc}</span></div>
+              <div class="campo"><span class="campo-lbl">Cliente</span><span class="campo-val cliente-nombre">${cliente?.nombre||cliTxt}</span></div>
               <div class="campo"><span class="campo-lbl">Cédula / NIT</span><span class="campo-val">${cedula||'99'}</span></div>
-            </div>
-            <div class="campo" style="margin-bottom:4px;">
-              <span class="campo-lbl">Cliente</span><span class="campo-val cliente-nombre">${cliente?.nombre||cliTxt}</span>
             </div>
             <div class="grid3">
               <div class="campo"><span class="campo-lbl">Dirección</span><span class="campo-val">${cliente?.direccion||''}</span></div>
@@ -247,14 +248,13 @@ export default function PrintNota({ datos, onClose }) {
         <div class="bloque-tabla">
           <table>
             <colgroup>
-              <col style="width:5%"><col style="width:8%"><col style="width:27%"><col style="width:9%">
-              <col style="width:8%"><col style="width:6%"><col style="width:6%"><col style="width:9%">
-              <col style="width:6%"><col style="width:7%"><col style="width:9%">
+              <col style="width:6%"><col style="width:10%"><col style="width:33%"><col style="width:10%">
+              <col style="width:9%"><col style="width:7%"><col style="width:12%"><col style="width:13%">
             </colgroup>
             <thead>
               <tr>
                 <th>Ítem</th><th>Código</th><th>Descripción</th><th>Marca</th><th>Género</th>
-                <th>Talla</th><th>Cant.</th><th>$ Unidad</th><th>%Dto</th><th>$Dto</th><th>$ Total</th>
+                <th>Cant.</th><th>$ Unidad</th><th>$ Total</th>
               </tr>
             </thead>
             <tbody>
@@ -265,11 +265,8 @@ export default function PrintNota({ datos, onClose }) {
                   <td title="${l.descartic}">${l.descartic}</td>
                   <td>${l.marca||''}</td>
                   <td>${l.genero||''}</td>
-                  <td style="text-align:center">${l.talla}</td>
                   <td style="text-align:center;font-weight:700">${l.cantidad}</td>
                   <td style="text-align:right">$${fmt(l.valunit)}</td>
-                  <td style="text-align:right">${l.porcdescue||0}%</td>
-                  <td style="text-align:right">$${fmt(l.valdescue)}</td>
                   <td style="text-align:right;font-weight:700">$${fmt(l.valtotal)}</td>
                 </tr>
               `).join('')}
@@ -291,6 +288,23 @@ export default function PrintNota({ datos, onClose }) {
             <span class="tot-val" style="font-size:15px;">$${fmt(total)}</span>
             <span class="tot-val" style="color:#2e7d32;">$${fmt(abonos)}</span>
             <span class="tot-val tot-saldo">$${fmt(saldo)}</span>
+          </div>
+
+          <div class="cierre-extra">
+            <div class="obs-box">
+              <div class="extra-lbl">Observaciones</div>
+              <div class="obs-lineas"><div class="obs-linea"></div></div>
+            </div>
+            <div class="devol-box">
+              <div class="extra-lbl">Devoluciones</div>
+              <table class="devol-tabla">
+                <colgroup><col style="width:22%"><col style="width:46%"><col style="width:16%"><col style="width:16%"></colgroup>
+                <thead><tr><th>Código</th><th>Descripción</th><th>Cant.</th><th>Fecha</th></tr></thead>
+                <tbody>
+                  <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div class="firma">
