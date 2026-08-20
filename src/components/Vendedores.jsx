@@ -134,6 +134,45 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
     setGuardando(false)
   }
 
+  function imprimirListado() {
+    const w = window.open('', '_blank', 'width=900,height=700')
+    const fecha = new Date().toLocaleDateString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric' })
+    w.document.write(`
+      <html><head><meta charset="UTF-8"><title>Listado de Vendedores</title>
+      <style>
+        @page{size:letter portrait;margin:12mm;}
+        body{font-family:Arial,sans-serif;font-size:11px;padding:16px;color:#222;}
+        h2{color:#1a1a2e;margin:0 0 2px;}
+        .sub{font-size:10px;color:#888;margin-bottom:10px;}
+        table{width:100%;border-collapse:collapse;table-layout:fixed;}
+        th{background:#1a1a2e;color:#fff;padding:6px 8px;text-align:left;font-size:10px;}
+        td{padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;word-wrap:break-word;}
+        tr:nth-child(even){background:#f5f5fa;}
+        .ret{color:#c62828;font-weight:700;}
+        @media print{body{padding:6px;}}
+      </style></head><body>
+      <h2>ATM CLOTHING — LISTADO DE VENDEDORES</h2>
+      <div class="sub">${busqueda.trim() ? `Filtro: "${busqueda.trim()}" | ` : ''}Fecha: ${fecha} | Total: ${lista.length} vendedor${lista.length !== 1 ? 'es' : ''}</div>
+      <table>
+        <colgroup><col style="width:16%"><col style="width:38%"><col style="width:18%"><col style="width:14%"><col style="width:14%"></colgroup>
+        <thead><tr><th>Cédula</th><th>Nombre</th><th>Celular</th><th>% Comisión</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${lista.map(v => `
+            <tr>
+              <td>${v.cedula || ''}</td>
+              <td>${v.nombre}</td>
+              <td>${v.celular || ''}</td>
+              <td style="text-align:center">${v.porcentaje_comision || 0}%</td>
+              <td style="text-align:center" class="${v.activo === false ? 'ret' : ''}">${v.activo === false ? 'Retirado' : 'Activo'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      </body></html>
+    `)
+    w.document.close(); w.focus()
+    setTimeout(() => { w.print(); w.close() }, 400)
+  }
+
   async function retirar() {
     if (!confirmDel) { setConfirmDel(true); return }
     setGuardando(true)
@@ -152,6 +191,7 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
         <img src={LOGO} alt="ATM" style={{ height:42 }} />
         <span style={S.hTitle}>GESTIÓN DE VENDEDORES</span>
         <button style={S.hBtn} onClick={nuevo}>+ Nuevo</button>
+        <button style={S.hBtn} onClick={imprimirListado} disabled={!lista.length} title="Imprimir listado de vendedores">🖨 Listado</button>
         {onAyuda && <button onClick={onAyuda} title="Ayuda" style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',color:'#fff',borderRadius:'50%',width:36,height:36,cursor:'pointer',fontSize:18}}>❓</button>}
         <button style={S.hBtn} onClick={onClose}><span style={{fontSize:16}}>✕</span> Cerrar</button>
       </div>
