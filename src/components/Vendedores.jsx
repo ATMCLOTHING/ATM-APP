@@ -87,7 +87,8 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
     if (error) console.error('Error cargando vendedores:', error)
     setLista(data || [])
     setTotal(count || 0)
-    setSeleccionados(new Set((data || []).map(v => v.id)))
+    // El listado solo incluye vendedores activos; los retirados siguen visibles en la lista para consulta/edición, pero no se seleccionan.
+    setSeleccionados(new Set((data || []).filter(v => v.activo !== false).map(v => v.id)))
   }
 
   // Cédula es texto pero se compara/ordena como número cuando es posible (evita que "9" quede después de "10")
@@ -104,6 +105,8 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
   }
 
   function toggleSel(id) {
+    const v = lista.find(x => x.id === id)
+    if (v?.activo === false) return // los retirados no se incluyen en el listado
     setSeleccionados(prev => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
@@ -111,7 +114,7 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
     })
   }
 
-  function selAll()  { setSeleccionados(new Set(lista.map(v => v.id))) }
+  function selAll()  { setSeleccionados(new Set(lista.filter(v => v.activo !== false).map(v => v.id))) }
   function selNone() { setSeleccionados(new Set()) }
 
   function seleccionarRango() {
@@ -119,6 +122,7 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
     if (!dTxt && !hTxt) return
     const d = numCed(dTxt), h = numCed(hTxt)
     const enRango = lista.filter(v => {
+      if (v.activo === false) return false
       const n = numCed(v.cedula)
       if (n === null) return false
       if (d !== null && n < d) return false
@@ -188,7 +192,8 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
   }
 
   function imprimirListado() {
-    const seleccionadosList = ordenarPorCedula(lista.filter(v => seleccionados.has(v.id)))
+    // El listado solo incluye vendedores activos (los retirados no se imprimen)
+    const seleccionadosList = ordenarPorCedula(lista.filter(v => seleccionados.has(v.id) && v.activo !== false))
     if (!seleccionadosList.length) return
     const w = window.open('', '_blank', 'width=900,height=700')
     const fecha = new Date().toLocaleDateString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric' })
@@ -203,14 +208,13 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
         th{background:#1a1a2e;color:#fff;padding:6px 8px;text-align:left;font-size:10px;}
         td{padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;word-wrap:break-word;}
         tr:nth-child(even){background:#f5f5fa;}
-        .ret{color:#c62828;font-weight:700;}
         @media print{body{padding:6px;}}
       </style></head><body>
-      <h2>ATM CLOTHING — LISTADO DE VENDEDORES</h2>
-      <div class="sub">${busqueda.trim() ? `Filtro: "${busqueda.trim()}" | ` : ''}Fecha: ${fecha} | Seleccionados: ${seleccionadosList.length} de ${lista.length} | Orden: cédula</div>
+      <h2>ATM CLOTHING — LISTADO DE VENDEDORES ACTIVOS</h2>
+      <div class="sub">${busqueda.trim() ? `Filtro: "${busqueda.trim()}" | ` : ''}Fecha: ${fecha} | Seleccionados: ${seleccionadosList.length} | Orden: cédula</div>
       <table>
-        <colgroup><col style="width:16%"><col style="width:38%"><col style="width:18%"><col style="width:14%"><col style="width:14%"></colgroup>
-        <thead><tr><th>Cédula</th><th>Nombre</th><th>Celular</th><th>% Comisión</th><th>Estado</th></tr></thead>
+        <colgroup><col style="width:18%"><col style="width:48%"><col style="width:20%"><col style="width:14%"></colgroup>
+        <thead><tr><th>Cédula</th><th>Nombre</th><th>Celular</th><th>% Comisión</th></tr></thead>
         <tbody>
           ${seleccionadosList.map(v => `
             <tr>
@@ -218,7 +222,6 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
               <td>${v.nombre}</td>
               <td>${v.celular || ''}</td>
               <td style="text-align:center">${v.porcentaje_comision || 0}%</td>
-              <td style="text-align:center" class="${v.activo === false ? 'ret' : ''}">${v.activo === false ? 'Retirado' : 'Activo'}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -279,8 +282,10 @@ export default function Vendedores({ supabase, onClose, onAyuda }) {
               ? <div style={S.lEmpty}>No hay vendedores registrados.</div>
               : lista.map(v => (
                 <div key={v.id} style={seleccion?.id === v.id ? S.lFilaRowSel : S.lFilaRow}>
-                  <input type="checkbox" style={S.lChk}
+                  <input type="checkbox" style={{ ...S.lChk, opacity: v.activo === false ? 0.3 : 1, cursor: v.activo === false ? 'not-allowed' : 'pointer' }}
                     checked={seleccionados.has(v.id)}
+                    disabled={v.activo === false}
+                    title={v.activo === false ? 'Los vendedores retirados no se incluyen en el listado' : undefined}
                     onClick={e => e.stopPropagation()}
                     onChange={() => toggleSel(v.id)} />
                   <div style={S.lContenido} onClick={() => seleccionar(v)}>
