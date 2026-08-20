@@ -206,13 +206,7 @@ export default function PrintNota({ datos, onClose }) {
         .tot-val { font-size:${fuenteBase}px; text-align:right; font-weight:700; color:#1a3a6b; }
         .tot-saldo { color:#c0392b; font-size:13px; }
         .cierre-extra { display:flex; gap:8px; margin-top:6px; page-break-inside:avoid; }
-        .obs-box, .devol-box { flex:1; border:1px solid #c8d5ea; border-radius:4px; padding:3px 8px; }
-        .extra-lbl { font-size:9px; font-weight:700; color:#5577aa; text-transform:uppercase; margin-bottom:3px; }
-        .obs-lineas { display:flex; flex-direction:column; gap:6px; }
-        .obs-linea { border-bottom:1px solid #ccc; height:8px; }
-        .devol-tabla { width:100%; table-layout:fixed; border-collapse:collapse; font-size:8px; }
-        .devol-tabla th { background:#eef2ff; color:#1a3a6b; padding:2px 3px; font-size:8px; }
-        .devol-tabla td { border-bottom:1px solid #eee; padding:0 3px; height:10px; }
+        .obs-box, .devol-box { flex:1; height:48px; border:1px solid #c8d5ea; border-radius:4px; }
         .firma { display:flex; justify-content:space-around; margin-top:${firmaTop}px; page-break-inside:avoid; }
         .linea-firma { border-top:1px solid #333; width:150px; padding-top:4px; text-align:center; font-size:9px; color:#555; }
         @page { size: letter portrait; margin: 0; }
@@ -291,20 +285,8 @@ export default function PrintNota({ datos, onClose }) {
           </div>
 
           <div class="cierre-extra">
-            <div class="obs-box">
-              <div class="extra-lbl">Observaciones</div>
-              <div class="obs-lineas"><div class="obs-linea"></div></div>
-            </div>
-            <div class="devol-box">
-              <div class="extra-lbl">Devoluciones</div>
-              <table class="devol-tabla">
-                <colgroup><col style="width:22%"><col style="width:46%"><col style="width:16%"><col style="width:16%"></colgroup>
-                <thead><tr><th>Código</th><th>Descripción</th><th>Cant.</th><th>Fecha</th></tr></thead>
-                <tbody>
-                  <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
-                </tbody>
-              </table>
-            </div>
+            <div class="obs-box"></div>
+            <div class="devol-box"></div>
           </div>
 
           <div class="firma">
