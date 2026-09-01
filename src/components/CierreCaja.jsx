@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { WZCLOSE, WZPRINT, WZLOCATE } from '../lib/assets'
 import { fmtFecha } from '../lib/fecha'
+import { fetchAll } from '../lib/fetchAll'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 
@@ -54,25 +55,6 @@ const rangoFechas = (desde, hasta) => {
   return arr
 }
 
-// Supabase/PostgREST limita cada respuesta a un máximo de filas (1000 en este proyecto), sin avisar
-// que hay más. Sin paginar, un rango de fechas con muchas notas quedaba cortado a la mitad y los
-// días más recientes del rango aparecían con $0 aunque sí hubo ventas. buildQuery debe devolver un
-// query NUEVO cada vez que se llama (sin .range()) y llevar un .order() por una columna única, para
-// que la paginación sea determinística.
-const PAGE_SIZE = 1000
-async function fetchAll(buildQuery) {
-  let all = []
-  let from = 0
-  while (true) {
-    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1)
-    if (error) throw error
-    if (!data || data.length === 0) break
-    all = all.concat(data)
-    if (data.length < PAGE_SIZE) break
-    from += PAGE_SIZE
-  }
-  return all
-}
 
 export default function CierreCaja({ supabase, onClose, onAyuda }) {
   const [desde,    setDesde]    = useState(hoy())

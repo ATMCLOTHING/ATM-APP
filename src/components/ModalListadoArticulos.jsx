@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchAll } from '../lib/fetchAll'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 
@@ -19,16 +20,19 @@ export default function ModalListadoArticulos({ supabase, onSelect, onClose }) {
 
   async function buscar() {
     setCargando(true)
-    let q = supabase.from('articulo')
-      .select('codartic,descartic,tipo,genero,marca,nomproveed,preciocomp,preciovent,preciovend,preciovenv,existencia,existminim,estado')
-      .order('codartic',{ascending:true})
-
-    if (filtMarca)        q = q.eq('marca', filtMarca)
-    if (filtDesde.trim()) q = q.gte('codartic', filtDesde.trim())
-    if (filtHasta.trim()) q = q.lte('codartic', filtHasta.trim())
-    if (filtDesc.trim())  q = q.ilike('descartic', `%${filtDesc.trim()}%`)
-
-    const {data} = await q
+    // articulo ya tiene más de 1000 filas — sin paginar, un listado sin filtrar (o con filtros
+    // amplios) quedaba cortado. Se arma como fábrica porque fetchAll pagina llamándola varias veces.
+    const buildQuery = () => {
+      let q = supabase.from('articulo')
+        .select('codartic,descartic,tipo,genero,marca,nomproveed,preciocomp,preciovent,preciovend,preciovenv,existencia,existminim,estado')
+        .order('codartic',{ascending:true})
+      if (filtMarca)        q = q.eq('marca', filtMarca)
+      if (filtDesde.trim()) q = q.gte('codartic', filtDesde.trim())
+      if (filtHasta.trim()) q = q.lte('codartic', filtHasta.trim())
+      if (filtDesc.trim())  q = q.ilike('descartic', `%${filtDesc.trim()}%`)
+      return q
+    }
+    const data = await fetchAll(buildQuery)
     setArticulos(data||[])
     setCargando(false)
   }

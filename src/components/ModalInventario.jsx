@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { fmtFecha } from '../lib/fecha'
+import { fetchAll } from '../lib/fetchAll'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
@@ -19,9 +20,10 @@ export default function ModalInventario({ supabase, onClose }) {
 
   async function cargar() {
     setCargando(true)
-    const { data } = await supabase.from('articulo')
+    // articulo ya tiene más de 1000 filas — sin paginar el resumen de inventario quedaba incompleto.
+    const data = await fetchAll(() => supabase.from('articulo')
       .select('codartic,descartic,marca,tipo,genero,existencia,preciocomp,preciovent,estado')
-      .order('marca').order('descartic')
+      .order('marca', {ascending:true}).order('descartic', {ascending:true}).order('codartic', {ascending:true}))
     setArticulos(data || [])
     setCargando(false)
   }

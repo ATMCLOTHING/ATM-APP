@@ -1,6 +1,7 @@
 // src/components/Dashboard.jsx
 import { useState, useEffect } from 'react'
 import { LOGO } from '../lib/assets'
+import { fetchAll } from '../lib/fetchAll'
 
 const fmt = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
 const hoy = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
@@ -17,9 +18,12 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
   async function cargarMetricas(d, h) {
     setCargando(true)
 
-    const {data:notas} = await supabase.from('encnotaen')
-      .select('valtotal,valabono,saldo,cedvended,anulada,cantotal')
+    // Sin paginar, un rango de fechas amplio (o un día muy activo) quedaba cortado en 1000 filas
+    // y las métricas del período aparecían por debajo de lo real.
+    const notas = await fetchAll(() => supabase.from('encnotaen')
+      .select('valtotal,valabono,saldo,cedvended,anulada,cantotal,numnotaent')
       .gte('fechanotae', d).lte('fechanotae', h)
+      .order('numnotaent', {ascending:true}))
 
     const notasActivas = (notas||[]).filter(n=>n.anulada!=='S')
     const notasAnuladas = (notas||[]).filter(n=>n.anulada==='S')
@@ -38,8 +42,11 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
       .select('valor_original').gte('fecregistr', d).lte('fecregistr', h+'T23:59:59')
     const totalVales = (valesEmitidos||[]).reduce((s,v)=>s+(v.valor_original||0),0)
 
-    const {data:cartera} = await supabase.from('encnotaen')
-      .select('saldo').or('anulada.is.null,anulada.neq.S').gt('saldo',0)
+    // La cartera pendiente ya va en 733 notas y sigue creciendo — sin paginar, apenas pase de
+    // 1000 el total de "Cartera Pendiente" del tablero empezaría a mostrar menos de lo real.
+    const cartera = await fetchAll(() => supabase.from('encnotaen')
+      .select('saldo,numnotaent').or('anulada.is.null,anulada.neq.S').gt('saldo',0)
+      .order('numnotaent', {ascending:true}))
     const totalCartera = (cartera||[]).reduce((s,n)=>s+(n.saldo||0),0)
 
     const {data:artsBajos} = await supabase.from('articulo')

@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { fmtFecha } from '../lib/fecha'
+import { fetchAll } from '../lib/fetchAll'
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -23,13 +24,15 @@ export default function ModalResumen({ supabase, onClose, onSelect }) {
 
   async function buscar() {
     setCargando(true)
-    const { data } = await supabase
+    // El rango por defecto es "un mes atrás", que fácilmente supera 1000 notas — sin paginar,
+    // el listado quedaba cortado y no correspondía con el total real del período.
+    const data = await fetchAll(() => supabase
       .from('encnotaen')
       .select('numnotaent,fechanotae,nombreclie,valtotal,valabono,saldo,cedvended,anulada,cantotal,formapago')
       .gte('fechanotae', desde)
       .lte('fechanotae', hasta)
       .eq('anulada', 'N')
-      .order('fechanotae', { ascending: false })
+      .order('numnotaent', { ascending: false }))
     setNotas(data || [])
     setCargando(false)
   }

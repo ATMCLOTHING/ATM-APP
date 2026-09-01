@@ -6,6 +6,7 @@ import ModalListadoArticulos  from './ModalListadoArticulos'
 import ModalEntradaMercancia  from './ModalEntradaMercancia'
 import ModalInventario        from './ModalInventario'
 import { logError }           from '../lib/logError'
+import { fetchAll }           from '../lib/fetchAll'
 
 const VACIO = {
   codartic:'', tipo:'', tipotalla:'U', descartic:'', genero:'', marca:'',
@@ -41,9 +42,7 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
     const {data:mdata} = await supabase.from('marcas').select('id,descmarca').order('descmarca')
     setMarcas(mdata||[])
     // cargar artículos
-    const {data} = await supabase.from('articulo').select('codartic').order('codartic',{ascending:true})
-    const ids=(data||[]).map(r=>r.codartic)
-    setAllIds(ids); allIdsRef.current=ids
+    const ids = await recargarIds()
     if (ids.length>0) await cargarDoc(ids[ids.length-1],ids)
     setBusy(false)
   }
@@ -63,7 +62,9 @@ export default function Articulos({ supabase, usuario, onClose, onAyuda }) {
   }
 
   async function recargarIds(){
-    const {data}=await supabase.from('articulo').select('codartic').order('codartic',{ascending:true})
+    // articulo ya tiene más de 1000 filas — sin paginar se perdían los últimos códigos de la
+    // navegación (Primero/Anterior/Siguiente/Último) y del buscador por rango.
+    const data = await fetchAll(() => supabase.from('articulo').select('codartic').order('codartic',{ascending:true}))
     const ids=(data||[]).map(r=>r.codartic); setAllIds(ids); allIdsRef.current=ids; return ids
   }
 

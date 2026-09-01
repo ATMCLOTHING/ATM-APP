@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import ModalAbonos from './ModalAbonos'
 import { fmtFecha } from '../lib/fecha'
+import { fetchAll } from '../lib/fetchAll'
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -70,23 +71,28 @@ export default function Cartera({ supabase, usuario, onClose }) {
 
     // FIX: usar neq('anulada','S') en lugar de eq('anulada','N')
     // así captura null y cualquier valor distinto de 'S'
-    let q = supabase.from('encnotaen')
-      .select('numnotaent,fechanotae,fechavence,cedrifclie,nombreclie,cedvended,valtotal,valdescue,porcdescue,valabono,saldo,formapago,mediopago,anulada')
-      .or('anulada.is.null,anulada.neq.S')
-      .order('numnotaent', {ascending:true})
-
-    // filtro vendedor
+    // Se arma como fábrica (función que devuelve un query NUEVO) porque fetchAll pagina llamándola
+    // varias veces — reutilizar un mismo objeto de query entre páginas no es seguro.
     const cedVend = filtVend
-    if (cedVend) q = q.eq('cedvended', cedVend)
+    const buildQuery = () => {
+      let q = supabase.from('encnotaen')
+        .select('numnotaent,fechanotae,fechavence,cedrifclie,nombreclie,cedvended,valtotal,valdescue,porcdescue,valabono,saldo,formapago,mediopago,anulada')
+        .or('anulada.is.null,anulada.neq.S')
+        .order('numnotaent', {ascending:true})
+      if (cedVend) q = q.eq('cedvended', cedVend)
+      if (filtEstado === 'pendiente') q = q.gt('saldo', 0)
+      else if (filtEstado === 'pagada') q = q.lte('saldo', 0)
+      if (filtCliente.trim()) q = q.ilike('nombreclie', `%${filtCliente.trim()}%`)
+      return q
+    }
 
-    // filtro estado
-    if (filtEstado === 'pendiente') q = q.gt('saldo', 0)
-    else if (filtEstado === 'pagada') q = q.lte('saldo', 0)
-
-    // filtro cliente
-    if (filtCliente.trim()) q = q.ilike('nombreclie', `%${filtCliente.trim()}%`)
-
-    const {data, error} = await q.limit(5000)
+    // OJO: .limit(5000) del lado del cliente NO alcanza — Supabase igual responde máximo 1000 filas
+    // por página sin avisar. Se pagina con fetchAll para no perder notas cuando el filtro trae más
+    // de 1000 (ej. filtro "pagada" o "todas" sobre encnotaen, que tiene decenas de miles de filas).
+    let data, error
+    try {
+      data = await fetchAll(buildQuery)
+    } catch (e) { error = e }
     if (error) { console.error('Cartera error:', error); setTotales({valor:0,abonado:0,saldo:0}); setNotas([]); setResumen([]); setGenerado(true); setCargando(false); return }
 
     // el nombre guardado nota por nota (nombreclie) puede variar entre notas de un mismo cliente
@@ -95,7 +101,9 @@ export default function Cartera({ supabase, usuario, onClose }) {
     // Excepción: cédulas genéricas ("99","999","5122603","9999980","32293713") comparten un registro
     // "CLIENTE GENERAL" en `clientes` para muchos compradores distintos — ahí el nombre real y
     // específico es el de la nota, no el de la tabla maestra.
-    const {data: clientesData} = await supabase.from('clientes').select('cedula,nombre').limit(5000)
+    // clientes ya tiene más de 1000 filas hoy — sin paginar, el mapa quedaba incompleto y algunos
+    // clientes mostraban el nombre viejo guardado en la nota en vez del nombre actual.
+    const clientesData = await fetchAll(() => supabase.from('clientes').select('cedula,nombre').order('cedula', {ascending:true}))
     const nombreClienteMap = {}
     ;(clientesData||[]).forEach(c => {
       if ((c.nombre||'').trim().toUpperCase() !== 'CLIENTE GENERAL') nombreClienteMap[c.cedula] = c.nombre

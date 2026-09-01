@@ -1,6 +1,7 @@
 // src/components/Egresos.jsx
 import { useState, useEffect, useRef } from 'react'
 import { fmtFecha } from '../lib/fecha'
+import { fetchAll } from '../lib/fetchAll'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0})
 const fmtM = n => '$'+fmt(n)
@@ -150,12 +151,17 @@ export default function Egresos({ supabase, usuario, onClose }) {
 
   async function consultar() {
     setCargando(true)
-    let q = supabase.from('egresos').select('*')
-      .gte('fecha_pago', filtDesde).lte('fecha_pago', filtHasta)
-      .order('fecha_pago', { ascending:false })
-    if (filtGrupo) q = q.eq('grupo_id', Number(filtGrupo))
-    if (filtMedio) q = q.eq('medio_pago', filtMedio)
-    const { data } = await q.limit(2000)
+    // .limit(2000) no alcanza: Supabase igual responde máximo 1000 filas por página sin avisar.
+    // Con un rango de fechas amplio (egresos ya va en miles de filas) se paginaba con fetchAll.
+    const buildQuery = () => {
+      let q = supabase.from('egresos').select('*')
+        .gte('fecha_pago', filtDesde).lte('fecha_pago', filtHasta)
+        .order('fecha_pago', { ascending:false }).order('id', { ascending:false })
+      if (filtGrupo) q = q.eq('grupo_id', Number(filtGrupo))
+      if (filtMedio) q = q.eq('medio_pago', filtMedio)
+      return q
+    }
+    const data = await fetchAll(buildQuery)
     setEgresos(data || [])
     setCargando(false)
   }

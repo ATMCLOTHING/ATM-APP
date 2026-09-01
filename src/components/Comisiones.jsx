@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { fmtFecha } from '../lib/fecha'
+import { fetchAll } from '../lib/fetchAll'
 
 const fmt  = n => Number(n||0).toLocaleString('es-CO',{minimumFractionDigits:0,maximumFractionDigits:0})
 const fmtM = n => '$' + fmt(n)
@@ -78,21 +79,24 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
     setCargando(true); setGenerado(false); setNotasSel({})
 
     // Notas pagadas del vendedor — no hechas por cajeras
-    let q = supabase.from('encnotaen')
-      .select('numnotaent,fechanotae,nombreclie,valtotal,valabono,saldo,formapago,mediopago,usuario,comision_pagada')
-      .eq('cedvended', filtVend)
-      .or('anulada.is.null,anulada.neq.S')
-      .eq('comision_pagada', false)  // solo las no liquidadas aún
-      .lte('saldo', 0)              // pagadas (saldo = 0)
-      .order('fechanotae', {ascending:true})
+    // Fábrica de query (no un query ya armado) porque fetchAll pagina llamándola varias veces.
+    // .limit(2000) no alcanzaba a evitarlo: Supabase igual responde máximo 1000 filas por página.
+    const buildQuery = () => {
+      let q = supabase.from('encnotaen')
+        .select('numnotaent,fechanotae,nombreclie,valtotal,valabono,saldo,formapago,mediopago,usuario,comision_pagada')
+        .eq('cedvended', filtVend)
+        .or('anulada.is.null,anulada.neq.S')
+        .eq('comision_pagada', false)  // solo las no liquidadas aún
+        .lte('saldo', 0)              // pagadas (saldo = 0)
+        .order('numnotaent', {ascending:true})
+      // Excluir notas hechas por cajeras
+      // (las cajeras no generan comisión)
+      if (usarFecha && desde) q = q.gte('fechanotae', desde)
+      if (usarFecha && hasta) q = q.lte('fechanotae', hasta)
+      return q
+    }
 
-    // Excluir notas hechas por cajeras
-    // (las cajeras no generan comisión)
-
-    if (usarFecha && desde) q = q.gte('fechanotae', desde)
-    if (usarFecha && hasta) q = q.lte('fechanotae', hasta)
-
-    const {data} = await q.limit(2000)
+    const data = await fetchAll(buildQuery)
 
     // Filtrar en JS las que NO son de cajera
     const resultado = (data||[]).filter(n => !CAJERAS.includes((n.usuario||'').toLowerCase()))
