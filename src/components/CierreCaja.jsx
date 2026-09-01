@@ -42,12 +42,25 @@ const LABEL_CAJA = {
 const hoy  = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 const ayer = () => { const d=new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 
+// Lista de fechas 'YYYY-MM-DD' entre desde y hasta, ambas incluidas
+const rangoFechas = (desde, hasta) => {
+  const arr = []
+  let d = new Date(desde+'T00:00:00')
+  const fin = new Date(hasta+'T00:00:00')
+  while (d <= fin) {
+    arr.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))
+    d.setDate(d.getDate()+1)
+  }
+  return arr
+}
+
 export default function CierreCaja({ supabase, onClose, onAyuda }) {
   const [desde,    setDesde]    = useState(hoy())
   const [hasta,    setHasta]    = useState(hoy())
   const [datos,    setDatos]    = useState(null)
   const [cargando, setCargando] = useState(false)
   const [tab,      setTab]      = useState('consolidado')
+  const [criterioVentasDia, setCriterioVentasDia] = useState('marca')
 
   async function generar() {
     setCargando(true)
@@ -291,12 +304,76 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     return { mostrador, clientes:Object.values(map).sort((a,b)=>b.total-a.total), totMostrador:mostrador.reduce((s,n)=>s+(n.valtotal||0),0) }
   }
 
+  // ── DINERO INGRESADO POR DÍA ──────────────────────────────────────────────
+  // Igual lógica que calcResumen(), pero discriminado día por día dentro del rango.
+  function calcDineroPorDia() {
+    if (!datos) return []
+    const { notas, abonos, digitalPorNota } = datos
+    const porDia = {}
+    rangoFechas(desde, hasta).forEach(f => { porDia[f] = { fecha:f, notas:0, efectivo:0, transferencia:0, mixto:0, credito:0, abonosCartera:0, valesAplicados:0, totalVentas:0, totalIngresado:0 } })
+    const get = f => { if (!porDia[f]) porDia[f] = { fecha:f, notas:0, efectivo:0, transferencia:0, mixto:0, credito:0, abonosCartera:0, valesAplicados:0, totalVentas:0, totalIngresado:0 }; return porDia[f] }
+
+    notas.forEach(n => {
+      const d = get(n.fechanotae)
+      const valDig = digitalPorNota[n.numnotaent]||0
+      const val   = (n.valtotal||0) - valDig
+      const medio = normMedio(n.mediopago)
+      const esC   = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
+      d.notas++
+      d.totalVentas += val
+      if (esC) { d.credito += val }
+      else {
+        if (medio==='efectivo')           d.efectivo      += val
+        else if (medio==='transferencia') d.transferencia += val
+        else if (medio==='mixto')         d.mixto         += val
+        else                              d.efectivo      += val
+      }
+    })
+
+    abonos.forEach(a => {
+      const d = get(a.fechaabono)
+      if ((a.mediopago||'').trim().toLowerCase()==='vale') { d.valesAplicados += a.valabono||0; return }
+      d.abonosCartera += a.valabono||0
+    })
+
+    return Object.values(porDia).map(d => ({ ...d, totalIngresado: d.efectivo+d.transferencia+d.mixto+d.abonosCartera }))
+      .sort((a,b) => a.fecha.localeCompare(b.fecha))
+  }
+
+  // ── VENTAS POR DÍA, AGRUPADAS POR MARCA O POR REFERENCIA (a elección) ─────
+  function calcVentasPorDia(criterio) {
+    if (!datos) return []
+    const { notas, detalle } = datos
+    const fechaPorNota = {}
+    notas.forEach(n => { fechaPorNota[n.numnotaent] = n.fechanotae })
+
+    const porDia = {}
+    rangoFechas(desde, hasta).forEach(f => { porDia[f] = { fecha:f, items:{}, totalUnidades:0, totalVenta:0 } })
+
+    detalle.forEach(d => {
+      const f = fechaPorNota[d.numnotaent]
+      if (!f) return
+      if (!porDia[f]) porDia[f] = { fecha:f, items:{}, totalUnidades:0, totalVenta:0 }
+      const dia = porDia[f]
+      const key = criterio==='referencia' ? `${d.codartic} — ${d.descartic}` : ((d.marca||'').trim() || 'SIN MARCA')
+      if (!dia.items[key]) dia.items[key] = { unidades:0, total:0 }
+      dia.items[key].unidades += Number(d.cantidad)||0
+      dia.items[key].total    += Number(d.valtotal)||0
+      dia.totalUnidades += Number(d.cantidad)||0
+      dia.totalVenta    += Number(d.valtotal)||0
+    })
+
+    return Object.values(porDia).sort((a,b) => a.fecha.localeCompare(b.fecha))
+  }
+
   const cons      = calcConsolidado()
   const marcas    = calcMarcas()
   const resumen   = calcResumen()
   const topArts   = calcTopArticulos()
   const carteraPorVend = calcCarteraPorVendedor()
   const ventasCli = calcVentasCliente()
+  const dineroPorDia = calcDineroPorDia()
+  const ventasPorDia = calcVentasPorDia(criterioVentasDia)
 
   // ── HELPERS IMPRESIÓN ─────────────────────────────────────────────────────
   // @page con orientación explícita: sin esto, el navegador puede reusar la orientación de la
@@ -616,12 +693,66 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
   }
 
+  function imprimirDineroPorDia() {
+    if (!dineroPorDia) return
+    const w = window.open('','_blank','width=1000,height=700')
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Dinero por Día</title><style>${estilosImp('landscape')}</style></head><body>
+    <h2>ATM — DINERO INGRESADO POR DÍA</h2>
+    <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
+    <table><thead><tr>
+      <th style="text-align:left">Fecha</th><th>Notas</th><th>Efectivo</th><th>Transf.</th><th>Mixto</th>
+      <th>Vtas. Crédito</th><th>Abonos Cartera</th><th>Total Ingresado</th>
+    </tr></thead><tbody>
+    ${dineroPorDia.map(d=>`<tr>
+      <td>${fmtFecha(d.fecha)}</td><td>${d.notas}</td>
+      <td>${d.efectivo?'$'+fmt(d.efectivo):''}</td>
+      <td>${d.transferencia?'$'+fmt(d.transferencia):''}</td>
+      <td>${d.mixto?'$'+fmt(d.mixto):''}</td>
+      <td>${d.credito?'$'+fmt(d.credito):''}</td>
+      <td>${d.abonosCartera?'$'+fmt(d.abonosCartera):''}</td>
+      <td><b>$${fmt(d.totalIngresado)}</b></td>
+    </tr>`).join('')}
+    <tr class="tot">
+      <td>TOTALES</td>
+      <td>${dineroPorDia.reduce((s,d)=>s+d.notas,0)}</td>
+      <td>$${fmt(dineroPorDia.reduce((s,d)=>s+d.efectivo,0))}</td>
+      <td>$${fmt(dineroPorDia.reduce((s,d)=>s+d.transferencia,0))}</td>
+      <td>$${fmt(dineroPorDia.reduce((s,d)=>s+d.mixto,0))}</td>
+      <td>$${fmt(dineroPorDia.reduce((s,d)=>s+d.credito,0))}</td>
+      <td>$${fmt(dineroPorDia.reduce((s,d)=>s+d.abonosCartera,0))}</td>
+      <td><b>$${fmt(dineroPorDia.reduce((s,d)=>s+d.totalIngresado,0))}</b></td>
+    </tr>
+    </tbody></table></body></html>`)
+    w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
+  }
+
+  function imprimirVentasPorDia() {
+    if (!ventasPorDia) return
+    const w = window.open('','_blank','width=1000,height=700')
+    const titCriterio = criterioVentasDia==='referencia' ? 'REFERENCIA' : 'MARCA'
+    w.document.write(`<html><head><meta charset="UTF-8"><title>Ventas por Día</title><style>${estilosImp('portrait')}
+    .diaTit{background:#1a3a6b;color:#fff;padding:6px 10px;font-weight:700;margin:14px 0 4px;border-radius:3px;display:flex;justify-content:space-between;}
+    </style></head><body>
+    <h2>ATM — VENTAS POR DÍA (${titCriterio})</h2>
+    <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
+    ${ventasPorDia.filter(d=>Object.keys(d.items).length>0).map(d=>`
+      <div class="diaTit"><span>📅 ${fmtFecha(d.fecha)}</span><span>${d.totalUnidades} unid. — $${fmt(d.totalVenta)}</span></div>
+      <table><thead><tr><th style="text-align:left">${criterioVentasDia==='referencia'?'Referencia':'Marca'}</th><th>Unidades</th><th>Total</th></tr></thead><tbody>
+      ${Object.entries(d.items).sort((a,b)=>b[1].total-a[1].total).map(([k,v])=>`<tr><td>${k}</td><td>${v.unidades}</td><td>$${fmt(v.total)}</td></tr>`).join('')}
+      </tbody></table>`).join('')}
+    ${ventasPorDia.every(d=>Object.keys(d.items).length===0) ? '<p style="text-align:center;color:#888">Sin ventas en este período.</p>' : ''}
+    </body></html>`)
+    w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close()},400)
+  }
+
   // ── RENDER ────────────────────────────────────────────────────────────────
   const TABS = [
     {id:'consolidado', icon:'📊', label:'Consolidado'},
     {id:'marcas',      icon:'🏷️', label:'Ventas por Marca'},
     {id:'clientes',    icon:'👥', label:'Ventas por Cliente'},
     {id:'resumen',     icon:'💰', label:'Resumen del Día'},
+    {id:'dineroDia',   icon:'📅', label:'Dinero Ingresado por Día'},
+    {id:'ventasDia',   icon:'📆', label:'Ventas por Día (Marca/Ref)'},
     {id:'top',         icon:'🏆', label:'Top Artículos'},
     {id:'cartera',     icon:'📋', label:'Cartera Pendiente'},
     {id:'anuladas',    icon:'🗑', label:'Notas Anuladas'},
@@ -701,6 +832,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {tab==='marcas'      && <button onClick={imprimirMarcas}      style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
               {tab==='clientes'    && <button onClick={imprimirVentasCliente} style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
               {tab==='resumen'     && <button onClick={imprimirResumen}     style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='dineroDia'   && <button onClick={imprimirDineroPorDia} style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
+              {tab==='ventasDia'   && <button onClick={imprimirVentasPorDia} style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
               {tab==='top'         && <button onClick={imprimirTop}         style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
               {tab==='cartera'     && <button onClick={imprimirCartera}     style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
               {tab==='anuladas'    && <button onClick={imprimirAnuladas}    style={P.btnPrint}><span style={{fontSize:16}}>🖨</span> Imprimir</button>}
@@ -845,6 +978,93 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                     <span><span style={{fontSize:17}}>📲</span> MARCA DIGITAL (no incluida en el cierre de caja)</span>
                     <strong>${fmt(resumen.totalDigital)}</strong>
                   </div>
+                </div>
+              )}
+
+              {/* ── DINERO INGRESADO POR DÍA ── */}
+              {tab==='dineroDia' && dineroPorDia && (
+                <div>
+                  <div style={P.secTit}><span style={{fontSize:18}}>📅</span> Dinero Ingresado por Día — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
+                  <table style={P.tabla}>
+                    <thead>
+                      <tr style={P.thead}>
+                        {['Fecha','Notas','Efectivo','Transferencia','Mixto','Ventas Crédito','Abonos Cartera','Total Ingresado'].map(h=>(
+                          <th key={h} style={{...P.th, textAlign:h==='Fecha'?'left':'right'}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dineroPorDia.map((d,i)=>(
+                        <tr key={d.fecha} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
+                          <td style={{...P.td,fontWeight:600}}>{fmtFecha(d.fecha)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#555'}}>{d.notas}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>{d.efectivo?`$${fmt(d.efectivo)}`:''}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>{d.transferencia?`$${fmt(d.transferencia)}`:''}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>{d.mixto?`$${fmt(d.mixto)}`:''}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#e65100'}}>{d.credito?`$${fmt(d.credito)}`:''}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#8e24aa'}}>{d.abonosCartera?`$${fmt(d.abonosCartera)}`:''}</td>
+                          <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#1a3a6b'}}>${fmt(d.totalIngresado)}</td>
+                        </tr>
+                      ))}
+                      {dineroPorDia.length>0 && (
+                        <tr style={P.totRow}>
+                          <td style={P.td}><strong>TOTALES</strong></td>
+                          <td style={{...P.td,textAlign:'right'}}>{dineroPorDia.reduce((s,d)=>s+d.notas,0)}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#2e7d32'}}>${fmt(dineroPorDia.reduce((s,d)=>s+d.efectivo,0))}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>${fmt(dineroPorDia.reduce((s,d)=>s+d.transferencia,0))}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>${fmt(dineroPorDia.reduce((s,d)=>s+d.mixto,0))}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#e65100'}}>${fmt(dineroPorDia.reduce((s,d)=>s+d.credito,0))}</td>
+                          <td style={{...P.td,textAlign:'right',color:'#8e24aa'}}>${fmt(dineroPorDia.reduce((s,d)=>s+d.abonosCartera,0))}</td>
+                          <td style={{...P.td,textAlign:'right',fontSize:14,color:'#1a3a6b'}}><strong>${fmt(dineroPorDia.reduce((s,d)=>s+d.totalIngresado,0))}</strong></td>
+                        </tr>
+                      )}
+                      {dineroPorDia.length===0 && <tr><td colSpan={8} style={{textAlign:'center',padding:16,color:'#aaa'}}>Sin datos en este período.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* ── VENTAS POR DÍA (MARCA / REFERENCIA) ── */}
+              {tab==='ventasDia' && ventasPorDia && (
+                <div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
+                    <div style={{...P.secTit,marginBottom:0,border:'none',paddingBottom:0}}><span style={{fontSize:18}}>📆</span> Ventas por Día — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
+                    <div style={{display:'flex',gap:6}}>
+                      <button onClick={()=>setCriterioVentasDia('marca')}
+                        style={{padding:'6px 14px',borderRadius:5,cursor:'pointer',fontSize:12,fontWeight:700,border:'1px solid #1a3a6b',background:criterioVentasDia==='marca'?'#1a3a6b':'#fff',color:criterioVentasDia==='marca'?'#fff':'#1a3a6b'}}>Por Marca</button>
+                      <button onClick={()=>setCriterioVentasDia('referencia')}
+                        style={{padding:'6px 14px',borderRadius:5,cursor:'pointer',fontSize:12,fontWeight:700,border:'1px solid #1a3a6b',background:criterioVentasDia==='referencia'?'#1a3a6b':'#fff',color:criterioVentasDia==='referencia'?'#fff':'#1a3a6b'}}>Por Referencia</button>
+                    </div>
+                  </div>
+                  {ventasPorDia.every(d=>Object.keys(d.items).length===0)
+                    ? <div style={{textAlign:'center',padding:30,color:'#aaa'}}>Sin ventas en este período.</div>
+                    : ventasPorDia.filter(d=>Object.keys(d.items).length>0).map(d => (
+                      <div key={d.fecha} style={{marginBottom:20}}>
+                        <div style={{background:'#1a3a6b',color:'#fff',padding:'6px 12px',borderRadius:5,marginBottom:6,fontWeight:700,fontSize:13,display:'flex',justifyContent:'space-between'}}>
+                          <span>📅 {fmtFecha(d.fecha)}</span>
+                          <span style={{fontWeight:400,opacity:0.85}}>{d.totalUnidades} unidades · ${fmt(d.totalVenta)}</span>
+                        </div>
+                        <table style={P.tabla}>
+                          <thead>
+                            <tr style={P.thead}>
+                              <th style={{...P.th,textAlign:'left'}}>{criterioVentasDia==='referencia'?'Referencia':'Marca'}</th>
+                              <th style={{...P.th,textAlign:'right'}}>Unidades</th>
+                              <th style={{...P.th,textAlign:'right'}}>Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(d.items).sort((a,b)=>b[1].total-a[1].total).map(([k,v],i)=>(
+                              <tr key={k} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
+                                <td style={{...P.td,fontWeight:600}}>{k}</td>
+                                <td style={{...P.td,textAlign:'right'}}>{v.unidades}</td>
+                                <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#1a3a6b'}}>${fmt(v.total)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))
+                  }
                 </div>
               )}
 
