@@ -54,6 +54,26 @@ const rangoFechas = (desde, hasta) => {
   return arr
 }
 
+// Supabase/PostgREST limita cada respuesta a un máximo de filas (1000 en este proyecto), sin avisar
+// que hay más. Sin paginar, un rango de fechas con muchas notas quedaba cortado a la mitad y los
+// días más recientes del rango aparecían con $0 aunque sí hubo ventas. buildQuery debe devolver un
+// query NUEVO cada vez que se llama (sin .range()) y llevar un .order() por una columna única, para
+// que la paginación sea determinística.
+const PAGE_SIZE = 1000
+async function fetchAll(buildQuery) {
+  let all = []
+  let from = 0
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all = all.concat(data)
+    if (data.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return all
+}
+
 export default function CierreCaja({ supabase, onClose, onAyuda }) {
   const [desde,    setDesde]    = useState(hoy())
   const [hasta,    setHasta]    = useState(hoy())
@@ -65,45 +85,58 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   async function generar() {
     setCargando(true)
     try {
-      const {data:notas} = await supabase.from('encnotaen')
+      const notas = await fetchAll(() => supabase.from('encnotaen')
         .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,cantotal,codclient,usuario')
         .gte('fechanotae', desde).lte('fechanotae', hasta)
         .or('anulada.is.null,anulada.neq.S')
+        .order('numnotaent', {ascending:true}))
 
-      const numNotas = (notas||[]).map(n => n.numnotaent)
+      const numNotas = notas.map(n => n.numnotaent)
       let detalle = []
       if (numNotas.length > 0) {
-        const {data:det} = await supabase.from('detnotaen')
-          .select('numnotaent,codartic,descartic,marca,cantidad,valunit,valtotal')
-          .in('numnotaent', numNotas)
-        detalle = det||[]
+        // .in() con miles de números en la URL puede fallar por longitud, así que se pide en
+        // tandas de 300 notas; cada tanda igual se pagina con fetchAll por si trae >1000 artículos.
+        const CHUNK = 300
+        for (let i = 0; i < numNotas.length; i += CHUNK) {
+          const tanda = numNotas.slice(i, i + CHUNK)
+          const rows = await fetchAll(() => supabase.from('detnotaen')
+            .select('numnotaent,codartic,descartic,marca,cantidad,valunit,valtotal')
+            .in('numnotaent', tanda)
+            .order('id', {ascending:true}))
+          detalle = detalle.concat(rows)
+        }
       }
 
       const {data:vends} = await supabase.from('vendedores').select('cedula,nombre')
       const vendMap = {}
       ;(vends||[]).forEach(v => { vendMap[String(v.cedula)] = v.nombre })
 
-      const {data:notasAyer} = await supabase.from('encnotaen')
+      const notasAyer = await fetchAll(() => supabase.from('encnotaen')
         .select('valtotal').gte('fechanotae', ayer()).lte('fechanotae', ayer())
         .or('anulada.is.null,anulada.neq.S')
+        .order('numnotaent', {ascending:true}))
 
-      const {data:abonos} = await supabase.from('detabonos')
-        .select('numnotaent,valabono,mediopago,fechaabono,cedvended,usuario')
+      // OJO: detabonos no tiene columna cedvended (solo encnotaen la tiene) — pedirla
+      // rompía toda la consulta; antes fallaba en silencio y dejaba abonos en blanco.
+      const abonos = await fetchAll(() => supabase.from('detabonos')
+        .select('numnotaent,valabono,mediopago,fechaabono,usuario')
         .gte('fechaabono', desde).lte('fechaabono', hasta)
+        .order('id', {ascending:true}))
 
       // Cartera pendiente: se trae SIEMPRE completa (sin filtrar por desde/hasta), porque una
       // deuda de un cliente no desaparece solo porque el rango de fechas del informe cambió.
-      const {data:carteraGlobal} = await supabase.from('encnotaen')
+      const carteraGlobal = await fetchAll(() => supabase.from('encnotaen')
         .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo')
         .or('anulada.is.null,anulada.neq.S').gt('saldo', 0)
-      const totalCarteraGlobal = (carteraGlobal||[]).reduce((s,n) => s+(n.saldo||0), 0)
+        .order('numnotaent', {ascending:true}))
+      const totalCarteraGlobal = carteraGlobal.reduce((s,n) => s+(n.saldo||0), 0)
 
       // Notas anuladas en el período
-      const {data:notasAnuladas} = await supabase.from('encnotaen')
+      const notasAnuladas = await fetchAll(() => supabase.from('encnotaen')
         .select('numnotaent,fechanotae,nombreclie,cedrifclie,valtotal,motivoanula,fechaanula,cedvended,usuario')
         .gte('fechanotae', desde).lte('fechanotae', hasta)
         .eq('anulada','S')
-        .order('numnotaent', {ascending:false})
+        .order('numnotaent', {ascending:false}))
 
       // Marca DIGITAL: se muestra aparte y no se suma al cierre de caja
       const digitalPorNota = {}
@@ -115,7 +148,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
         }
       })
 
-      setDatos({ notas:notas||[], detalle, vendMap, abonos:abonos||[], notasAyer:notasAyer||[], carteraGlobal:carteraGlobal||[], totalCarteraGlobal, digitalPorNota, totalDigital, notasAnuladas:notasAnuladas||[] })
+      setDatos({ notas, detalle, vendMap, abonos, notasAyer, carteraGlobal, totalCarteraGlobal, digitalPorNota, totalDigital, notasAnuladas })
     } catch(e) { console.error(e) }
     setCargando(false)
   }
