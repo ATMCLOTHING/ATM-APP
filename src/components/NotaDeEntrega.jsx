@@ -458,6 +458,42 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
     if (data?.length) cargarDoc(data[0].numnotaent)
   }
 
+  // Guarda encabezado+detalle vía guardar_nota_completa. Si el guardado dejaría la nota
+  // con saldo negativo (ej. una devolución tecleada a mano en la grilla reduce el total
+  // por debajo de lo ya abonado — ver nota 46210 con $SALDO -$7.000), el RPC no guarda
+  // nada y responde con el error especial "SALDO_NEGATIVO|monto|valtotal|valabono"; se le
+  // pregunta a la usuaria si se ajusta a $0 (genera un vale a favor del cliente por el
+  // excedente, para no perder ese dinero que ya fue abonado de verdad) y, si confirma, se
+  // reintenta el mismo guardado autorizando el ajuste. Usada por guardar()/guardarSilencioso().
+  async function rpcGuardarNota(enc) {
+    const base = {
+      p_numnotaent: Number(nroDoc),
+      p_encabezado: enc,
+      p_detalle: detValidas.map(l=>({
+        codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
+        talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
+        porciva:l.porciva, valiva:l.valiva,
+        porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
+      })),
+      p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
+    }
+    let {data, error} = await supabase.rpc('guardar_nota_completa', {...base, p_confirmar_ajuste_saldo:false})
+    if (error && String(error.message||'').startsWith('SALDO_NEGATIVO')) {
+      const [, montoStr, totalStr, abonoStr] = error.message.split('|')
+      const monto = Number(montoStr)||0, tot = Number(totalStr)||0, abo = Number(abonoStr)||0
+      const confirma = window.confirm(
+        `Esta N.E. está quedando con saldo negativo (-$${fmt(monto)}) porque el abono ya registrado `+
+        `($${fmt(abo)}) supera el nuevo total de la nota ($${fmt(tot)}).\n\n`+
+        `Se generará un vale a favor del cliente por $${fmt(monto)} y la nota quedará saldada en $0.\n\n`+
+        `¿Lo ajustamos a Cero?`
+      )
+      if (!confirma) return {ok:false, cancelado:true}
+      ;({data, error} = await supabase.rpc('guardar_nota_completa', {...base, p_confirmar_ajuste_saldo:true}))
+    }
+    if (error) return {ok:false, error}
+    return {ok:true, data}
+  }
+
   async function guardar() {
     if (!cliente&&!cliTxt.trim()){setMsg({tipo:'err',texto:'Ingresa un cliente antes de guardar.'}); return}
     if (!cedVend){setMsg({tipo:'err',texto:'⚠️ Debes seleccionar un vendedor antes de guardar.'}); return}
@@ -477,7 +513,6 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         }
       }
       const totalReal = total - extraDescue
-      const saldoReal = Math.max(0, totalReal - abonoReal)
 
       const enc = {
         fechanotae:fecha, fechavence:fechaPago,
@@ -496,62 +531,24 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         nomempresa:cliente?.nom_empresa||'',
         porcdescue:pDesc, porciva:pIva,
         subtotal, valdescue:totDcto+extraDescue, valiva:totIva, valtotal:totalReal,
-        valabono:abonoReal, saldo:saldoReal, cedvended:cedVend,
+        valabono:abonoReal, saldo:Math.max(0,totalReal-abonoReal), cedvended:cedVend,
         cantotal:prendas,
       }
-      // Encabezado + detalle + ajuste de inventario + kardex se guardan en una sola
-      // transacción en el servidor (ver migración control_consecutivos_notas): si algo
-      // falla a mitad de camino, Postgres revierte todo — nunca queda la nota a medias.
-      const {data:resGuardar, error:eGuardar} = await supabase.rpc('guardar_nota_completa', {
-        p_numnotaent: Number(nroDoc),
-        p_encabezado: enc,
-        p_detalle: detValidas.map(l=>({
-          codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
-          talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
-          porciva:l.porciva, valiva:l.valiva,
-          porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
-        })),
-        p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
-      })
-      if (eGuardar) throw eGuardar
+      // Encabezado + detalle + ajuste de inventario + kardex (y, si aplica, el vale por
+      // saldo negativo) se guardan en una sola transacción en el servidor — ver migración
+      // ajustar_saldo_negativo_nota: si algo falla a mitad de camino, Postgres revierte todo.
+      const {ok, data:resGuardar, error:eGuardar, cancelado} = await rpcGuardarNota(enc)
+      if (cancelado) {
+        setMsg({tipo:'warn', texto:'Guardado cancelado. Ajusta las cantidades o el abono antes de volver a guardar.'})
+        setBusy(false); return
+      }
+      if (!ok) throw eGuardar
       const avisos = (resGuardar?.avisos||[]).map(a=>`${a.codartic} T:${a.talla} (existencia: ${a.existencia})`)
       setGuardada(true); setModoNueva(false)
 
-      // Punto 7: Si el saldo real quedó negativo (devolvió más de lo que compró),
-      // generar un vale por el excedente
-      if (saldoReal < -0.01) {
-        const montoVale = Math.abs(saldoReal)
-        const {data:codData} = await supabase.rpc('siguiente_codigo_vale')
-        const codigoVale = codData || `V-${Date.now()}`
-        const {data:valeIns} = await supabase.from('vales').insert({
-          codigo: codigoVale,
-          cliente_id: cliente?.id || null,
-          cliente_ced: cedula || cliente?.cedula || '',
-          cliente_nombre: cliTxt.trim() || cliente?.nombre || 'Cliente general',
-          valor_original: montoVale, saldo: montoVale,
-          numnotaent_origen: nroDoc,
-          motivo: `Devolución con saldo a favor en nota ${nroDoc}`,
-          estado: 'ACTIVO',
-          usuario: usuario?.usuario || 'sistema',
-        }).select().single()
-        if (valeIns) {
-          await supabase.from('vale_movimientos').insert({
-            vale_id: valeIns.id, tipo:'EMISION', valor:montoVale, numnotaent:nroDoc,
-            usuario: usuario?.usuario || 'sistema',
-          })
-          // Dejar la nota con saldo en 0 (el vale cubre el excedente)
-          await supabase.from('encnotaen').update({saldo:0}).eq('numnotaent',nroDoc)
-          setResultDevolucion({
-            nota: nroDoc, descripcion: 'Devolución con saldo a favor',
-            codartic:'', talla:'', cantidad:'', valorDevolucion: montoVale,
-            saldoAntes: 0, saldoNuevo: 0,
-            cliente: cliTxt.trim()||cliente?.nombre||'Cliente general',
-            fecha: hoy(), vale: {codigo:codigoVale, valor:montoVale},
-          })
-        }
-      }
-
-      const msgBase = `✅ Nota ${nroDoc} guardada.`
+      const msgBase = resGuardar?.vale
+        ? `✅ Nota ${nroDoc} guardada. Saldo ajustado a $0 — se generó el vale ${resGuardar.vale.codigo} por $${fmt(resGuardar.vale.valor)}.`
+        : `✅ Nota ${nroDoc} guardada.`
       setMsg({tipo:avisos.length?'warn':'ok', texto:avisos.length?`${msgBase} ⚠️ Inventario negativo en: ${avisos.join(', ')}`:msgBase})
       await recargarIds()
     } catch(e){
@@ -749,27 +746,23 @@ export default function NotaDeEntrega({ supabase, usuario, onClose, onAyuda }) {
         nomempresa:cliente?.nom_empresa||'',
         porcdescue:pDesc, porciva:pIva,
         subtotal, valdescue:totDcto, valiva:totIva, valtotal:total,
-        valabono:abonos, saldo, cedvended:cedVend,
+        valabono:abonos, saldo:Math.max(0,saldo), cedvended:cedVend,
         cantotal:prendas,
       }
-      // Mismo guardado atómico que guardar(): encabezado + detalle + inventario + kardex
-      // en una sola transacción. Sin esto, las notas que se pagan directo por "Pagar
-      // Todo"/Abonos/Vale (sin pasar por el botón Guardar) podían quedar a medias si el
-      // navegador se cerraba entre uno de los varios pasos que antes se hacían sueltos.
-      const {error:eGuardar} = await supabase.rpc('guardar_nota_completa', {
-        p_numnotaent: Number(nroDoc),
-        p_encabezado: enc,
-        p_detalle: detValidas.map(l=>({
-          codartic:l.codartic, descartic:l.descartic, marca:l.marca||'',
-          talla:l.talla, cantidad:Number(l.cantidad), valunit:Number(l.valunit),
-          porciva:l.porciva, valiva:l.valiva,
-          porcdescue:l.porcdescue, valdescue:l.valdescue, valtotal:l.valtotal,
-        })),
-        p_usuario: usuario?.usuario || usuario?.nombre || 'sistema',
-      })
-      if (eGuardar) throw eGuardar
+      // Mismo guardado atómico que guardar() (con el mismo ajuste de saldo negativo si
+      // aplica): encabezado + detalle + inventario + kardex en una sola transacción. Sin
+      // esto, las notas que se pagan directo por "Pagar Todo"/Abonos/Vale (sin pasar por
+      // el botón Guardar) podían quedar a medias si el navegador se cerraba entre uno de
+      // los varios pasos que antes se hacían sueltos.
+      const {ok, data, error:eGuardar, cancelado} = await rpcGuardarNota(enc)
+      if (cancelado) {
+        setMsg({tipo:'warn', texto:'Operación cancelada. Ajusta las cantidades o el abono antes de continuar.'})
+        return false
+      }
+      if (!ok) throw eGuardar
       setGuardada(true); setModoNueva(false)
       await recargarIds()
+      if (data?.vale) setMsg({tipo:'ok', texto:`Saldo ajustado a $0 — se generó el vale ${data.vale.codigo} por $${fmt(data.vale.valor)}.`})
       return true
     } catch(e) {
       setMsg({tipo:'err',texto:`❌ Error al guardar: ${e.message}`})
