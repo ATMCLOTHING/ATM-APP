@@ -150,7 +150,11 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       if (!obj[key]) obj[key] = { efectivo:0, transferencia:0, mixto:0, credito:0, noAbonado:0, total:0, notas:0, digital:0 }
       const v     = obj[key]
       const medio = normMedio(n.mediopago)
-      const esC   = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
+      // esC = saldo pendiente = el dinero aún no ha ingresado, sin importar si la nota quedó
+      // marcada como CONTADO (ej. "cliente general" facturado hoy a la espera de que el
+      // cliente transfiera al día siguiente). Antes exigía formapago<>CONTADO y por eso una
+      // nota "CONTADO" sin cobrar se sumaba de todos modos al cierre del día.
+      const esC   = (n.saldo||0) > 0
       const valDig = digitalPorNota[n.numnotaent]||0
       if (esC) { v.credito += n.valabono||0; v.noAbonado += n.saldo||0 }
       else {
@@ -168,7 +172,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       const cedv  = String(n.cedvended||'')
       const usu   = (n.usuario||'').trim()
       const medio = normMedio(n.mediopago)
-      const esC   = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
+      // esC: ver comentario en acum() más arriba (saldo pendiente = dinero no ingresado)
+      const esC   = (n.saldo||0) > 0
       const valDig = digitalPorNota[n.numnotaent]||0
       const val   = (n.valtotal||0) - valDig   // excluye lo facturado en marca DIGITAL
 
@@ -235,7 +240,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       const valDig = digitalPorNota[n.numnotaent]||0
       const val   = (n.valtotal||0) - valDig   // excluye lo facturado en marca DIGITAL
       const medio = normMedio(n.mediopago)
-      const esC   = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
+      // esC: saldo pendiente = dinero no ingresado (ver acum() en calcConsolidado)
+      const esC   = (n.saldo||0) > 0
       totalVentas += val
       if (esC) { totalCredito += val }
       else {
@@ -333,7 +339,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       const valDig = digitalPorNota[n.numnotaent]||0
       const val   = (n.valtotal||0) - valDig
       const medio = normMedio(n.mediopago)
-      const esC   = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
+      // esC: saldo pendiente = dinero no ingresado (ver acum() en calcConsolidado)
+      const esC   = (n.saldo||0) > 0
       d.notas++
       d.totalVentas += val
       if (esC) { d.credito += val }
@@ -572,7 +579,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       const usu  = (n.usuario||'Sin usuario').trim()
       const u    = get(usu)
       const medio= normMedio(n.mediopago)
-      const esC  = n.formapago !== 'CONTADO' && (n.saldo||0) > 0
+      // Igual criterio que en calcConsolidado/calcResumen: saldo pendiente = dinero no ingresado.
+      const esC  = (n.saldo||0) > 0
       const valD = digitalPorNota[n.numnotaent]||0
       const val  = (n.valtotal||0) - valD
       u.notas++; u.prendas += n.cantotal||0

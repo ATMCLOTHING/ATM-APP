@@ -287,7 +287,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
       const totSal = cli.notas.reduce((s,n)=>s+(n.saldo||0),0)
       w.document.write(`
         <div class="cliente-header">
-          <span>CLIENTE: ${cli.cedula} &nbsp;&nbsp; ${cli.nombre.toUpperCase()}</span>
+          <span>CLIENTE: ${cli.cedula} &nbsp;&nbsp; <span style="color:#000;font-size:13px">${cli.nombre.toUpperCase()}</span></span>
           <span>SALDO: $${fmt(totSal)}</span>
         </div>
         <table>
