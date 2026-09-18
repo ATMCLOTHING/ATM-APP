@@ -271,7 +271,17 @@ export default function Cartera({ supabase, usuario, onClose }) {
       #abonoModal .resumen b{display:block;font-size:14px;}
       #abonoModal table{margin:0;}
       #abonoModal .cerrar{background:#e74c3c;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-weight:700;font-size:14px;}
-      @media print{body{margin:10px;}button{display:none!important;}#abonoOverlay{display:none!important;}}
+      @media print{
+        body{margin:10px;}
+        button{display:none!important;}
+        #abonoOverlay{display:none!important;}
+        /* La mayoría de navegadores no imprimen fondos por defecto (para ahorrar tinta),
+           así que el texto blanco sobre fondo azul de .cliente-header y .tot-gen queda
+           casi invisible/gris en el papel o al "Guardar como PDF". En impresión se fuerza
+           texto negro y un borde (los bordes sí se imprimen) en vez de depender del fondo. */
+        .cliente-header{background:#fff!important;color:#000!important;border:1px solid #1a3a6b;}
+        .tot-gen, .tot-gen td{background:#fff!important;color:#000!important;border-top:1px solid #1a3a6b;border-bottom:1px solid #1a3a6b;}
+      }
     </style></head><body>
     <h2>CARTERA VIGENTE</h2>
     <div class="vendedor">VENDEDOR: ${vendNombre.toUpperCase()}</div>
@@ -486,7 +496,12 @@ export default function Cartera({ supabase, usuario, onClose }) {
     td{padding:4px 5px;border-bottom:1px solid #eee;overflow-wrap:break-word}
     tr:nth-child(even){background:#f5f7ff}
     .tot{font-weight:bold;background:#e8eaf6!important}
-    @media print{button{display:none}}</style></head><body>
+    @media print{
+      button{display:none}
+      /* mismo motivo que en Cartera Completa: si el navegador no imprime fondos, el
+         encabezado blanco-sobre-azul queda casi invisible/gris en papel o PDF */
+      th{background:#fff!important;color:#000!important;border-bottom:1px solid #1a3a6b;}
+    }</style></head><body>
     <h2>${titulo.replace('\n','<br>')}</h2>
     <p>Generado: ${new Date().toLocaleString('es-CO')} | Estado: ${filtEstado} | Mora: ${filtMora}</p>
     <button onclick="window.print()" style="margin-bottom:12px;padding:6px 18px;background:#1a3a6b;color:#fff;border:none;borderRadius:4px;cursor:pointer">🖨 Imprimir</button>`)
