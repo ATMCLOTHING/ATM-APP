@@ -235,6 +235,10 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
     let totalVentas=0, totalCredito=0, totalContado=0
     let totalEfectivo=0, totalTransferencia=0, totalMixto=0
+    // Desglose específico de Ventas Mostrador (cedvended<=1000): lo que entró en efectivo/
+    // transferencia/mixto ese mismo día (Contado) vs lo causado/facturado que quedó con saldo
+    // pendiente (Crédito o con saldo) — este último no es dinero que ingresó, es venta generada.
+    let totalMostradorContado=0, totalMostradorCredito=0
 
     notas.forEach(n => {
       const valDig = digitalPorNota[n.numnotaent]||0
@@ -242,10 +246,14 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       const medio = normMedio(n.mediopago)
       // esC: saldo pendiente = dinero no ingresado (ver acum() en calcConsolidado)
       const esC   = (n.saldo||0) > 0
+      const esMostrador = !esVendedorExterno(n.cedvended)
       totalVentas += val
-      if (esC) { totalCredito += val }
-      else {
+      if (esC) {
+        totalCredito += val
+        if (esMostrador) totalMostradorCredito += val
+      } else {
         totalContado += val
+        if (esMostrador) totalMostradorContado += val
         if (medio==='efectivo')           totalEfectivo      += val
         else if (medio==='transferencia') totalTransferencia += val
         else if (medio==='mixto')         totalMixto         += val
@@ -263,6 +271,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
 
     return {
       totalVentas, totalCredito, totalContado,
+      totalMostradorContado, totalMostradorCredito,
       totalEfectivo, totalTransferencia, totalMixto,
       totalIngresado, totalAbonosCredito, totalAyer,
       totalPendiente: datos.totalCarteraGlobal||0,
@@ -700,6 +709,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     <div class="f tot"><span class="lbl">VENTAS TOTALES</span><span class="val">$${fmt(resumen.totalVentas)}</span></div>
     <div class="f"><span class="lbl">Ventas a crédito</span><span class="val">$${fmt(resumen.totalCredito)}</span></div>
     <div class="f"><span class="lbl">Ventas de contado</span><span class="val">$${fmt(resumen.totalContado)}</span></div>
+    <div class="f"><span class="lbl">Ventas Mostrador Contado</span><span class="val" style="color:#2e7d32">$${fmt(resumen.totalMostradorContado)}</span></div>
+    <div class="f"><span class="lbl">Ventas Mostrador Crédito o con Saldo (causado en el período)</span><span class="val" style="color:#e65100">$${fmt(resumen.totalMostradorCredito)}</span></div>
     <div class="f"><span class="lbl">Ingresos en efectivo</span><span class="val">$${fmt(resumen.totalEfectivo)}</span></div>
     <div class="f"><span class="lbl">Ingresos en transferencia</span><span class="val">$${fmt(resumen.totalTransferencia)}</span></div>
     <div class="f"><span class="lbl">Ingresos en mixto</span><span class="val">$${fmt(resumen.totalMixto)}</span></div>
@@ -978,6 +989,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                     {lbl:'Ventas totales (contado + crédito)',        val:`$${fmt(resumen.totalVentas)}`,        grande:true},
                     {lbl:'Ventas a crédito',                          val:`$${fmt(resumen.totalCredito)}`},
                     {lbl:'Ventas de contado',                         val:`$${fmt(resumen.totalContado)}`},
+                    {lbl:'Ventas Mostrador Contado',                  val:`$${fmt(resumen.totalMostradorContado)}`, color:'#2e7d32'},
+                    {lbl:'Ventas Mostrador Crédito o con Saldo (causado en el período)', val:`$${fmt(resumen.totalMostradorCredito)}`, color:'#e65100'},
                     {lbl:'Ingresos en efectivo',                      val:`$${fmt(resumen.totalEfectivo)}`},
                     {lbl:'Ingresos en transferencia',                 val:`$${fmt(resumen.totalTransferencia)}`},
                     {lbl:'Ingresos en mixto',                         val:`$${fmt(resumen.totalMixto)}`},

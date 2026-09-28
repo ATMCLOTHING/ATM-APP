@@ -28,13 +28,30 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
     const notasActivas = (notas||[]).filter(n=>n.anulada!=='S')
     const notasAnuladas = (notas||[]).filter(n=>n.anulada==='S')
     const totalVentas  = notasActivas.reduce((s,n)=>s+(n.valtotal||0),0)
-    const totalAbonos  = notasActivas.reduce((s,n)=>s+(n.valabono||0),0)
     const totalPrendas = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
 
-    // cedvended con cédula larga (>1000) = vendedor externo; el resto son ventas de mostrador
-    const totalVentasMostrador = notasActivas
-      .filter(n => Number(n.cedvended) <= 1000)
+    // Abonos recibidos: dinero que realmente entró en el período, el día que entró — no el
+    // valabono acumulado de notas creadas en el período (eso mezclaba abonos de otros días).
+    // Igual criterio que CierreCaja.jsx (detabonos.fechaabono, excluyendo mediopago='Vale').
+    const abonosPeriodo = await fetchAll(() => supabase.from('detabonos')
+      .select('valabono,mediopago,fechaabono')
+      .gte('fechaabono', d).lte('fechaabono', h)
+      .order('id', {ascending:true}))
+    const totalAbonos = abonosPeriodo
+      .filter(a => (a.mediopago||'').trim().toLowerCase() !== 'vale')
+      .reduce((s,a)=>s+(a.valabono||0),0)
+
+    // cedvended con cédula larga (>1000) = vendedor externo; el resto son ventas de mostrador.
+    // Se separa Contado (dinero que entró ese mismo día) de Crédito o con saldo (lo causado/
+    // facturado en el período aunque el dinero no haya entrado todavía).
+    const notasMostrador = notasActivas.filter(n => Number(n.cedvended) <= 1000)
+    const totalVentasMostradorContado = notasMostrador
+      .filter(n => (n.saldo||0) <= 0)
       .reduce((s,n)=>s+(n.valtotal||0),0)
+    const totalVentasMostradorCredito = notasMostrador
+      .filter(n => (n.saldo||0) > 0)
+      .reduce((s,n)=>s+(n.valtotal||0),0)
+    const totalVentasMostrador = totalVentasMostradorContado + totalVentasMostradorCredito
     const totalVentasVendedor = totalVentas - totalVentasMostrador
 
     // Vales emitidos en el período
@@ -71,7 +88,8 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
     const topVend = Object.values(porVend).sort((a,b)=>b.total-a.total).slice(0,5)
 
     setMetricas({
-      totalVentas, totalVentasMostrador, totalVentasVendedor, totalAbonos, totalPrendas, totalVales,
+      totalVentas, totalVentasMostrador, totalVentasMostradorContado, totalVentasMostradorCredito,
+      totalVentasVendedor, totalAbonos, totalPrendas, totalVales,
       cantNotas: notasActivas.length,
       cantAnuladas: notasAnuladas.length,
       totalCartera, bajos:bajos||[], topVend,
@@ -159,7 +177,8 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
             ) : metricas && (
               <>
                 <div style={S.metricasGrid}>
-                  <Metrica label="Ventas mostrador"      val={`$${fmt(metricas.totalVentasMostrador)}`} color="#6a1b9a" icon="👖"/>
+                  <Metrica label="Ventas Mostrador Contado"           val={`$${fmt(metricas.totalVentasMostradorContado)}`} color="#2e7d32" icon="👖"/>
+                  <Metrica label="Ventas Mostrador Crédito o con Saldo" val={`$${fmt(metricas.totalVentasMostradorCredito)}`} color="#e65100" icon="👖"/>
                   <Metrica label="Ventas vendedor"       val={`$${fmt(metricas.totalVentasVendedor)}`}  color="#0d47a1" icon="👤"/>
                   <Metrica label="Ventas del período"    val={`$${fmt(metricas.totalVentas)}`}  color="#1a3a6b" icon="💰"/>
                   <Metrica label="Notas creadas"         val={metricas.cantNotas}               color="#2e7d32" icon="📋"/>
