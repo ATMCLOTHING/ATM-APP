@@ -156,14 +156,15 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       // nota "CONTADO" sin cobrar se sumaba de todos modos al cierre del día.
       const esC   = (n.saldo||0) > 0
       const valDig = digitalPorNota[n.numnotaent]||0
-      if (esC) { v.credito += n.valabono||0; v.noAbonado += n.saldo||0 }
+      // v.total = solo dinero que efectivamente ingresó (no se suma noAbonado: eso no es
+      // dinero del cierre del día hasta que entre, y se muestra aparte en su propia sección).
+      if (esC) { v.credito += n.valabono||0; v.noAbonado += n.saldo||0; v.total += n.valabono||0 }
       else {
-        if (medio==='efectivo')           v.efectivo      += val
-        else if (medio==='transferencia') v.transferencia += val
-        else if (medio==='mixto')         v.mixto         += val
-        else                              v.efectivo      += val
+        if (medio==='efectivo')           { v.efectivo      += val; v.total += val }
+        else if (medio==='transferencia') { v.transferencia += val; v.total += val }
+        else if (medio==='mixto')         { v.mixto         += val; v.total += val }
+        else                              { v.efectivo      += val; v.total += val }
       }
-      v.total += val
       v.digital += valDig
       v.notas++
     }
@@ -185,16 +186,15 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       const nomCaja = LABEL_CAJA[usu] || usu || 'Sin caja'
       acum(porCaja, nomCaja, n, val)
 
-      // Totales generales
-      totales.total += val
+      // Totales generales (mismo criterio que acum(): total = solo dinero ingresado)
       totales.digital += valDig
       totales.notas++
-      if (esC) { totales.credito += n.valabono||0; totales.noAbonado += n.saldo||0 }
+      if (esC) { totales.credito += n.valabono||0; totales.noAbonado += n.saldo||0; totales.total += n.valabono||0 }
       else {
-        if (medio==='efectivo')           totales.efectivo      += val
-        else if (medio==='transferencia') totales.transferencia += val
-        else if (medio==='mixto')         totales.mixto         += val
-        else                              totales.efectivo      += val
+        if (medio==='efectivo')           { totales.efectivo      += val; totales.total += val }
+        else if (medio==='transferencia') { totales.transferencia += val; totales.total += val }
+        else if (medio==='mixto')         { totales.mixto         += val; totales.total += val }
+        else                              { totales.efectivo      += val; totales.total += val }
       }
     })
 
@@ -427,7 +427,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     @media print{body{padding:8px;}}
   `
 
-  const filaTabla = (nom, v) => `
+  const filaTabla = (nom, v, ocultarNoAbonado) => `
     <tr>
       <td>${nom}</td>
       <td>${v.notas}</td>
@@ -435,18 +435,18 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       <td>${v.transferencia?'$'+fmt(v.transferencia):''}</td>
       <td>${v.mixto?'$'+fmt(v.mixto):''}</td>
       <td>${v.credito?'$'+fmt(v.credito):''}</td>
-      <td style="color:#c62828">${v.noAbonado?'$'+fmt(v.noAbonado):''}</td>
+      ${ocultarNoAbonado?'':`<td style="color:#c62828">${v.noAbonado?'$'+fmt(v.noAbonado):''}</td>`}
       <td><b>$${fmt(v.total)}</b></td>
     </tr>`
 
-  const cabeceraTabla = (titulo) => `
-    <tr class="sec"><td colspan="8">${titulo}</td></tr>
+  const cabeceraTabla = (titulo, ocultarNoAbonado) => `
+    <tr class="sec"><td colspan="${ocultarNoAbonado?7:8}">${titulo}</td></tr>
     <tr style="background:#1a3a6b">
       <th style="text-align:left">NOMBRE</th><th>NOTAS</th><th>EFECTIVO</th>
-      <th>TRANSF.</th><th>MIXTO</th><th>CRÉDITO</th><th>NO ABONADO</th><th>TOTAL</th>
+      <th>TRANSF.</th><th>MIXTO</th><th>CRÉDITO</th>${ocultarNoAbonado?'':'<th>NO ABONADO</th>'}<th>TOTAL</th>
     </tr>`
 
-  const filaSubtotal = (etiqueta, v) => `
+  const filaSubtotal = (etiqueta, v, ocultarNoAbonado) => `
     <tr style="background:#eef2ff;font-style:italic;font-weight:800">
       <td>Subtotal ${etiqueta}</td>
       <td>${v.notas}</td>
@@ -454,7 +454,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       <td>${v.transferencia?'$'+fmt(v.transferencia):''}</td>
       <td>${v.mixto?'$'+fmt(v.mixto):''}</td>
       <td>${v.credito?'$'+fmt(v.credito):''}</td>
-      <td style="color:#c62828">${v.noAbonado?'$'+fmt(v.noAbonado):''}</td>
+      ${ocultarNoAbonado?'':`<td style="color:#c62828">${v.noAbonado?'$'+fmt(v.noAbonado):''}</td>`}
       <td><b>$${fmt(v.total)}</b></td>
     </tr>`
 
@@ -466,9 +466,9 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     <div class="sub">DESDE ${fmtFecha(desde)} &nbsp;&nbsp; HASTA ${fmtFecha(hasta)}</div>
     <table>
       <tbody>
-        ${cabeceraTabla('VENTAS POR VENDEDORA DE MOSTRADOR')}
-        ${Object.entries(cons.vendMostrador).sort((a,b)=>b[1].total-a[1].total).map(([n,v])=>filaTabla(n,v)).join('')}
-        ${Object.keys(cons.vendMostrador).length ? filaSubtotal('mostrador', cons.subtotalMostrador) : ''}
+        ${cabeceraTabla('VENTAS POR VENDEDORA DE MOSTRADOR', true)}
+        ${Object.entries(cons.vendMostrador).sort((a,b)=>b[1].total-a[1].total).map(([n,v])=>filaTabla(n,v,true)).join('')}
+        ${Object.keys(cons.vendMostrador).length ? filaSubtotal('mostrador', cons.subtotalMostrador, true) : ''}
         ${Object.keys(cons.vendExterno).length ? cabeceraTabla('VENTAS POR VENDEDOR EXTERNO') + Object.entries(cons.vendExterno).map(([n,v])=>filaTabla(n,v)).join('') + filaSubtotal('vendedores externos', cons.subtotalExterno) : ''}
         ${cabeceraTabla('TOTALES POR CAJA')}
         ${Object.entries(cons.porCaja).map(([n,v])=>filaTabla(n,v)).join('')}
@@ -485,6 +485,16 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
         </tr>
       </tbody>
     </table>
+    <table>
+      <tbody>
+        <tr class="sec"><td colspan="3">VENTAS DE MOSTRADOR CRÉDITO O CON SALDO</td></tr>
+        <tr style="background:#1a3a6b"><th style="text-align:left">NOMBRE</th><th>NOTAS</th><th>NO ABONADO</th></tr>
+        ${Object.entries(cons.vendMostrador).filter(([,v])=>v.noAbonado>0).sort((a,b)=>b[1].noAbonado-a[1].noAbonado).map(([n,v])=>`
+        <tr><td>${n}</td><td>${v.notas}</td><td style="color:#c62828"><b>$${fmt(v.noAbonado)}</b></td></tr>`).join('')}
+        ${cons.subtotalMostrador.noAbonado>0 ? `<tr style="background:#fdecea;font-style:italic;font-weight:800">
+          <td>Subtotal mostrador con saldo</td><td></td><td style="color:#c62828">$${fmt(cons.subtotalMostrador.noAbonado)}</td></tr>` : '<tr><td colspan="3" style="text-align:center;color:#888">Sin saldo pendiente de mostrador en este período.</td></tr>'}
+      </tbody>
+    </table>
     <div style="display:flex;gap:12px;margin-bottom:14px;">
       <div style="flex:1;background:#e8f5e9;border:1px dashed #2e7d32;border-radius:6px;padding:10px 14px;font-weight:700;color:#1b5e20;display:flex;justify-content:space-between;">
         <span>👗 TOTAL VENTAS MOSTRADOR</span><span>$${fmt(cons.subtotalMostrador.total)}</span>
@@ -492,6 +502,9 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       ${Object.keys(cons.vendExterno).length ? `<div style="flex:1;background:#e3f2fd;border:1px dashed #1565c0;border-radius:6px;padding:10px 14px;font-weight:700;color:#0d47a1;display:flex;justify-content:space-between;">
         <span>👤 TOTAL VENTAS VENDEDORES EXTERNOS</span><span>$${fmt(cons.subtotalExterno.total)}</span>
       </div>` : ''}
+      <div style="flex:1;background:#fdecea;border:1px dashed #c62828;border-radius:6px;padding:10px 14px;font-weight:700;color:#c62828;display:flex;justify-content:space-between;">
+        <span>💳 TOTAL VENTAS MOSTRADOR CRÉDITO O CON SALDO</span><span>$${fmt(cons.subtotalMostrador.noAbonado)}</span>
+      </div>
     </div>
     <div style="background:#ede7f6;border:1px dashed #7e57c2;border-radius:6px;padding:10px 14px;font-weight:700;color:#4527a0;display:flex;justify-content:space-between;">
       <span>📲 MARCA DIGITAL (no incluida en el cierre de caja)</span><span>$${fmt(cons.totales.digital)}</span>
@@ -793,16 +806,19 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     {id:'porusuario',  icon:'👤', label:'Por Usuario'},
   ]
 
-  const TablaConsolidado = ({ titulo, datos: filas, icono }) => {
+  const TablaConsolidado = ({ titulo, datos: filas, icono, ocultarNoAbonado }) => {
     const hayFilas = Object.keys(filas).length > 0
     const sub = sumarBloque(filas)
+    const cols = ocultarNoAbonado
+      ? ['Nombre','Notas','Efectivo','Transferencia','Mixto','Crédito','Total']
+      : ['Nombre','Notas','Efectivo','Transferencia','Mixto','Crédito','No Abonado','Total']
     return (
       <div style={{marginBottom:24}}>
         <div style={P.secTit}><span style={{fontSize:18}}>{icono}</span> {titulo} — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
         <table style={P.tabla}>
           <thead>
             <tr style={P.thead}>
-              {['Nombre','Notas','Efectivo','Transferencia','Mixto','Crédito','No Abonado','Total'].map(h=>(
+              {cols.map(h=>(
                 <th key={h} style={{...P.th, textAlign:h==='Nombre'?'left':'right'}}>{h}</th>
               ))}
             </tr>
@@ -816,7 +832,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                 <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>{v.transferencia?`$${fmt(v.transferencia)}`:''}</td>
                 <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>{v.mixto?`$${fmt(v.mixto)}`:''}</td>
                 <td style={{...P.td,textAlign:'right',color:'#e65100'}}>{v.credito?`$${fmt(v.credito)}`:''}</td>
-                <td style={{...P.td,textAlign:'right',color:'#c62828'}}>{v.noAbonado?`$${fmt(v.noAbonado)}`:''}</td>
+                {!ocultarNoAbonado && <td style={{...P.td,textAlign:'right',color:'#c62828'}}>{v.noAbonado?`$${fmt(v.noAbonado)}`:''}</td>}
                 <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#1a3a6b'}}>${fmt(v.total)}</td>
               </tr>
             ))}
@@ -828,12 +844,12 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                 <td style={{...P.td,textAlign:'right',color:'#1565c0'}}>{sub.transferencia?`$${fmt(sub.transferencia)}`:''}</td>
                 <td style={{...P.td,textAlign:'right',color:'#6a1b9a'}}>{sub.mixto?`$${fmt(sub.mixto)}`:''}</td>
                 <td style={{...P.td,textAlign:'right',color:'#e65100'}}>{sub.credito?`$${fmt(sub.credito)}`:''}</td>
-                <td style={{...P.td,textAlign:'right',color:'#c62828'}}>{sub.noAbonado?`$${fmt(sub.noAbonado)}`:''}</td>
+                {!ocultarNoAbonado && <td style={{...P.td,textAlign:'right',color:'#c62828'}}>{sub.noAbonado?`$${fmt(sub.noAbonado)}`:''}</td>}
                 <td style={{...P.td,textAlign:'right',fontWeight:800,color:'#1a3a6b'}}>${fmt(sub.total)}</td>
               </tr>
             )}
             {!hayFilas && (
-              <tr><td colSpan={8} style={{textAlign:'center',padding:16,color:'#aaa'}}>Sin datos en este período.</td></tr>
+              <tr><td colSpan={cols.length} style={{textAlign:'center',padding:16,color:'#aaa'}}>Sin datos en este período.</td></tr>
             )}
           </tbody>
         </table>
@@ -899,13 +915,47 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
               {/* ── CONSOLIDADO ── */}
               {tab==='consolidado' && cons && (
                 <div>
-                  <TablaConsolidado titulo="Ventas por Vendedora de Mostrador" icono="👗" datos={cons.vendMostrador} />
+                  <TablaConsolidado titulo="Ventas por Vendedora de Mostrador" icono="👗" datos={cons.vendMostrador} ocultarNoAbonado />
                   {Object.keys(cons.vendExterno).length > 0 && (
                     <TablaConsolidado titulo="Ventas por Vendedor Externo" icono="👤" datos={cons.vendExterno} />
                   )}
 
-                  {/* Comparación total mostrador vs externos */}
-                  <div style={{display:'flex',gap:12,marginBottom:24}}>
+                  {/* Ventas de mostrador con saldo pendiente: no es dinero del cierre del día,
+                      se muestra aparte y solo pasa a "Abonos recibidos" el día que entra */}
+                  <div style={{marginBottom:24}}>
+                    <div style={P.secTit}><span style={{fontSize:18}}>💳</span> Ventas de Mostrador Crédito o con Saldo — {fmtFecha(desde)} al {fmtFecha(hasta)}</div>
+                    <table style={P.tabla}>
+                      <thead>
+                        <tr style={P.thead}>
+                          {['Nombre','Notas','No Abonado'].map(h=>(
+                            <th key={h} style={{...P.th, textAlign:h==='Nombre'?'left':'right'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(cons.vendMostrador).filter(([,v])=>v.noAbonado>0).sort((a,b)=>b[1].noAbonado-a[1].noAbonado).map(([nom,v],i)=>(
+                          <tr key={nom} style={{background:i%2===0?'#fff':'#f5f7fc'}}>
+                            <td style={{...P.td,fontWeight:600}}>{nom}</td>
+                            <td style={{...P.td,textAlign:'right',color:'#555'}}>{v.notas}</td>
+                            <td style={{...P.td,textAlign:'right',fontWeight:700,color:'#c62828'}}>${fmt(v.noAbonado)}</td>
+                          </tr>
+                        ))}
+                        {cons.subtotalMostrador.noAbonado>0 && (
+                          <tr style={{...P.totRow,background:'#fdecea',fontStyle:'italic'}}>
+                            <td style={P.td}>Subtotal mostrador con saldo</td>
+                            <td style={{...P.td,textAlign:'right'}}>{Object.values(cons.vendMostrador).reduce((s,v)=>s+(v.noAbonado>0?v.notas:0),0)}</td>
+                            <td style={{...P.td,textAlign:'right',fontWeight:800,color:'#c62828'}}>${fmt(cons.subtotalMostrador.noAbonado)}</td>
+                          </tr>
+                        )}
+                        {cons.subtotalMostrador.noAbonado<=0 && (
+                          <tr><td colSpan={3} style={{textAlign:'center',padding:16,color:'#aaa'}}>Sin saldo pendiente de mostrador en este período.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Comparación total mostrador vs externos vs mostrador con saldo */}
+                  <div style={{display:'flex',gap:12,marginBottom:24,flexWrap:'wrap'}}>
                     <div style={{...P.digitalBox,flex:1,background:'#e8f5e9',border:'1px dashed #2e7d32',color:'#1b5e20'}}>
                       <span><span style={{fontSize:17}}>👗</span> TOTAL VENTAS MOSTRADOR</span>
                       <strong>${fmt(cons.subtotalMostrador.total)}</strong>
@@ -916,6 +966,10 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
                         <strong>${fmt(cons.subtotalExterno.total)}</strong>
                       </div>
                     )}
+                    <div style={{...P.digitalBox,flex:1,background:'#fdecea',border:'1px dashed #c62828',color:'#c62828'}}>
+                      <span><span style={{fontSize:17}}>💳</span> TOTAL VENTAS MOSTRADOR CRÉDITO O CON SALDO</span>
+                      <strong>${fmt(cons.subtotalMostrador.noAbonado)}</strong>
+                    </div>
                   </div>
 
                   <TablaConsolidado titulo="Totales por Caja" icono="🏧" datos={cons.porCaja} />
