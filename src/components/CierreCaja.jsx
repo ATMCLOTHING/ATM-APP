@@ -68,8 +68,8 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     setCargando(true)
     try {
       const notas = await fetchAll(() => supabase.from('encnotaen')
-        .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,cantotal,codclient,usuario')
-        .gte('fechanotae', desde).lte('fechanotae', hasta)
+        .select('numnotaent,fechanotae,fechavence,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,cantotal,codclient,usuario')
+        .gte('fechavence', desde).lte('fechavence', hasta)
         .or('anulada.is.null,anulada.neq.S')
         .order('numnotaent', {ascending:true}))
 
@@ -344,7 +344,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     const get = f => { if (!porDia[f]) porDia[f] = { fecha:f, notas:0, efectivo:0, transferencia:0, mixto:0, credito:0, abonosCartera:0, valesAplicados:0, totalVentas:0, totalIngresado:0 }; return porDia[f] }
 
     notas.forEach(n => {
-      const d = get(n.fechanotae)
+      const d = get(n.fechavence)
       const valDig = digitalPorNota[n.numnotaent]||0
       const val   = (n.valtotal||0) - valDig
       const medio = normMedio(n.mediopago)
@@ -376,7 +376,7 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
     if (!datos) return []
     const { notas, detalle } = datos
     const fechaPorNota = {}
-    notas.forEach(n => { fechaPorNota[n.numnotaent] = n.fechanotae })
+    notas.forEach(n => { fechaPorNota[n.numnotaent] = n.fechavence })
 
     const porDia = {}
     rangoFechas(desde, hasta).forEach(f => { porDia[f] = { fecha:f, items:{}, totalUnidades:0, totalVenta:0 } })

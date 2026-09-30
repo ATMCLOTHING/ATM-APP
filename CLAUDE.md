@@ -1,120 +1,335 @@
-\# ATM-APP
+# ATM-APP
 
+## Qué es
 
+Sistema de gestión interna para ATM Clothing (jeans).
 
-\## Qué es
+Administra inventario, clientes, proveedores, cartera, ventas, caja, comisiones, usuarios y demás procesos internos de la empresa.
 
-Sistema de gestión interna para ATM Clothing (jeans). Administra inventario de productos y pedidos de clientes. Usado por varios usuarios con distintos roles (no solo un usuario admin).
+La aplicación es utilizada simultáneamente por varios usuarios con distintos roles y permisos.
 
+---
 
+# Tecnologías
 
-\## Tecnologías
+- Frontend: HTML, CSS y JavaScript.
+- Base de datos: PostgreSQL en Supabase.
+- Control de versiones: Git + GitHub.
+- Despliegue: Vercel (cuando se configure).
 
-\- Frontend: HTML / CSS / JS puro (sin framework)
+---
 
-\- Base de datos: SQL, manejada en Supabase
+# Prioridad de configuración
 
+Las políticas de permisos, acceso a herramientas, variables de entorno y modo de ejecución están definidas en:
 
+.claude/settings.json
 
-\## Cuentas de este proyecto
+Este documento NO debe contradecir esa configuración.
 
-\- Carpeta local: `C:\\Mis\_Apps\\ATM-APP`
+Si existe alguna diferencia entre este documento y settings.json, siempre prevalece settings.json.
 
-\- GitHub: usar la cuenta \*\*atmjeans.app@gmail.com\*\* (ya configurada como `git config user.email` en esta carpeta — si Claude ve otra cuenta activa debe avisar antes de hacer push)
+---
 
-\- Supabase: proyecto ya vinculado con `supabase link`, Reference ID \*\*snyaahynqqeotsdvsenw\*\*
+# Información del proyecto
 
-\- Vercel: todavía no configurado en este proyecto (pendiente `vercel link`)
+Carpeta local
 
+C:\Mis_Apps\ATM-APP
 
+Repositorio GitHub
 
-\## Modo de trabajo: autónomo
+https://github.com/atmjeans
 
-La usuaria trabaja en modo autónomo: **no hay que pausar a pedir aprobación antes de programar, hacer `git commit`, hacer `git push`, ni de tocar la base de datos en Supabase** (incluye correr migraciones/`supabase db push` cuando el cambio lo requiera). Se avisa **después** de hecho, no antes: qué se hizo, qué archivos cambiaron, por qué, y cómo probarlo. Esto reemplaza cualquier paso de "mostrar plan y esperar aprobación" de versiones anteriores de este documento.
+Cuenta de GitHub que debe utilizar este proyecto
 
-Esto NO cambia el resto de las reglas de cuidado (rol de usuario, revertir si algo se rompe, explicar en español simple, no tocar la tabla `clientes` sin decirlo, etc.) — solo elimina la pausa previa. Si una acción es realmente difícil de revertir o de alto riesgo (ej. borrar tablas completas, `--force`), seguir avisando/confirmando antes, igual que el comportamiento por defecto de Claude Code.
+atmjeans.app@gmail.com
 
-## Rutina de trabajo esperada
+Proyecto Supabase
 
-1\. El usuario abre PowerShell y se mueve a esta carpeta.
+Reference ID:
 
-2\. Si la tarea toca la base de datos, el usuario activa el token de Supabase de este proyecto en la sesión (`$env:SUPABASE\_ACCESS\_TOKEN`) antes de abrir Claude Code.
+snyaahynqqeotsdvsenw
 
-3\. Programar el cambio directamente (sin pausa de aprobación previa — ver "Modo de trabajo: autónomo").
+Claude Code ya dispone del token de Supabase mediante settings.json.
 
-4\. Después de hacer el cambio, indicar cómo probarlo.
+No es necesario solicitar que el usuario configure variables de entorno.
 
-5\. Después de hacer `git commit` / `git push`, indicar qué archivos cambiaron y por qué.
+---
 
-6\. Si el cambio tocó la base de datos en Supabase, avisar explícitamente qué se ejecutó (o qué falta ejecutar, ej. `supabase db push`, si algo requiere que lo corra la usuaria manualmente por permisos).
+# Forma de trabajar
 
-7\. El usuario es nueva usando terminal y Claude Code: explicar cada paso y cada comando en español simple, sin dar por hecho que conoce la terminal.
+Trabajar como un desarrollador senior completamente autónomo.
 
+Se espera que Claude Code:
 
+- Analice el proyecto antes de modificar código.
+- Entienda el contexto.
+- Investigue cómo funciona el módulo involucrado.
+- Implemente la mejor solución.
+- Corrija automáticamente errores encontrados.
+- Ejecute pruebas.
+- Valide el resultado.
+- Haga commit.
+- Haga push.
+- Informe al finalizar.
 
-\## Reglas para trabajar en este proyecto
+No detener el trabajo para mostrar planes ni pedir autorización cuando la acción ya esté permitida por settings.json.
 
-\- Explicar siempre los cambios en español, en lenguaje simple y sin tecnicismos innecesarios
+La comunicación con la usuaria debe hacerse únicamente cuando el trabajo ya esté realizado o cuando exista un riesgo extraordinario e irreversible.
 
-\- Programar/commitear/hacer push/tocar la base de datos sin pausa previa de aprobación — avisar después de hecho (ver "Modo de trabajo: autónomo")
+---
 
-\- Después de hacer commit/push, mostrar un resumen de qué archivos cambiaron
+# Autonomía
 
-\- Tener cuidado especial con los permisos por rol de usuario (no romper el acceso de otros roles al modificar algo)
+Claude Code debe ejecutar automáticamente todas las acciones autorizadas por settings.json, incluyendo:
 
-\- Si algo tocó la base de datos en Supabase, avisar explícitamente después de ejecutar
+- editar archivos
+- crear archivos
+- eliminar archivos innecesarios
+- ejecutar comandos
+- instalar dependencias
+- ejecutar npm
+- ejecutar node
+- ejecutar scripts
+- ejecutar Supabase CLI
+- ejecutar migraciones
+- hacer git add
+- hacer git commit
+- hacer git push
+- corregir errores encontrados durante el proceso
+- volver a ejecutar pruebas
 
-\- Si un cambio rompe algo, revertir con git y avisar a la usuaria — no intentar arreglarlo sobre la marcha sin decirle primero
+No detenerse entre pasos.
 
+Si aparece un error:
 
+- investigar la causa
+- intentar otra estrategia
+- corregir automáticamente
+- volver a probar
 
-\## Estructura del proyecto
+Continuar trabajando hasta completar la tarea.
 
-\- `src/components/` — una vista/modal por archivo (React, sin router): `Dashboard.jsx` es el menú principal; `NotaDeEntrega.jsx`, `Cartera.jsx`, `Articulos.jsx`, `Clientes.jsx`, `Proveedores.jsx`, `CierreCaja.jsx`, `Egresos.jsx`, `Comisiones.jsx`, `Vales.jsx`, `Vendedores.jsx`, `ControlDocumentos.jsx`, `GestionUsuarios.jsx` son los módulos; los `Modal*.jsx` son diálogos que se abren desde esos módulos (ej. `ModalAbonos.jsx`, `ModalAutorizarUsuario.jsx`, `ModalPin.jsx`, `ModalDevolucion.jsx`).
+---
 
-\- `src/lib/` — utilidades compartidas: `auth.js` (sesión en localStorage + `tienePermiso()`), `fecha.js` (`fmtFecha` para DD/MM/AAAA), `supabase.js` (cliente Supabase), `assets.js` (íconos/logo).
+# Git
 
-\- `App.jsx` — controla login y qué se muestra según `usuario.rol` (algunos roles redirigen directo a un módulo, ver "Roles de usuario" abajo).
+Antes de hacer git push verificar automáticamente:
 
-\- `supabase/migrations/` — migraciones SQL para `supabase db push` (carpeta nueva, no todo el historial de cambios de BD pasó por aquí — antes se corrían sueltas).
+git config user.email
 
-\- `sql/` — respaldos/export de esquema y datos (`backup_esquema.sql`, `backup_datos.sql`), no son migraciones a aplicar.
+Debe corresponder a:
 
-\- `docs/` — capturas de pantalla y archivos de referencia que la usuaria va dejando para explicarle tareas a Claude Code; algunos son grandes o sensibles y no están en git (ver `.gitignore`).
+atmjeans.app@gmail.com
 
-\- `.github/workflows/backup-automatico.yml` — respaldo semanal automático de la base de datos hacia Google Drive.
+Si corresponde a otra cuenta:
 
+- corregir la configuración local del repositorio
+- realizar el push
+- informar después que fue corregido
 
+Nunca detener el trabajo por ese motivo.
 
-\## Entorno de pruebas vs. producción
+---
 
-\- No existe un proyecto de Supabase de pruebas separado: solo está linkeado el proyecto real de ATM-APP (ref `snyaahynqqeotsdvsenw`). Todo cambio de base de datos (migraciones, `db push`, SQL directo) se aplica directo sobre producción — no hay ambiente intermedio donde probar primero.
+# Supabase
 
+Este proyecto trabaja directamente sobre producción.
 
+No existe ambiente de pruebas separado.
 
-\## Roles de usuario
+Claude Code puede:
 
-Columna `usuarios.rol` (texto libre, sin restricción en la base de datos). El código de `src/lib/auth.js`, `App.jsx` y `Dashboard.jsx` trata distinto cada valor:
+- ejecutar SQL
+- crear migraciones
+- ejecutar supabase db push
+- ejecutar Supabase CLI
+- actualizar funciones
+- actualizar políticas
+- actualizar tablas
 
-\- \*\*admin\*\*: acceso total sin restricciones (`tienePermiso()` siempre devuelve `true`).
+Siempre informar al finalizar:
 
-\- \*\*cajera\*\* / \*\*vendedor\*\*: al iniciar sesión entran derecho a "Nota de Entrega" (nunca ven el menú/Dashboard), y ya traen acceso por defecto a varios módulos sin necesidad de marcarlos en Gestión de Usuarios.
+- qué se modificó
+- qué migraciones se ejecutaron
+- qué tablas cambiaron
 
-\- \*\*bodega\*\*: al iniciar sesión entra derecho a "Artículos", mismo comportamiento que cajera/vendedor.
+No pedir autorización antes de hacerlo si está permitido por settings.json.
 
-\- \*\*consulta\*\*: rol "en blanco" a propósito — sin redirección fija ni módulos por defecto. Es el que hay que usar si se necesita un usuario restringido a un solo módulo puntual (marcando solo ese módulo en "Permisos por módulo" desde Gestión de Usuarios).
+Solo solicitar confirmación cuando una acción implique un riesgo extraordinario e irreversible, por ejemplo:
 
-\- Los permisos granulares por módulo (`usuario_permisos`: puede\_ver/crear/editar/eliminar/anular) se gestionan desde Gestión de Usuarios. Hay además un permiso especial fuera de esa tabla-por-módulo: \*\*puede\_revertir\_abono\*\* (ligado al módulo "nota"), que controla quién puede revertir abonos en el modal de Abonos sin necesitar autorización de otra persona (ver flujo de autorización más abajo).
+- borrar completamente una base de datos
+- eliminar tablas completas sin respaldo
+- eliminar ramas remotas importantes
+- operaciones destructivas imposibles de revertir razonablemente
 
+---
 
+# Comunicación
 
-\## Autorización de acciones sensibles (step-up auth)
+Siempre responder en español.
 
-Para acciones sensibles con permiso granular (por ahora: revertir abonos), el botón queda siempre visible para cualquier usuario logueado — no se oculta ni se deshabilita por rol/permiso. La validación ocurre al momento de ejecutar la acción:
+Explicar en lenguaje sencillo.
 
-\- Si quien tiene la sesión abierta ya está autorizado (admin, o tiene el permiso específico) → solo se pide una confirmación simple y se ejecuta.
+No utilizar tecnicismos innecesarios.
 
-\- Si no está autorizado → se abre `ModalAutorizarUsuario.jsx`, que pide usuario y contraseña de una persona que sí esté autorizada, valida contra la tabla `usuarios` y el permiso en `usuario_permisos`, y solo entonces ejecuta la acción.
+Al terminar cualquier tarea informar:
 
-Este patrón (no el PIN genérico compartido de `ModalPin.jsx`, que sigue usándose sin cambios para anular notas y en Vales) es el que se debe seguir si se agrega autorización a otras acciones sensibles en el futuro.
+- qué hizo
+- qué archivos modificó
+- por qué
+- cómo probarlo
+- qué comandos ejecutó
+- qué migraciones ejecutó
+- qué commit realizó
+- qué push realizó
 
+No describir cada paso antes de hacerlo.
+
+Primero ejecutar.
+
+Después informar.
+
+---
+
+# Calidad del código
+
+Siempre:
+
+- mantener consistencia con el estilo existente
+- reutilizar funciones antes de crear nuevas
+- evitar duplicación
+- eliminar código muerto
+- corregir warnings cuando sea posible
+- corregir errores relacionados encontrados durante el trabajo aunque no hayan sido solicitados directamente
+
+---
+
+# Roles de usuario
+
+Respetar siempre la lógica existente.
+
+No romper permisos.
+
+No modificar comportamiento de otros roles salvo que la tarea lo requiera.
+
+Roles actuales:
+
+- admin
+- cajera
+- vendedor
+- bodega
+- consulta
+
+Los permisos granulares se controlan mediante:
+
+usuario_permisos
+
+No modificar su funcionamiento salvo solicitud expresa.
+
+---
+
+# Autorizaciones especiales
+
+Las acciones sensibles continúan utilizando el mecanismo existente basado en:
+
+ModalAutorizarUsuario.jsx
+
+No reemplazar este mecanismo.
+
+Si se agregan nuevas autorizaciones sensibles utilizar el mismo patrón.
+
+---
+
+# Estructura del proyecto
+
+src/components/
+
+Módulos principales.
+
+src/lib/
+
+Funciones compartidas.
+
+App.jsx
+
+Control de sesión y navegación.
+
+supabase/migrations/
+
+Migraciones oficiales.
+
+sql/
+
+Respaldos.
+
+docs/
+
+Documentación.
+
+.github/workflows/
+
+Automatizaciones.
+
+---
+
+# Objetivo
+
+Priorizar siempre:
+
+1. estabilidad
+
+2. simplicidad
+
+3. mantenibilidad
+
+4. seguridad
+
+5. experiencia del usuario
+
+Antes de finalizar verificar que:
+
+- el proyecto compile
+- no existan errores evidentes
+- los cambios sean consistentes
+- el código quede listo para producción
+
+Si durante el trabajo detectas mejoras pequeñas claramente beneficiosas y de bajo riesgo, impleméntalas sin detenerte y repórtalas al finalizar.
+
+<!-- BEGIN: actualiza-memoria-control-intervencion -->
+## Actualizar Control_Intervencion_Diaria.xlsx ("Actualiza Memoria")
+
+Cuando el usuario diga **"Actualiza Memoria"** (o "actualiza memoria") en esta sesión, además de
+guardar la memoria de la sesión como normalmente lo harías:
+
+1. Resume en 1-2 líneas qué se hizo en la sesión (será la "Actividad realizada").
+2. Define el "Estado tras la intervención": uno de "Al día", "Pendiente", "Atrasado", "Pausado", "Finalizado".
+3. Si aplica, define el "Próximo paso" (y opcionalmente una fecha para ese próximo paso).
+4. Verifica que `C:\mis_apps\Control_Intervencion_Diaria.xlsx` no esté abierto en Excel (si lo está, pide al usuario que lo cierre y no sigas intentando en loop).
+5. Ejecuta en terminal:
+
+   ```
+   node C:\mis_apps\excel-tools\log-intervencion.js --proyecto "ATM" --actividad "<resumen>" --estado "<estado>" --proximo "<próximo paso>"
+   ```
+
+   El nombre de proyecto de ESTA carpeta en la hoja "Proyectos" de Control_Intervencion_Diaria.xlsx es
+   exactamente: **"ATM"** (no lo cambies ni lo traduzcas).
+
+6. Inmediatamente después (SIEMPRE, no solo si algo se ve roto), ejecuta también:
+
+   ```
+   node C:\mis_apps\excel-tools\fix-proyectos-formulas.js
+   ```
+
+   Motivo: el usuario abre este archivo directamente en Excel entre sesiones, y eso (por una
+   causa aún no confirmada) termina pisando con valores fijos las fórmulas de la hoja
+   "Proyectos" que traen "Última intervención" y "Qué queda pendiente" desde la Bitácora — ya
+   pasó el 2026-09-13 en 17 de 31 filas, incluida Higietex. Este script repara/reescribe esas
+   fórmulas siempre; es idempotente y no hace daño correrlo aunque no haga falta.
+
+Nunca edites ese xlsx directamente con ExcelJS ni otro script por tu cuenta: usa siempre
+`log-intervencion.js` (ya valida el proyecto/estado, encuentra la fila libre, guarda, y repara
+automáticamente unas extensiones de Excel que ExcelJS rompe si se tocan a mano — ver
+`C:\mis_apps\excel-tools\fix-extlst.js`) y luego `fix-proyectos-formulas.js` (paso 6 arriba).
+<!-- END: actualiza-memoria-control-intervencion -->

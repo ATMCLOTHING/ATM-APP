@@ -1,0 +1,21 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- HOTFIX: ambigüedad de sobrecarga en guardar_nota_completa
+-- ═══════════════════════════════════════════════════════════════════════════
+-- La migración anterior (ajustar_saldo_negativo_nota) le agregó el parámetro
+-- p_confirmar_ajuste_saldo (con DEFAULT) a guardar_nota_completa esperando que
+-- CREATE OR REPLACE reemplazara la función existente. Postgres, sin embargo,
+-- identifica una función por su lista completa de tipos de parámetros: al
+-- cambiar de 4 a 5 parámetros quedaron DOS funciones separadas conviviendo
+-- (la vieja de 4 y la nueva de 5 con default), y cualquier llamada con
+-- exactamente los 4 argumentos viejos (como el bundle del navegador que
+-- todavía no se ha desplegado, atascado por el incidente de Vercel de hoy)
+-- queda ambigua entre ambas — rompiendo el guardado de TODAS las notas de
+-- entrega en producción ahora mismo (ver "Error al guardar: Could not choose
+-- the best candidate function..." en la nota 58257).
+--
+-- Se elimina la sobrecarga vieja de 4 parámetros: solo debe quedar la de 5
+-- (con DEFAULT false), que sigue resolviendo sin problema las llamadas viejas
+-- de 4 argumentos mientras el nuevo bundle del navegador termina de desplegarse.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+DROP FUNCTION IF EXISTS public.guardar_nota_completa(bigint, jsonb, jsonb, text);

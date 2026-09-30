@@ -22,7 +22,7 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
     // y las métricas del período aparecían por debajo de lo real.
     const notas = await fetchAll(() => supabase.from('encnotaen')
       .select('valtotal,valabono,saldo,cedvended,anulada,cantotal,numnotaent')
-      .gte('fechanotae', d).lte('fechanotae', h)
+      .gte('fechavence', d).lte('fechavence', h)
       .order('numnotaent', {ascending:true}))
 
     const notasActivas = (notas||[]).filter(n=>n.anulada!=='S')

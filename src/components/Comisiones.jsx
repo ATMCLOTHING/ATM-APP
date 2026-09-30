@@ -83,7 +83,7 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
     // .limit(2000) no alcanzaba a evitarlo: Supabase igual responde máximo 1000 filas por página.
     const buildQuery = () => {
       let q = supabase.from('encnotaen')
-        .select('numnotaent,fechanotae,nombreclie,valtotal,valabono,saldo,formapago,mediopago,usuario,comision_pagada')
+        .select('numnotaent,fechanotae,fechavence,nombreclie,valtotal,valabono,saldo,formapago,mediopago,usuario,comision_pagada')
         .eq('cedvended', filtVend)
         .or('anulada.is.null,anulada.neq.S')
         .eq('comision_pagada', false)  // solo las no liquidadas aún
@@ -91,8 +91,8 @@ export default function Comisiones({ supabase, usuario, onClose, onAyuda }) {
         .order('numnotaent', {ascending:true})
       // Excluir notas hechas por cajeras
       // (las cajeras no generan comisión)
-      if (usarFecha && desde) q = q.gte('fechanotae', desde)
-      if (usarFecha && hasta) q = q.lte('fechanotae', hasta)
+      if (usarFecha && desde) q = q.gte('fechavence', desde)
+      if (usarFecha && hasta) q = q.lte('fechavence', hasta)
       return q
     }
 
