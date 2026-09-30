@@ -67,20 +67,30 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   async function generar() {
     setCargando(true)
     try {
-      const notas = await fetchAll(() => supabase.from('encnotaen')
-        .select('numnotaent,fechanotae,fechavence,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo,formapago,mediopago,cantotal,codclient,usuario')
-        .gte('fechavence', desde).lte('fechavence', hasta)
+      // El dinero se refleja cuando se registra el abono, no cuando se crea la nota.
+      // Se traen TODOS los abonos del período (independiente de la nota).
+      const abonos = await fetchAll(() => supabase.from('detabonos')
+        .select('numnotaent,valabono,mediopago,fechaabono,usuario')
+        .gte('fechaabono', desde).lte('fechaabono', hasta)
+        .order('id', {ascending:true}))
+
+      // Se traen TODAS las notas (sin filtro por fecha) para mapear info de vendedores, clientes, etc.
+      const notasCompletas = await fetchAll(() => supabase.from('encnotaen')
+        .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo,formapago,cantotal,codclient')
         .or('anulada.is.null,anulada.neq.S')
         .order('numnotaent', {ascending:true}))
 
-      const numNotas = notas.map(n => n.numnotaent)
+      // Mapear notas por número para búsqueda rápida
+      const notasMap = {}
+      notasCompletas.forEach(n => { notasMap[n.numnotaent] = n })
+
+      // Para el detalle de artículos, se necesitan las notas que tuvieron abonos en el período
+      const notasConAbonos = [...new Set(abonos.map(a => a.numnotaent))]
       let detalle = []
-      if (numNotas.length > 0) {
-        // .in() con miles de números en la URL puede fallar por longitud, así que se pide en
-        // tandas de 300 notas; cada tanda igual se pagina con fetchAll por si trae >1000 artículos.
+      if (notasConAbonos.length > 0) {
         const CHUNK = 300
-        for (let i = 0; i < numNotas.length; i += CHUNK) {
-          const tanda = numNotas.slice(i, i + CHUNK)
+        for (let i = 0; i < notasConAbonos.length; i += CHUNK) {
+          const tanda = notasConAbonos.slice(i, i + CHUNK)
           const rows = await fetchAll(() => supabase.from('detnotaen')
             .select('numnotaent,codartic,descartic,marca,cantidad,valunit,valtotal')
             .in('numnotaent', tanda)
@@ -93,27 +103,18 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
       const vendMap = {}
       ;(vends||[]).forEach(v => { vendMap[String(v.cedula)] = v.nombre })
 
-      const notasAyer = await fetchAll(() => supabase.from('encnotaen')
-        .select('valtotal').gte('fechanotae', ayer()).lte('fechanotae', ayer())
-        .or('anulada.is.null,anulada.neq.S')
-        .order('numnotaent', {ascending:true}))
-
-      // OJO: detabonos no tiene columna cedvended (solo encnotaen la tiene) — pedirla
-      // rompía toda la consulta; antes fallaba en silencio y dejaba abonos en blanco.
-      const abonos = await fetchAll(() => supabase.from('detabonos')
-        .select('numnotaent,valabono,mediopago,fechaabono,usuario')
-        .gte('fechaabono', desde).lte('fechaabono', hasta)
+      // Abonos del día anterior para comparativa
+      const abonosAyer = await fetchAll(() => supabase.from('detabonos')
+        .select('valabono').gte('fechaabono', ayer()).lte('fechaabono', ayer())
         .order('id', {ascending:true}))
+      const totalAbonosAyer = abonosAyer.reduce((s,a) => s+(a.valabono||0), 0)
 
       // Cartera pendiente: se trae SIEMPRE completa (sin filtrar por desde/hasta), porque una
       // deuda de un cliente no desaparece solo porque el rango de fechas del informe cambió.
-      const carteraGlobal = await fetchAll(() => supabase.from('encnotaen')
-        .select('numnotaent,fechanotae,nombreclie,cedrifclie,cedvended,valtotal,valabono,saldo')
-        .or('anulada.is.null,anulada.neq.S').gt('saldo', 0)
-        .order('numnotaent', {ascending:true}))
+      const carteraGlobal = notasCompletas.filter(n => (n.saldo||0) > 0)
       const totalCarteraGlobal = carteraGlobal.reduce((s,n) => s+(n.saldo||0), 0)
 
-      // Notas anuladas en el período
+      // Notas anuladas en el período (por fecha de anulación, no de creación)
       const notasAnuladas = await fetchAll(() => supabase.from('encnotaen')
         .select('numnotaent,fechanotae,nombreclie,cedrifclie,valtotal,motivoanula,fechaanula,cedvended,usuario')
         .gte('fechanotae', desde).lte('fechanotae', hasta)
@@ -130,72 +131,71 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
         }
       })
 
-      setDatos({ notas, detalle, vendMap, abonos, notasAyer, carteraGlobal, totalCarteraGlobal, digitalPorNota, totalDigital, notasAnuladas })
+      setDatos({ abonos, notasMap, detalle, vendMap, totalAbonosAyer, carteraGlobal, totalCarteraGlobal, digitalPorNota, totalDigital, notasAnuladas })
     } catch(e) { console.error(e) }
     setCargando(false)
   }
 
   // ── CONSOLIDADO ──────────────────────────────────────────────────────────
-  // porVendedor: agrupa por cedvended (quién vendió)
-  // porCaja: agrupa por usuario (en qué caja se registró)
+  // Dinero ingresado en el período, agrupado por vendedor (quién vendió) y caja (dónde se registró).
+  // Solo se cuentan los abonos registrados en el período (dinero que REALMENTE entra).
   function calcConsolidado() {
     if (!datos) return null
-    const { notas, vendMap, digitalPorNota } = datos
+    const { abonos, notasMap, vendMap, digitalPorNota } = datos
 
     const porVendedor = {}   // cedvended → totales
     const porCaja     = {}   // usuario   → totales
     const totales     = { efectivo:0, transferencia:0, mixto:0, credito:0, noAbonado:0, total:0, notas:0, digital:0 }
 
-    const acum = (obj, key, n, val) => {
+    const acum = (obj, key, abono, nota) => {
       if (!obj[key]) obj[key] = { efectivo:0, transferencia:0, mixto:0, credito:0, noAbonado:0, total:0, notas:0, digital:0 }
       const v     = obj[key]
-      const medio = normMedio(n.mediopago)
-      // esC = saldo pendiente = el dinero aún no ha ingresado, sin importar si la nota quedó
-      // marcada como CONTADO (ej. "cliente general" facturado hoy a la espera de que el
-      // cliente transfiera al día siguiente). Antes exigía formapago<>CONTADO y por eso una
-      // nota "CONTADO" sin cobrar se sumaba de todos modos al cierre del día.
-      const esC   = (n.saldo||0) > 0
-      const valDig = digitalPorNota[n.numnotaent]||0
-      // v.total = solo dinero que efectivamente ingresó (no se suma noAbonado: eso no es
-      // dinero del cierre del día hasta que entre, y se muestra aparte en su propia sección).
-      if (esC) { v.credito += n.valabono||0; v.noAbonado += n.saldo||0; v.total += n.valabono||0 }
-      else {
-        if (medio==='efectivo')           { v.efectivo      += val; v.total += val }
-        else if (medio==='transferencia') { v.transferencia += val; v.total += val }
-        else if (medio==='mixto')         { v.mixto         += val; v.total += val }
-        else                              { v.efectivo      += val; v.total += val }
+      const medio = normMedio(abono.mediopago)
+      const valAbono = abono.valabono||0
+      const valDig = digitalPorNota[nota.numnotaent]||0
+
+      // Excluir vales (no es dinero real)
+      if ((abono.mediopago||'').trim().toLowerCase() === 'vale') {
+        return
       }
+
+      if (medio==='efectivo')           { v.efectivo      += valAbono; v.total += valAbono }
+      else if (medio==='transferencia') { v.transferencia += valAbono; v.total += valAbono }
+      else if (medio==='mixto')         { v.mixto         += valAbono; v.total += valAbono }
+      else                              { v.efectivo      += valAbono; v.total += valAbono }
       v.digital += valDig
       v.notas++
     }
 
-    notas.forEach(n => {
-      const cedv  = String(n.cedvended||'')
-      const usu   = (n.usuario||'').trim()
-      const medio = normMedio(n.mediopago)
-      // esC: ver comentario en acum() más arriba (saldo pendiente = dinero no ingresado)
-      const esC   = (n.saldo||0) > 0
-      const valDig = digitalPorNota[n.numnotaent]||0
-      const val   = (n.valtotal||0) - valDig   // excluye lo facturado en marca DIGITAL
+    // Iterar abonos (dinero que realmente entra en el período)
+    abonos.forEach(abono => {
+      const nota = notasMap[abono.numnotaent]
+      if (!nota) return // nota no existe
+
+      const cedv  = String(nota.cedvended||'')
+      const usu   = (abono.usuario||'').trim()
+      const medio = normMedio(abono.mediopago)
+      const valAbono = abono.valabono||0
+      const valDig = digitalPorNota[nota.numnotaent]||0
+
+      // Excluir vales
+      if (medio === 'vale') return
 
       // Por vendedor (cedvended)
       const nomVend = cedv ? (vendMap[cedv] || `Vendedor ${cedv}`) : 'Sin vendedor'
-      acum(porVendedor, nomVend, n, val)
+      acum(porVendedor, nomVend, abono, nota)
 
-      // Por caja (usuario)
+      // Por caja (usuario que registró el abono)
       const nomCaja = LABEL_CAJA[usu] || usu || 'Sin caja'
-      acum(porCaja, nomCaja, n, val)
+      acum(porCaja, nomCaja, abono, nota)
 
-      // Totales generales (mismo criterio que acum(): total = solo dinero ingresado)
+      // Totales generales
       totales.digital += valDig
       totales.notas++
-      if (esC) { totales.credito += n.valabono||0; totales.noAbonado += n.saldo||0; totales.total += n.valabono||0 }
-      else {
-        if (medio==='efectivo')           { totales.efectivo      += val; totales.total += val }
-        else if (medio==='transferencia') { totales.transferencia += val; totales.total += val }
-        else if (medio==='mixto')         { totales.mixto         += val; totales.total += val }
-        else                              { totales.efectivo      += val; totales.total += val }
-      }
+      if (medio==='efectivo')           { totales.efectivo      += valAbono; totales.total += valAbono }
+      else if (medio==='transferencia') { totales.transferencia += valAbono; totales.total += valAbono }
+      else if (medio==='mixto')         { totales.mixto         += valAbono; totales.total += valAbono }
+      else                              { totales.efectivo      += valAbono; totales.total += valAbono }
     })
 
     // Separar vendedores externos de vendedoras de mostrador
@@ -216,10 +216,14 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   }
 
   // ── VENTAS POR MARCA ──────────────────────────────────────────────────────
+  // Artículos de notas que fueron abonadas en el período.
   function calcMarcas() {
     if (!datos) return null
+    const { abonos, detalle } = datos
+    const notasConAbono = new Set(abonos.map(a => a.numnotaent))
     const porMarca = {}
-    datos.detalle.forEach(d => {
+    detalle.forEach(d => {
+      if (!notasConAbono.has(d.numnotaent)) return
       const marca = (d.marca||'').trim() || 'SIN MARCA'
       if (!porMarca[marca]) porMarca[marca] = { unidades:0, total:0 }
       porMarca[marca].unidades += Number(d.cantidad)||0
@@ -229,63 +233,50 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   }
 
   // ── RESUMEN DEL DÍA ───────────────────────────────────────────────────────
+  // Dinero que REALMENTE entra en el período: suma de abonos registrados ese día.
   function calcResumen() {
     if (!datos) return null
-    const { notas, abonos, notasAyer, digitalPorNota, totalDigital } = datos
+    const { abonos, notasMap, totalAbonosAyer, digitalPorNota, totalDigital } = datos
 
-    let totalVentas=0, totalCredito=0, totalContado=0
     let totalEfectivo=0, totalTransferencia=0, totalMixto=0
-    // Desglose específico de Ventas Mostrador (cedvended<=1000): lo que entró en efectivo/
-    // transferencia/mixto ese mismo día (Contado) vs lo causado/facturado que quedó con saldo
-    // pendiente (Crédito o con saldo) — este último no es dinero que ingresó, es venta generada.
-    let totalMostradorContado=0, totalMostradorCredito=0
+    let totalAbonosCredito=0, totalValesAplicados=0
 
-    notas.forEach(n => {
-      const valDig = digitalPorNota[n.numnotaent]||0
-      const val   = (n.valtotal||0) - valDig   // excluye lo facturado en marca DIGITAL
-      const medio = normMedio(n.mediopago)
-      // esC: saldo pendiente = dinero no ingresado (ver acum() en calcConsolidado)
-      const esC   = (n.saldo||0) > 0
-      const esMostrador = !esVendedorExterno(n.cedvended)
-      totalVentas += val
-      if (esC) {
-        totalCredito += val
-        if (esMostrador) totalMostradorCredito += val
+    abonos.forEach(a => {
+      const medio = normMedio(a.mediopago)
+      const valAbono = a.valabono||0
+
+      if (medio === 'vale') {
+        totalValesAplicados += valAbono
       } else {
-        totalContado += val
-        if (esMostrador) totalMostradorContado += val
-        if (medio==='efectivo')           totalEfectivo      += val
-        else if (medio==='transferencia') totalTransferencia += val
-        else if (medio==='mixto')         totalMixto         += val
-        else                              totalEfectivo      += val
+        if (medio==='efectivo')           totalEfectivo      += valAbono
+        else if (medio==='transferencia') totalTransferencia += valAbono
+        else if (medio==='mixto')         totalMixto         += valAbono
+        else                              totalEfectivo      += valAbono
+        totalAbonosCredito += valAbono
       }
     })
 
-    // Excluir abonos con mediopago='Vale' — no es dinero real que ingresó
-    const abonosReales = abonos.filter(a => (a.mediopago||'').trim().toLowerCase() !== 'vale')
-    const totalAbonosCredito = abonosReales.reduce((s,a) => s+(a.valabono||0), 0)
-    const totalValesAplicados = abonos.filter(a => (a.mediopago||'').trim().toLowerCase() === 'vale')
-                                      .reduce((s,a) => s+(a.valabono||0), 0)
-    const totalAyer          = notasAyer.reduce((s,n) => s+(n.valtotal||0), 0)
-    const totalIngresado     = totalEfectivo + totalTransferencia + totalMixto + totalAbonosCredito
+    const totalIngresado = totalEfectivo + totalTransferencia + totalMixto
 
     return {
-      totalVentas, totalCredito, totalContado,
-      totalMostradorContado, totalMostradorCredito,
       totalEfectivo, totalTransferencia, totalMixto,
-      totalIngresado, totalAbonosCredito, totalAyer,
+      totalIngresado, totalAbonosCredito, totalAbonosAyer: totalAbonosAyer,
       totalPendiente: datos.totalCarteraGlobal||0,
       totalDigital: totalDigital||0,
       totalValesAplicados,
-      cantNotas: notas.length
+      cantNotas: abonos.length
     }
   }
 
   // ── TOP ARTÍCULOS ─────────────────────────────────────────────────────────
+  // Artículos de notas que fueron abonadas en el período.
   function calcTopArticulos() {
     if (!datos) return []
+    const { abonos, detalle } = datos
+    const notasConAbono = new Set(abonos.map(a => a.numnotaent))
     const map = {}
-    datos.detalle.forEach(d => {
+    detalle.forEach(d => {
+      if (!notasConAbono.has(d.numnotaent)) return
       if (!map[d.codartic]) map[d.codartic] = { codartic:d.codartic, descartic:d.descartic, unidades:0, total:0 }
       map[d.codartic].unidades += Number(d.cantidad)||0
       map[d.codartic].total    += Number(d.valtotal)||0
@@ -322,9 +313,10 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   function calcVentasCliente() {
     if (!datos) return { mostrador:[], clientes:[], totMostrador:0 }
     const MOSTRADOR = ['99','9','999','5031']
+    const notasCompletas = Object.values(datos.notasMap||{})
     const esMost = n => MOSTRADOR.includes(String(n.codclient||'').trim()) || MOSTRADOR.includes(String(n.cedrifclie||'').trim())
-    const mostrador = datos.notas.filter(esMost)
-    const clientes  = datos.notas.filter(n => !esMost(n))
+    const mostrador = notasCompletas.filter(esMost)
+    const clientes  = notasCompletas.filter(n => !esMost(n))
     const map = {}
     clientes.forEach(n => {
       const k = String(n.cedrifclie||n.codclient||'?')
@@ -335,36 +327,29 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   }
 
   // ── DINERO INGRESADO POR DÍA ──────────────────────────────────────────────
-  // Igual lógica que calcResumen(), pero discriminado día por día dentro del rango.
+  // Dinero que realmente entra cada día: solo cuenta abonos registrados ese día.
   function calcDineroPorDia() {
     if (!datos) return []
-    const { notas, abonos, digitalPorNota } = datos
+    const { abonos } = datos
     const porDia = {}
-    rangoFechas(desde, hasta).forEach(f => { porDia[f] = { fecha:f, notas:0, efectivo:0, transferencia:0, mixto:0, credito:0, abonosCartera:0, valesAplicados:0, totalVentas:0, totalIngresado:0 } })
-    const get = f => { if (!porDia[f]) porDia[f] = { fecha:f, notas:0, efectivo:0, transferencia:0, mixto:0, credito:0, abonosCartera:0, valesAplicados:0, totalVentas:0, totalIngresado:0 }; return porDia[f] }
-
-    notas.forEach(n => {
-      const d = get(n.fechavence)
-      const valDig = digitalPorNota[n.numnotaent]||0
-      const val   = (n.valtotal||0) - valDig
-      const medio = normMedio(n.mediopago)
-      // esC: saldo pendiente = dinero no ingresado (ver acum() en calcConsolidado)
-      const esC   = (n.saldo||0) > 0
-      d.notas++
-      d.totalVentas += val
-      if (esC) { d.credito += val }
-      else {
-        if (medio==='efectivo')           d.efectivo      += val
-        else if (medio==='transferencia') d.transferencia += val
-        else if (medio==='mixto')         d.mixto         += val
-        else                              d.efectivo      += val
-      }
-    })
+    rangoFechas(desde, hasta).forEach(f => { porDia[f] = { fecha:f, notas:0, efectivo:0, transferencia:0, mixto:0, abonosCartera:0, valesAplicados:0, totalIngresado:0 } })
+    const get = f => { if (!porDia[f]) porDia[f] = { fecha:f, notas:0, efectivo:0, transferencia:0, mixto:0, abonosCartera:0, valesAplicados:0, totalIngresado:0 }; return porDia[f] }
 
     abonos.forEach(a => {
       const d = get(a.fechaabono)
-      if ((a.mediopago||'').trim().toLowerCase()==='vale') { d.valesAplicados += a.valabono||0; return }
-      d.abonosCartera += a.valabono||0
+      const medio = normMedio(a.mediopago)
+      const valAbono = a.valabono||0
+
+      if (medio === 'vale') {
+        d.valesAplicados += valAbono
+      } else {
+        if (medio==='efectivo')           d.efectivo      += valAbono
+        else if (medio==='transferencia') d.transferencia += valAbono
+        else if (medio==='mixto')         d.mixto         += valAbono
+        else                              d.efectivo      += valAbono
+        d.abonosCartera += valAbono
+      }
+      d.notas++
     })
 
     return Object.values(porDia).map(d => ({ ...d, totalIngresado: d.efectivo+d.transferencia+d.mixto+d.abonosCartera }))
@@ -372,11 +357,18 @@ export default function CierreCaja({ supabase, onClose, onAyuda }) {
   }
 
   // ── VENTAS POR DÍA, AGRUPADAS POR MARCA O POR REFERENCIA (a elección) ─────
+  // Artículos agrupados por la fecha en que se abonó la nota (dinero que entra ese día).
   function calcVentasPorDia(criterio) {
     if (!datos) return []
-    const { notas, detalle } = datos
+    const { abonos, detalle, notasMap } = datos
+
+    // Mapear: para cada nota, la fecha de su primer abono en el período
     const fechaPorNota = {}
-    notas.forEach(n => { fechaPorNota[n.numnotaent] = n.fechavence })
+    abonos.forEach(a => {
+      if (!fechaPorNota[a.numnotaent]) {
+        fechaPorNota[a.numnotaent] = a.fechaabono
+      }
+    })
 
     const porDia = {}
     rangoFechas(desde, hasta).forEach(f => { porDia[f] = { fecha:f, items:{}, totalUnidades:0, totalVenta:0 } })

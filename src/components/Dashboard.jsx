@@ -18,28 +18,34 @@ export default function Dashboard({ supabase, usuario, permisosExtra=[], onModul
   async function cargarMetricas(d, h) {
     setCargando(true)
 
-    // Sin paginar, un rango de fechas amplio (o un día muy activo) quedaba cortado en 1000 filas
-    // y las métricas del período aparecían por debajo de lo real.
-    const notas = await fetchAll(() => supabase.from('encnotaen')
-      .select('valtotal,valabono,saldo,cedvended,anulada,cantotal,numnotaent')
-      .gte('fechavence', d).lte('fechavence', h)
-      .order('numnotaent', {ascending:true}))
-
-    const notasActivas = (notas||[]).filter(n=>n.anulada!=='S')
-    const notasAnuladas = (notas||[]).filter(n=>n.anulada==='S')
-    const totalVentas  = notasActivas.reduce((s,n)=>s+(n.valtotal||0),0)
-    const totalPrendas = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
-
-    // Abonos recibidos: dinero que realmente entró en el período, el día que entró — no el
-    // valabono acumulado de notas creadas en el período (eso mezclaba abonos de otros días).
-    // Igual criterio que CierreCaja.jsx (detabonos.fechaabono, excluyendo mediopago='Vale').
+    // Dinero que realmente entra: suma de abonos registrados en el período.
     const abonosPeriodo = await fetchAll(() => supabase.from('detabonos')
-      .select('valabono,mediopago,fechaabono')
+      .select('numnotaent,valabono,mediopago,fechaabono')
       .gte('fechaabono', d).lte('fechaabono', h)
       .order('id', {ascending:true}))
+
     const totalAbonos = abonosPeriodo
       .filter(a => (a.mediopago||'').trim().toLowerCase() !== 'vale')
       .reduce((s,a)=>s+(a.valabono||0),0)
+
+    // Se traen todas las notas para mapear info de vendedores, clientes, etc.
+    const notasCompletas = await fetchAll(() => supabase.from('encnotaen')
+      .select('numnotaent,valtotal,valabono,saldo,cedvended,anulada,cantotal')
+      .or('anulada.is.null,anulada.neq.S')
+      .order('numnotaent', {ascending:true}))
+
+    // Mapear notas por número
+    const notasMap = {}
+    notasCompletas.forEach(n => { notasMap[n.numnotaent] = n })
+
+    // Se cuentan solo notas que tuvieron abonos en el período
+    const notasConAbono = new Set(abonosPeriodo.map(a => a.numnotaent))
+    const notasActivas = notasCompletas.filter(n => notasConAbono.has(n.numnotaent) && n.anulada!=='S')
+    const notasAnuladas = notasCompletas.filter(n => n.anulada==='S')
+
+    // Totales de ventas: notas que fueron abonadas en el período
+    const totalVentas  = notasActivas.reduce((s,n)=>s+(n.valtotal||0),0)
+    const totalPrendas = notasActivas.reduce((s,n)=>s+(n.cantotal||0),0)
 
     // cedvended con cédula larga (>1000) = vendedor externo; el resto son ventas de mostrador.
     // Se separa Contado (dinero que entró ese mismo día) de Crédito o con saldo (lo causado/
