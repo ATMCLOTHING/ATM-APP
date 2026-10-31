@@ -190,15 +190,18 @@ export default function Cartera({ supabase, usuario, onClose }) {
     setFiltCliente(texto)
     setClienteSelDrill(null)
     if (!texto || texto.length < 2) { setSugerencias([]); setShowSuger(false); return }
+    // Se traen más filas que las que se muestran: un mismo cliente con muchas notas pendientes
+    // (ej. "ADRIANA CORREA - FABRICA") llenaba las 10 filas y tapaba a los demás clientes.
+    // Se quitan repetidos por cédula y recién ahí se recortan a 10.
     const {data} = await supabase.from('encnotaen')
       .select('cedrifclie,nombreclie')
       .ilike('nombreclie', `%${texto}%`)
       .or('anulada.is.null,anulada.neq.S')
       .gt('saldo', 0)
-      .limit(10)
+      .limit(1000)
     const unicos = {}
     ;(data||[]).forEach(n => { if(n.cedrifclie) unicos[n.cedrifclie] = n.nombreclie })
-    setSugerencias(Object.entries(unicos).map(([ced,nom])=>({cedula:ced,nombre:nom})))
+    setSugerencias(Object.entries(unicos).slice(0,10).map(([ced,nom])=>({cedula:ced,nombre:nom})))
     setShowSuger(true)
   }
 
