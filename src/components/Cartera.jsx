@@ -26,6 +26,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
   const [vendedores,  setVendedores]  = useState([])
   const [filtVend,    setFiltVend]    = useState('')
   const [filtCliente, setFiltCliente] = useState('')
+  const [filtClienteCed, setFiltClienteCed] = useState('') // cédula elegida del autocompletar (filtra por cédula, no por nombre)
   const [filtEstado,  setFiltEstado]  = useState('pendiente')
   const [filtMora,    setFiltMora]    = useState('todas')
   const [notas,       setNotas]       = useState([])
@@ -74,6 +75,15 @@ export default function Cartera({ supabase, usuario, onClose }) {
     // Se arma como fábrica (función que devuelve un query NUEVO) porque fetchAll pagina llamándola
     // varias veces — reutilizar un mismo objeto de query entre páginas no es seguro.
     const cedVend = filtVend
+    const textoCli = filtCliente.trim()
+    // Un mismo cliente puede tener su nombre escrito distinto de nota a nota (RUBICELA / RUBICHELA).
+    // Por eso se filtra por CÉDULA: la elegida en el autocompletar, o las de los clientes cuyo nombre
+    // actual (tabla maestra `clientes`) coincide con lo escrito; el nombre de la nota queda como respaldo.
+    let cedulasCli = filtClienteCed ? [filtClienteCed] : []
+    if (textoCli && !filtClienteCed) {
+      const {data: cl} = await supabase.from('clientes').select('cedula').ilike('nombre', `%${textoCli}%`).limit(200)
+      cedulasCli = (cl||[]).map(c => c.cedula).filter(Boolean)
+    }
     const buildQuery = () => {
       let q = supabase.from('encnotaen')
         .select('numnotaent,fechanotae,fechavence,cedrifclie,nombreclie,cedvended,valtotal,valdescue,porcdescue,valabono,saldo,formapago,mediopago,anulada')
@@ -82,7 +92,13 @@ export default function Cartera({ supabase, usuario, onClose }) {
       if (cedVend) q = q.eq('cedvended', cedVend)
       if (filtEstado === 'pendiente') q = q.gt('saldo', 0)
       else if (filtEstado === 'pagada') q = q.lte('saldo', 0)
-      if (filtCliente.trim()) q = q.ilike('nombreclie', `%${filtCliente.trim()}%`)
+      if (filtClienteCed) q = q.eq('cedrifclie', filtClienteCed)
+      else if (textoCli) {
+        const nom = textoCli.replace(/[,()*%]/g, ' ')
+        q = cedulasCli.length
+          ? q.or(`nombreclie.ilike.%${nom}%,cedrifclie.in.(${cedulasCli.map(c => `"${c}"`).join(',')})`)
+          : q.ilike('nombreclie', `%${textoCli}%`)
+      }
       return q
     }
 
@@ -188,6 +204,7 @@ export default function Cartera({ supabase, usuario, onClose }) {
   // ── AUTOCOMPLETE CLIENTE ─────────────────────────────────────────────────
   async function buscarClientes(texto) {
     setFiltCliente(texto)
+    setFiltClienteCed('')
     setClienteSelDrill(null)
     if (!texto || texto.length < 2) { setSugerencias([]); setShowSuger(false); return }
     // Se traen más filas que las que se muestran: un mismo cliente con muchas notas pendientes
@@ -201,12 +218,19 @@ export default function Cartera({ supabase, usuario, onClose }) {
       .limit(1000)
     const unicos = {}
     ;(data||[]).forEach(n => { if(n.cedrifclie) unicos[n.cedrifclie] = n.nombreclie })
-    setSugerencias(Object.entries(unicos).slice(0,10).map(([ced,nom])=>({cedula:ced,nombre:nom})))
+    // se muestra el nombre actual de la tabla maestra (no el que quedó escrito en una nota vieja)
+    const ceds = Object.keys(unicos).slice(0,10)
+    if (ceds.length) {
+      const {data: cl} = await supabase.from('clientes').select('cedula,nombre').in('cedula', ceds)
+      ;(cl||[]).forEach(c => { if ((c.nombre||'').trim().toUpperCase() !== 'CLIENTE GENERAL') unicos[c.cedula] = c.nombre })
+    }
+    setSugerencias(ceds.map(ced=>({cedula:ced,nombre:unicos[ced]})))
     setShowSuger(true)
   }
 
   function seleccionarSugerencia(s) {
     setFiltCliente(s.nombre)
+    setFiltClienteCed(s.cedula)
     setSugerencias([])
     setShowSuger(false)
   }
