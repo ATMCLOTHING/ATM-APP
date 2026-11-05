@@ -83,6 +83,17 @@ export default function Cartera({ supabase, usuario, onClose }) {
     if (textoCli && !filtClienteCed) {
       const {data: cl} = await supabase.from('clientes').select('cedula').ilike('nombre', `%${textoCli}%`).limit(200)
       cedulasCli = (cl||[]).map(c => c.cedula).filter(Boolean)
+      // también las cédulas de las notas cuyo nombre escrito coincide (ej. "RUBICHELA" en una nota
+      // aunque el cliente hoy se llame "RUBICELA"), para traer TODAS las notas de ese cliente.
+      // Se descartan las cédulas genéricas (CLIENTE GENERAL), que mezclarían compradores distintos.
+      const {data: nn} = await supabase.from('encnotaen').select('cedrifclie')
+        .ilike('nombreclie', `%${textoCli}%`).or('anulada.is.null,anulada.neq.S').limit(1000)
+      const cedsNotas = [...new Set((nn||[]).map(n => n.cedrifclie).filter(Boolean))].slice(0,200)
+      if (cedsNotas.length) {
+        const {data: cl2} = await supabase.from('clientes').select('cedula,nombre').in('cedula', cedsNotas)
+        const generales = new Set((cl2||[]).filter(c => (c.nombre||'').trim().toUpperCase() === 'CLIENTE GENERAL').map(c => c.cedula))
+        cedulasCli = [...new Set([...cedulasCli, ...cedsNotas.filter(c => !generales.has(c))])]
+      }
     }
     const buildQuery = () => {
       let q = supabase.from('encnotaen')
